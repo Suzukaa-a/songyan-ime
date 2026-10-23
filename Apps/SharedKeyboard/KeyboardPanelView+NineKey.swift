@@ -2,6 +2,7 @@ import CandidateKit
 import Combine
 import KeyboardCore
 import LayoutKit
+import QuickContentKit
 import SwiftUI
 
 extension KeyboardPanelView {
@@ -341,11 +342,11 @@ extension KeyboardPanelView {
     }
 
     /// The 9-key symbol page: categories in the leading rail, the open category's
-    /// symbols in a four-column grid of digit-pad-height keys that scrolls vertically,
-    /// and the 123 page's trailing column and control row, so a thumb reaches every
-    /// symbol without hunting through rows of narrow keys.
+    /// symbols in a grid of digit-pad-height keys (four columns, two for kaomoji) that
+    /// scrolls vertically, and the 123 page's trailing column and control row, so a
+    /// thumb reaches every symbol without hunting through rows of narrow keys.
     var phoneCategorySymbolKeypad: some View {
-        let categories = SymbolPageTable.phoneSymbolCategories()
+        let categories = phoneSymbolCategories
         let open = categories.first { $0.id == phoneSymbolCategoryID } ?? categories[0]
         return StablePhoneKeypadShell(
             trailingSpansControlRow: isBuiltinPhonePad,
@@ -353,8 +354,9 @@ extension KeyboardPanelView {
                 phoneSymbolCategoryRail(categories, open: open.id, metrics: metrics)
             },
             main: { metrics in
-                let rows = stride(from: 0, to: open.caps.count, by: 4).map {
-                    Array(open.caps[$0..<min($0 + 4, open.caps.count)])
+                let columns = open.columns
+                let rows = stride(from: 0, to: open.caps.count, by: columns).map {
+                    Array(open.caps[$0..<min($0 + columns, open.caps.count)])
                 }
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: CGFloat(metrics.spacing)) {
@@ -362,12 +364,16 @@ extension KeyboardPanelView {
                             // A short last row keeps the grid's cell width.
                             GeometryReader { geometry in
                                 let spacing = CGFloat(metrics.spacing)
-                                let cell = (geometry.size.width - spacing * 3) / 4
+                                let cell = (geometry.size.width - spacing * CGFloat(columns - 1)) / CGFloat(columns)
                                 HStack(spacing: 0) {
                                     WeightedKeyRow(
                                         caps: caps, alternates: alternates, showsKeyPreview: true,
                                         showsAlternateHint: false
-                                    ) { handleKey($0.action) }
+                                    ) { cap in
+                                        if handleKey(cap.action), case .literal(let text) = cap.action {
+                                            pendingSymbolUses.append(text)
+                                        }
+                                    }
                                     .frame(width: cell * CGFloat(caps.count) + spacing * CGFloat(caps.count - 1))
                                     Spacer(minLength: 0)
                                 }
@@ -386,6 +392,29 @@ extension KeyboardPanelView {
             },
             bottom: { metrics in
                 phoneControlRow(metrics)
+            }
+        )
+        // Picks up library edits made in the app and recents from the symbol panel.
+        .onAppear { symbolLibrary.reload() }
+        // Uses are recorded when the page closes, so 最近 never reorders under the
+        // finger while several symbols are typed in a row.
+        .onDisappear {
+            for text in pendingSymbolUses { symbolLibrary.recordUse(text) }
+            pendingSymbolUses = []
+        }
+    }
+
+    /// Full-width marks lead in Chinese punctuation, half-width ones in English or
+    /// ASCII punctuation, matching what the letter page's punctuation types.
+    private var phoneSymbolCategories: [SymbolPageTable.PhoneSymbolCategory] {
+        let catalog = symbolLibrary.catalog
+        return SymbolPageTable.phoneSymbolCategories(
+            ascii: controller.isEnglishMode || controller.usesASCIIPunctuation,
+            recents: symbolLibrary.recents.map(\.text),
+            library: catalog.orderedCategories.map { category in
+                SymbolPageTable.LibraryCategory(
+                    id: category.id, title: category.name,
+                    symbols: catalog.items(in: category.id).map(\.text))
             })
     }
 

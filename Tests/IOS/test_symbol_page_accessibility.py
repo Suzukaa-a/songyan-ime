@@ -1,4 +1,5 @@
 """Execute the production symbol tables, including phone-rail reachability."""
+import json
 import sys
 import unittest
 
@@ -13,7 +14,16 @@ class SymbolPageAccessibilityTests(unittest.TestCase):
         # first-key rotation" from LayoutKit's BuiltinLayouts, so the probe below must compile the REAL
         # LayoutKit/KeyboardCore modules; a stand-in would not test the production ordering rules.
         table = tables[tables.index("enum SymbolPageTable {"):]
-        checks = r'''
+        catalog = json.loads((ROOT / "Packages/QuickContentKit/Sources/QuickContentKit/Resources/default-symbols.json")
+                             .read_text(encoding="utf-8"))
+        order = sorted(catalog["categories"], key=lambda c: (c["order"], c["id"]))
+        library = ",\n".join(
+            "SymbolPageTable.LibraryCategory(id: %s, title: %s, symbols: [%s])" % (
+                json.dumps(c["id"]), json.dumps(c["name"], ensure_ascii=False),
+                ", ".join(json.dumps(i["text"], ensure_ascii=False) for i in catalog["items"]
+                          if i["category"] == c["id"]))
+            for c in order)
+        checks = "let defaultLibrary = [\n" + library + "\n]\n" + r'''
 func literalValues(_ caps: [KeyCap]) -> [String] {
     caps.map { cap in
         guard case .literal(let text) = cap.action else {
@@ -55,15 +65,37 @@ for ascii in [false, true] {
     precondition(railValues.allSatisfy { !$0.allSatisfy(\.isNumber) }, "phone rail contains symbols only")
     precondition(rail == SymbolPageTable.phoneNumericRail(ascii: ascii), "stable identities across recomputation")
 
-    // Nine-key symbol page: the category grid must contain every symbol of the other layouts' 123/#+= pages (- / @ etc. must not be reachable only elsewhere).
-    let categories = SymbolPageTable.phoneSymbolCategories()
-    precondition(categories.first?.id == "common", "the page opens on the common symbols")
-    precondition(literalValues(categories[0].caps).allSatisfy { $0 == "…" || $0 == "¥" || $0.allSatisfy(\.isASCII) },
-                 "common is the half-width set in both punctuation modes")
+    // Nine-key symbol page: the built-in tabs alone must contain every symbol of the other layouts' 123/#+= pages
+    // (- / @ etc. must not be reachable only elsewhere), whatever the user's symbol library holds.
+    let builtIn = SymbolPageTable.phoneSymbolCategories(ascii: ascii)
+    precondition(builtIn.map(\.id) == ["common", "chinese", "english", "brackets"], "built-in tab order")
+    let commonValues = literalValues(builtIn[0].caps)
+    let firstScreen = Array(commonValues.prefix(12))
+    let expectedLead = ascii ? [",", ".", "?", "!"] : ["，", "。", "？", "！"]
+    precondition(Array(firstScreen.prefix(4)) == expectedLead, "常用 leads with the sentence marks of the current width")
+    if ascii {
+        precondition(commonValues.allSatisfy { $0.allSatisfy(\.isASCII) }, "ASCII 常用 is half-width")
+    } else {
+        precondition(firstScreen.allSatisfy { !$0.allSatisfy(\.isASCII) }, "Chinese 常用 opens on full-width marks")
+    }
+    precondition(literalValues(builtIn[1].caps).allSatisfy { !$0.allSatisfy(\.isASCII) }, "中文 is full-width")
+    precondition(literalValues(builtIn[2].caps).allSatisfy { $0.unicodeScalars.allSatisfy { $0.value < 0x3000 } },
+                 "英文 is half-width")
+
+    // The default library adds themed tabs; a set already covered by built-in tabs (标点) is not repeated.
+    let categories = SymbolPageTable.phoneSymbolCategories(ascii: ascii, recents: ["→", "，"], library: defaultLibrary)
+    precondition(Array(categories.map(\.id).prefix(5)) == ["common", "recent", "chinese", "english", "brackets"],
+                 "最近 follows 常用 once there is something to show")
+    precondition(literalValues(categories[1].caps) == ["→", "，"], "最近 keeps the most-recent-first order")
+    let themedTitles = categories.dropFirst(5).map(\.title)
+    precondition(Array(themedTitles.prefix(3)) == ["数学", "序号", "箭头"], "themed tabs follow the library order: \(themedTitles)")
+    precondition(!themedTitles.contains("标点"), "a fully covered library set is not repeated")
+    precondition(categories.first { $0.title == "颜文字" }?.columns == 2, "kaomoji use two wide columns")
+    precondition(categories.first { $0.title == "数学" }?.columns == 4)
     precondition(Set(categories.map(\.id)).count == categories.count, "unique category identity")
-    let categoryCaps = categories.flatMap(\.caps)
+    let categoryCaps = categories.filter { $0.id != "recent" }.flatMap(\.caps)
     precondition(Set(categoryCaps.map(\.id)).count == categoryCaps.count, "unique symbol key identity")
-    let categoryValues = Set(literalValues(categoryCaps))
+    let categoryValues = Set(literalValues(builtIn.flatMap(\.caps)))
     let shared = Set(literalValues((numeric + symbols).flatMap(\.caps))).filter { !$0.allSatisfy(\.isNumber) }
     precondition(shared.isSubset(of: categoryValues),
                  "9-key categories miss \(shared.subtracting(categoryValues).sorted()) (ascii=\(ascii))")

@@ -53,62 +53,90 @@ enum SymbolPageTable {
         ]
     }
 
-    /// A phone (digit pad) definition's symbol page, like mainstream 9-key pinyin: a
-    /// category rail and a scrolling grid of keys as large as the digit pad's. It holds
-    /// every symbol the 123/#+= rows of the other layouts offer (- / @ included), so
-    /// nothing is reachable there but missing here.
+    /// A phone (digit pad) definition's symbol page, organised like mainstream 9-key
+    /// pinyin (Sogou, iFlytek, Baidu: 常用 first, then 中文 / 英文 split by width,
+    /// then themed sets): a category rail and a scrolling grid of keys as large as the
+    /// digit pad's. The built-in tabs hold every symbol the 123/#+= rows of the other
+    /// layouts offer, so nothing is reachable there but missing here; the themed tabs
+    /// come from the symbol library, which the user can replace from the app.
     struct PhoneSymbolCategory: Equatable {
         let id: String
         let title: String
         let caps: [KeyCap]
+        /// Kaomoji and other multi-glyph entries need two wide columns instead of four.
+        var columns: Int { caps.contains { $0.title.count > 3 } ? 2 : 4 }
     }
 
-    static func phoneSymbolCategories() -> [PhoneSymbolCategory] {
+    /// A themed set from the symbol library, in the library's order.
+    struct LibraryCategory: Equatable {
+        let id: String
+        let title: String
+        let symbols: [String]
+    }
+
+    static let commonCategoryID = "common"
+    static let recentCategoryID = "recent"
+
+    /// 常用 opens the page. Its first three rows (all the page shows before a
+    /// scroll) are the marks typed most in the current punctuation width, in a fixed
+    /// order so their positions can be learned.
+    static func phoneCommonSymbols(ascii: Bool) -> [String] {
+        ascii
+            ? [
+                ",", ".", "?", "!", ":", ";", "'", "\"", "(", ")", "@", "#",
+                "&", "*", "-", "_", "/", "\\", "~", "%", "+", "=", "$", "^",
+            ]
+            : [
+                "，", "。", "？", "！", "、", "：", "；", "……", "“", "”", "（", "）",
+                "《", "》", "——", "·", "@", "#", "%", "&", "*", "/", "~", "-",
+            ]
+    }
+
+    /// Full-width marks; 「……」 and 「——」 are the doubled forms Chinese text uses.
+    static let phoneChineseSymbols = [
+        "，", "。", "？", "！", "、", "：", "；", "……", "“", "”", "‘", "’",
+        "（", "）", "《", "》", "——", "·", "…", "—", "「", "」", "『", "』",
+        "【", "】", "〈", "〉", "〔", "〕", "～", "￥",
+    ]
+
+    static let phoneEnglishSymbols = [
+        ",", ".", "?", "!", ":", ";", "'", "\"", "(", ")", "[", "]",
+        "{", "}", "<", ">", "@", "#", "$", "%", "&", "*", "-", "_",
+        "+", "=", "/", "\\", "|", "~", "^", "`", "–", "¥", "€", "£",
+    ]
+
+    /// Pairs side by side, two pairs per row.
+    static let phoneBracketSymbols = [
+        "（", "）", "【", "】", "《", "》", "「", "」", "『", "』", "〈", "〉",
+        "〔", "〕", "〖", "〗", "(", ")", "[", "]", "{", "}", "<", ">",
+    ]
+
+    /// 常用, then 最近 (once something has been typed from this page or the symbol
+    /// library), 中文, 英文, 括号, then the library's sets. A library set whose every
+    /// symbol is already in a built-in tab (the default 标点 set) is not repeated.
+    static func phoneSymbolCategories(
+        ascii: Bool, recents: [String] = [], library: [LibraryCategory] = []
+    ) -> [PhoneSymbolCategory] {
         func category(_ id: String, _ title: String, _ symbols: [String]) -> PhoneSymbolCategory {
             var seen = Set<String>()
             return PhoneSymbolCategory(
                 id: id, title: title,
-                caps: literals("ps-\(id)", symbols.filter { seen.insert($0).inserted }))
+                caps: literals("ps-\(id)", symbols.filter { !$0.isEmpty && seen.insert($0).inserted }))
         }
-        // "." (the 123-page half-width period) is the half-width set in both punctuation modes (addresses, URLs, code);
-        // full-width punctuation is one tap away under the Chinese page.
-        let common = [
-            ",", ".", "?", "!", "@", "/", "-", ":", ";", "(", ")", "\"", "'", "&", "_", "~",
-            "#", "*", "…", "¥",
+        let common = category(commonCategoryID, "常用", phoneCommonSymbols(ascii: ascii))
+        let widths = [
+            category("chinese", "中文", phoneChineseSymbols),
+            category("english", "英文", phoneEnglishSymbols),
+            category("brackets", "括号", phoneBracketSymbols),
         ]
-        return [
-            category("common", "常用", common),
-            category(
-                "chinese", "中文",
-                [
-                    "，", "。", "？", "！", "、", "：", "；", "…", "—", "·", "“", "”", "‘", "’",
-                    "（", "）", "《", "》", "〈", "〉", "「", "」", "『", "』", "【", "】", "～", "¥",
-                ]),
-            category(
-                "english", "英文",
-                [
-                    ",", ".", "?", "!", ":", ";", "'", "\"", "`", "@", "#", "$", "%", "&", "*",
-                    "-", "_", "/", "\\", "|", "~", "^", "(", ")", "[", "]", "{", "}", "<", ">",
-                ]),
-            category(
-                "brackets", "括号",
-                [
-                    "（", "）", "【", "】", "《", "》", "「", "」", "『", "』", "〈", "〉",
-                    "〔", "〕", "(", ")", "[", "]", "{", "}", "<", ">",
-                ]),
-            category(
-                "math", "数学",
-                [
-                    "+", "-", "×", "÷", "=", "≠", "≈", "<", ">", "≤", "≥", "%", "‰", "±",
-                    "√", "°", "∞", "π", "∑", "²", "³", "½", "¼", "^",
-                ]),
-            category(
-                "other", "其他",
-                [
-                    "¥", "$", "€", "£", "¢", "&", "#", "§", "©", "®", "™", "℃", "·", "•", "※",
-                    "★", "☆", "○", "●", "△", "□", "→", "←", "↑", "↓", "✓", "✗", "_", "\\", "|",
-                ]),
-        ]
+        let covered = Set(([common] + widths).flatMap { $0.caps.map(\.title) })
+        let themed = library.compactMap { set -> PhoneSymbolCategory? in
+            let result = category("library-\(set.id)", set.title, set.symbols)
+            guard result.caps.contains(where: { !covered.contains($0.title) }) else { return nil }
+            return result
+        }
+        let recent = recents.isEmpty ? [] : [category(recentCategoryID, "最近", recents)]
+        return [common] + recent + widths + themed
     }
 
     static func symbolRows(ascii: Bool) -> [KeyboardRow] {

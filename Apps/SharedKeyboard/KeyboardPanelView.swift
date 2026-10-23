@@ -93,6 +93,12 @@ public struct KeyboardPanelView: View {
     /// Whether a symbol has been entered on the current number/symbol page (used to return to letters after space); reset on every page change.
     @State private var typedOnSymbolPage = false
     @StateObject var quickSymbols = T9QuickSymbolModel()
+    /// The symbol library behind the 9-key symbol page's themed tabs and recents.
+    /// Read only when that page opens; the page inserts through `handleKey` and
+    /// only reports uses, so the model's own insert exit is never called.
+    @StateObject var symbolLibrary = SymbolLibraryModel(onInsert: { _ in false }, loadsImmediately: false)
+    /// Symbols typed on the open 9-key symbol page, recorded as recents when it closes.
+    @State var pendingSymbolUses: [String] = []
     @State var showsAllCandidates = false
     @State var localLayoutID: String?
     /// Layout/scheme switch hint: consumes only the real-switch event token from controller.successfulChange,
@@ -385,17 +391,18 @@ public struct KeyboardPanelView: View {
     /// Literal keys skip the token comparison: confirming a composition may commit partially and still keep it,
     /// so a snapshot/count change does not prove this literal succeeded; only the real dispatch result of `insertLiteral`
     /// counts (false = partial commit / no valid host exit / input disabled, no feedback).
-    func handleKey(_ action: KeyAction, emitFeedback: Bool = true) {
+    /// Returns whether a literal was dispatched; other actions return false.
+    @discardableResult
+    func handleKey(_ action: KeyAction, emitFeedback: Bool = true) -> Bool {
         guard action != .switchKeyboard else {
             controller.handle(action)
-            return
+            return false
         }
         if case .literal(let text) = action {
-            if controller.insertLiteral(text) {
-                feedback.keyPressed()
-                if page != .letters { typedOnSymbolPage = true }
-            }
-            return
+            guard controller.insertLiteral(text) else { return false }
+            feedback.keyPressed()
+            if page != .letters { typedOnSymbolPage = true }
+            return true
         }
         // As on the system keyboard: pressing space after entering a symbol on the number/symbol page returns to the letters page.
         if action == .space, page != .letters, typedOnSymbolPage, controller.hostPreferredInput != .numeric {
@@ -404,13 +411,14 @@ public struct KeyboardPanelView: View {
         }
         if !emitFeedback {
             controller.handle(action)
-            return
+            return false
         }
         let before = controller.inputEffectToken()
         controller.handle(action)
         if KeyboardController.InputEffectToken.isEffect(before: before, after: controller.inputEffectToken()) {
             feedback.keyPressed()
         }
+        return false
     }
 
     /// List/candidate selections (commit candidate, paging, layout list, tools menu item): selection haptic.
