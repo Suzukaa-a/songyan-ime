@@ -570,7 +570,8 @@ final class KeyboardPanelGeometryTests: XCTestCase {
             readingRowReserved: true, candidateAreaReserved: true)
         XCTAssertEqual(fit.readingRowHeight, CandidateReadingRowPolicy.minimumHeight, accuracy: 0.001)
         XCTAssertEqual(
-            fit.keyHeight, 54 - (CandidateReadingRowPolicy.minimumHeight - KeyboardPanelGeometry.candidateAreaBonus) / 4,
+            fit.keyHeight,
+            54 - (CandidateReadingRowPolicy.minimumHeight - KeyboardPanelGeometry.candidateAreaBonus) / 4,
             accuracy: 0.001, "only what the row cannot give comes from the keys")
         XCTAssertEqual(
             CandidateReadingRowPolicy.textTopPadding(rowHeight: fit.readingRowHeight), 0,
