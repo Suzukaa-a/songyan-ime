@@ -120,6 +120,15 @@ public struct KeyboardPanelHost: View {
     private var isPhonePortrait: Bool {
         UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass != .compact
     }
+
+    /// The one write path for one-handed mode from the keyboard (settings row and gutter).
+    private func setOneHandMode(_ mode: KeyboardOneHandMode) {
+        guard mode != oneHandMode else { return }
+        KeyboardOneHandPreferences.set(mode)
+        oneHandMode = mode
+        // Keys move under any recorded route's window point, so drop it.
+        KeyboardRoutedTouch.clear()
+    }
     /// Standalone reading row granted by the host (the single owner). The initial value comes from the
     /// cold-start hint (`KeyboardInitialPresentation.readingRowReserved`), the same source as the first `loadView` frame.
     @State private var readingRowGranted = false
@@ -388,7 +397,13 @@ public struct KeyboardPanelHost: View {
                 },
                 additionalTools: AnyView(
                     Group {
-                        InlineCompositionToggle(session: session)
+                        KeyboardToolsSection(title: "输入") {
+                            InlineCompositionToggle(session: session)
+                            if isPhonePortrait {
+                                KeyboardToolsSeparator()
+                                OneHandModeRow(mode: oneHandMode) { setOneHandMode($0) }
+                            }
+                        }
                         KeyboardOptionsView(controller: controller)
                         if let additionalTools { additionalTools }
                     }),
@@ -427,14 +442,9 @@ public struct KeyboardPanelHost: View {
         .frame(maxWidth: .infinity, alignment: plan.gutterOnLeft ? .trailing : .leading)
         .overlay(alignment: plan.gutterOnLeft ? .leading : .trailing) {
             if plan.active {
-                OneHandGutterRepresentable {
-                    // Keys move under any recorded route's window point, so drop it.
-                    KeyboardOneHandPreferences.set(.off)
-                    oneHandMode = .off
-                    KeyboardRoutedTouch.clear()
-                }
-                .frame(width: CGFloat(plan.gutterWidth), height: layoutShellHeight)
-                .contentShape(Rectangle())
+                OneHandGutterRepresentable { setOneHandMode(.off) }
+                    .frame(width: CGFloat(plan.gutterWidth), height: layoutShellHeight)
+                    .contentShape(Rectangle())
             }
         }
     }
@@ -744,20 +754,65 @@ struct InlineCompositionToggle: View {
     }
 
     var body: some View {
-        KeyboardToolsSection(title: "输入") {
-            KeyboardToolsRow(
-                icon: "character.cursor.ibeam",
-                title: "在输入框中显示拼写",
-                mark: .toggle(enabled),
-                accessibilityLabel: "在输入框中显示拼写",
-                accessibilityValue: enabled ? "开启" : "关闭",
-                accessibilityHint: "开启后，正在输入的字母显示在输入框内"
-            ) {
-                enabled.toggle()
-                KeyboardCompositionPreferences.inlineEnabled = enabled
-                session.refreshCompositionPresentation()
+        KeyboardToolsRow(
+            icon: "character.cursor.ibeam",
+            title: "在输入框中显示拼写",
+            mark: .toggle(enabled),
+            accessibilityLabel: "在输入框中显示拼写",
+            accessibilityValue: enabled ? "开启" : "关闭",
+            accessibilityHint: "开启后，正在输入的字母显示在输入框内"
+        ) {
+            enabled.toggle()
+            KeyboardCompositionPreferences.inlineEnabled = enabled
+            session.refreshCompositionPresentation()
+        }
+    }
+}
+
+/// One-handed mode in the keyboard's own settings, so it can be switched where it is used; the
+/// choice applies at once and is the same preference the app's input options edit.
+struct OneHandModeRow: View {
+    @Environment(\.keyboardAppearance) private var appearance
+    let mode: KeyboardOneHandMode
+    let onSelect: (KeyboardOneHandMode) -> Void
+
+    private static let choices: [(KeyboardOneHandMode, String)] = [
+        (.off, "关闭"), (.left, "左手"), (.right, "右手"),
+    ]
+
+    var body: some View {
+        HStack(spacing: KeyboardToolsStyle.iconTitleSpacing) {
+            Image(systemName: "hand.raised")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color(uiColor: appearance.text(on: "key", secondary: true)))
+                .frame(width: KeyboardToolsStyle.iconColumnWidth)
+                .accessibilityHidden(true)
+            Text("单手模式")
+                .font(.body)
+                .foregroundStyle(Color(uiColor: appearance.text(on: "key")))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 8)
+            HStack(spacing: 6) {
+                ForEach(Self.choices, id: \.0) { choice, title in
+                    Button {
+                        onSelect(choice)
+                    } label: {
+                        Text(title)
+                            .font(.subheadline.weight(mode == choice ? .semibold : .regular))
+                            .lineLimit(1)
+                            .padding(.horizontal, 12)
+                            .frame(minWidth: 44, minHeight: KeyboardToolsStyle.rowMinHeight)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(KeyboardToolsKeyButtonStyle(role: mode == choice ? "accent" : "control"))
+                    .accessibilityLabel("单手模式：\(title)")
+                    .accessibilityAddTraits(mode == choice ? .isSelected : [])
+                }
             }
         }
+        .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
+        .frame(maxWidth: .infinity, minHeight: KeyboardToolsStyle.rowMinHeight, alignment: .leading)
     }
 }
 
