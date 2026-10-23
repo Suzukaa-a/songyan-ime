@@ -8,7 +8,7 @@ In this guide the *built-in package* is the offline input scheme bundled with th
 
 ## 1. Setup
 
-- Full Xcode 26 or later, selected with `DEVELOPER_DIR` or `xcode-select`. The scripts fall back to an installed `/Applications/Xcode*.app`.
+- Full Xcode 27 or later, selected with `DEVELOPER_DIR` or `xcode-select`. The scripts fall back to an installed `/Applications/Xcode*.app`.
 - [`axe`](https://github.com/cameroncooke/AXe) for simulator input (`axe -h` lists the commands). Only the UI automation and `make sim-perf` need it.
 - A dedicated simulator. Every `sim-*` script resolves it by name: `Songyan-Dev` by default, `SIM_NAME` to choose another, or `UDID` to target one directly. Use a separate `SIM_NAME` per parallel session so scripts never touch each other's simulator.
 

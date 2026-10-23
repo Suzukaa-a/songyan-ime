@@ -1,27 +1,43 @@
 name: CI
 
+# Pushes and pull requests get the quick set: lint, tests and the strictest
+# single build (Release, device: warnings are errors). The four-way build
+# matrix runs on demand and for every release tag (release.yml calls this).
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - '.github/screenshots/**'
+      - 'LICENSE'
   push:
     branches:
       - main
+    paths-ignore:
+      - '**/*.md'
+      - '.github/screenshots/**'
+      - 'LICENSE'
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
+# A fixed prefix: under workflow_call github.workflow is the caller's name,
+# and sharing the caller's group would deadlock.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Pin one Xcode from the macos-26 image so every job builds with the same SDK.
-  # The cache keys below carry the same version; bump both together.
-  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  # The Xcode used for local builds, from the xcode-27 image, so CI checks the
+  # same compiler and SDK. The cache keys below carry the same version; bump
+  # both together.
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
 
 jobs:
   lint:
     name: Lint
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +52,7 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,9 +68,9 @@ jobs:
             .local/swiftpm-cache
             .local/ci/swift-package-builds
             .local/swift-probes
-          key: tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved', 'Tests/IOS/swift_probe.py') }}
+          key: tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.1-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved', 'Tests/IOS/swift_probe.py') }}
           restore-keys: |
-            tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
+            tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.1-
       - name: Run tests
         run: Tools/CI/ci.sh fast
       - name: Save Swift build caches
@@ -77,14 +93,15 @@ jobs:
 
   build:
     name: Build (${{ matrix.configuration }}, ${{ matrix.platform }})
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # A push to a branch or a pull request builds Release for device only:
+      # it turns warnings into errors, so it is the strictest single build.
       matrix:
-        # Release turns warnings into errors, so it is built too.
-        configuration: [Debug, Release]
-        platform: [simulator, device]
+        configuration: ${{ fromJSON(((github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request') && '["Release"]' || '["Debug", "Release"]') }}
+        platform: ${{ fromJSON(((github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request') && '["device"]' || '["simulator", "device"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,9 +116,9 @@ jobs:
             .local/ci/app-builds
             .local/ci/xcode-source-packages
             .local/xcode-package-cache
-          key: build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-26.6-${{ hashFiles('Songyan.xcodeproj/project.pbxproj', '**/Package.resolved') }}
+          key: build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-27.1-${{ hashFiles('Songyan.xcodeproj/project.pbxproj', '**/Package.resolved') }}
           restore-keys: |
-            build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-26.6-
+            build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-27.1-
       # The HostApp scheme also builds the embedded keyboard extension. These
       # unsigned products check compiling and linking only; they cannot run.
       - name: Build host app and keyboard extension

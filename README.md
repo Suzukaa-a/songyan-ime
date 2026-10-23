@@ -37,7 +37,7 @@ input schemes and a keyboard extension that runs the engine on device.
 
 ## Requirements
 
-- macOS with Xcode 26 or later (iOS 26 SDK or newer); the app runs on iOS 17.0 and later.
+- macOS with Xcode 27 or later (iOS 27 SDK or newer); the app runs on iOS 17.0 and later.
 - An Apple silicon Mac to run on the simulator: the engine ships only an arm64
   simulator slice.
 - Python 3.11 or later for the project scripts and tests (standard library

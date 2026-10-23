@@ -25,7 +25,7 @@
 
 ## 环境要求
 
-- macOS 与 Xcode 26 或更高版本（iOS 26 SDK 及以上）；App 支持 iOS 17.0 及以上。
+- macOS 与 Xcode 27 或更高版本（iOS 27 SDK 及以上）；App 支持 iOS 17.0 及以上。
 - 在模拟器上运行需要 Apple 芯片的 Mac：引擎只提供 arm64 模拟器版本。
 - Python 3.11 或更高版本，用于运行项目脚本与测试（只用标准库）。
 

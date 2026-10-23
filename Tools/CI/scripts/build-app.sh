@@ -51,6 +51,10 @@ if [[ "${CI_SWIFTPM_DISABLE_SANDBOX:-0}" == 1 ]]; then
 else
   defaults write "${BUILD_HOME}/Library/Preferences/.GlobalPreferences" IDEPackageSupportDisableManifestSandbox -bool NO
 fi
+# A release build stamps the tag's version; everyday builds keep the project's own.
+VERSION_SETTINGS=()
+[[ -z "${APP_VERSION:-}" ]] || VERSION_SETTINGS+=("MARKETING_VERSION=${APP_VERSION}")
+[[ -z "${APP_BUILD:-}" ]] || VERSION_SETTINGS+=("CURRENT_PROJECT_VERSION=${APP_BUILD}")
 CFFIXED_USER_HOME="${BUILD_HOME}" \
 "${DEVELOPER_DIR}/usr/bin/xcodebuild" \
   -project "${CI_ROOT}/Songyan.xcodeproj" \
@@ -64,6 +68,7 @@ CFFIXED_USER_HOME="${BUILD_HOME}" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
   ${SWIFT_SANDBOX_OPTIONS[@]+"${SWIFT_SANDBOX_OPTIONS[@]}"} \
+  ${VERSION_SETTINGS[@]+"${VERSION_SETTINGS[@]}"} \
   "${EXTRA[@]}" build | tee "${RUN_DIR}/xcodebuild.log"
 
 printf '\n[CI] App build output: %s\n' "${RUN_DIR}"

@@ -4,7 +4,7 @@ Thanks for helping. Songyan (松烟) is an iOS keyboard built on the RIME engine
 
 ## Prerequisites
 
-- macOS with full Xcode 26 or later (select it with `xcode-select` or `DEVELOPER_DIR`).
+- macOS with full Xcode 27 or later (select it with `xcode-select` or `DEVELOPER_DIR`).
 - Python 3.11 or later; the gates and helper scripts use only the standard library.
 - For `make lint`: `shellcheck` (`brew install shellcheck`) and `ruff` (used directly, or through `uvx` or `pipx` when installed). `swift-format` ships with Xcode.
 - To run on a device under your own Apple team, create the git-ignored `Config/Local.xcconfig` and override any of `SONGYAN_BUNDLE_ID`, `SONGYAN_APP_GROUP` and `DEVELOPMENT_TEAM` from [Config/Identity.xcconfig](Config/Identity.xcconfig).
@@ -24,7 +24,7 @@ Thanks for helping. Songyan (松烟) is an iOS keyboard built on the RIME engine
 
 ## Gates
 
-Run the gate that matches your change. CI runs `make lint`, `make fast` and unsigned Debug builds for simulator and device on every pull request, and all of them must pass.
+Run the gate that matches your change. CI runs `make lint`, `make fast` and an unsigned Release device build on every pull request (changes that touch only docs are skipped), and all of them must pass. The Debug and simulator builds run when CI is started by hand and for every release.
 
 | Command | Runs | Use it when |
 | --- | --- | --- |
@@ -58,6 +58,17 @@ If you cannot run a gate, say so in the pull request and list what remains unver
 ## Commits and pull requests
 
 Use short conventional commits, for example `fix(candidates): keep reading row height stable`, `feat(layout): ...`, `refactor(...)`, `docs(...)`, `build(...)`, `test(...)`. Describe what changed and why in the pull request, and name the gates you ran.
+
+## Releases
+
+`main` is the development branch. A release is an annotated tag on a commit of `main`:
+
+```sh
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
+[release.yml](.github/workflows/release.yml) then runs the full CI, builds the app with version `0.2.0` (the build number is the commit count), and publishes a GitHub Release with an ad-hoc signed IPA and notes generated from the commits since the previous tag. A tag with a suffix such as `v0.2.0-beta.1` is published as a pre-release. The IPA is meant for installers that re-sign it under your own Apple ID, such as AltStore or Sideloadly.
 
 ## Security
 
