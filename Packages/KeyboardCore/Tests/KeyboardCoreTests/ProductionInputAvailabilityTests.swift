@@ -23,9 +23,9 @@ final class ProductionInputAvailabilityTests: XCTestCase {
 
     func testInstallationSummaryCountsEveryInstalledScheme() {
         XCTAssertEqual(
-            ProductionInputAvailability.installationSummary(sources: 0),
+            UserTerminology.installedSourceSummary(count: 0),
             ProductionInputAvailability.unconfiguredCountSummary)
-        XCTAssertEqual(ProductionInputAvailability.installationSummary(sources: 1), "已安装 1 个输入方案")
+        XCTAssertEqual(UserTerminology.installedSourceSummary(count: 1), "已安装 1 个输入方案")
     }
 
     func testRuntimeFallbackTextsNameTheBuiltinScheme() {

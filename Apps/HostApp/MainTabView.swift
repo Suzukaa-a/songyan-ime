@@ -2,7 +2,10 @@ import KeyboardCore
 import LayoutKit
 import SwiftUI
 
-/// Home: input schemes / keyboard (my keyboards, appearance, try typing) / tools; settings at top right (including "Keyboard & Full Access").
+/// Home: input schemes and my keyboards / keyboard (appearance, try typing) / tools; settings at top right (including "Keyboard & Full Access").
+///
+/// The first two rows are the app's only two places to act: 输入方案 (what is installed, and which
+/// scheme the keyboard uses) and 我的键盘 (what is on the keyboard, and the keyboard in use).
 ///
 /// User model (`UserTerminology`):
 ///  - Input scheme: an installable, applicable data unit (source); one source can hold any number of arbitrarily named schemes.
@@ -12,7 +15,10 @@ import SwiftUI
 ///  - Dictionary: supplementary vocabulary, under Tools.
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var schemeLine = "正在读取…"
+    /// Scheme in use, for the 输入方案 row; nil until read.
+    @State private var inUseSchemeName: String?
+    /// The keyboard in use, for the 我的键盘 row.
+    @State private var keyboardLine = "正在读取…"
     @StateObject private var center = KeyboardSelectionCenter.shared
     @StateObject private var imports = DictionaryImportCenter.shared
     @StateObject private var schemeImports = SchemeImportCenter.shared
@@ -22,24 +28,22 @@ struct MainTabView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(UserTerminology.inputScheme) {
+                Section {
                     NavigationLink {
                         InputSchemeListView()
                     } label: {
-                        HomeRow(title: schemeLine, subtitle: installationSummary, systemImage: "character.book.closed")
+                        HomeRow(
+                            title: UserTerminology.inputScheme, subtitle: installationSummary,
+                            systemImage: "character.book.closed")
+                    }
+                    NavigationLink {
+                        UserKeyboardManagementView(source: center.userKeyboardSource)
+                    } label: {
+                        HomeRow(title: UserTerminology.userKeyboard, subtitle: keyboardLine, systemImage: "keyboard")
                     }
                 }
 
                 Section {
-                    NavigationLink {
-                        // With nothing published the keyboard runs the built-in scheme, so its keyboards are the ones to edit.
-                        UserKeyboardManagementView(
-                            source: center.usesInstalledScheme
-                                ? .active : .package(ProductionInputAvailability.builtinPackageID))
-                    } label: {
-                        HomeRow(
-                            title: UserTerminology.userKeyboard, subtitle: "长按「ABC/中文」键可切换", systemImage: "keyboard")
-                    }
                     // One appearance project carries both the keyboard skin and the candidate-bar layout: this is the only entry.
                     NavigationLink {
                         SkinManagementView()
@@ -103,7 +107,7 @@ struct MainTabView: View {
                 await schemeImports.refresh()
                 // On launch / foreground, converge a previously interrupted deletion (removes leftover trash inside the lease).
                 await schemeImports.recoverInterruptedDeletions()
-                await refreshSchemeLine()
+                await refreshInUse()
                 // Typo correction is on by default: converge once for the source in use (one automatic attempt per publish revision),
                 // after keyboards saved by an older adapter generator are rebuilt (once per launch).
                 // The built-in scheme is installed first so the adapter rebuild sees its current version.
@@ -127,43 +131,47 @@ struct MainTabView: View {
     }
 
     @State private var refreshTick = 0
-    /// Latest-wins token for the home scheme summary: a late old read does not overwrite a newer value.
-    @State private var schemeLineGeneration: UInt64 = 0
+    /// Latest-wins token for the home summaries: a late old read does not overwrite a newer value.
+    @State private var inUseGeneration: UInt64 = 0
 
     /// The input method display name prefers the real name from the publication record; if it cannot be resolved the item is hidden and the internal ID is never exposed.
     ///
     /// The `activation` read completes on the read-only queue (`AppliedSelectionLoader`); the main thread only derives the text.
-    private func refreshSchemeLine() async {
-        schemeLineGeneration &+= 1
-        let token = schemeLineGeneration
+    private func refreshInUse() async {
+        inUseGeneration &+= 1
+        let token = inUseGeneration
         let result = await AppliedSelectionLoader.load()
+        guard token == inUseGeneration else { return }
         guard let snapshot = result.snapshot else {
-            guard token == schemeLineGeneration else { return }
-            schemeLine =
+            inUseSchemeName = nil
+            keyboardLine =
                 result.error == AppliedSelectionLoader.missingGroupMessage
-                ? "暂时无法读取设置" : "无法读取当前输入方案"
+                ? "暂时无法读取设置" : "暂时无法读取正在使用的键盘"
             return
         }
-        guard token == schemeLineGeneration else { return }
         if snapshot.recipeEnabled {
-            let inputMethod = UserTerminology.inputMethodName(
-                schemaID: snapshot.selectedSchemaID, schemas: snapshot.schemas)
-            let layout = snapshot.selectedLayout.map { UserTerminology.layoutName($0) }
-            schemeLine = UserTerminology.inUseSummary(
-                scheme: snapshot.displayConfigName, inputMethod: inputMethod, layout: layout)
+            inUseSchemeName = snapshot.displayConfigName
+            keyboardLine =
+                UserTerminology.currentKeyboardSummary(
+                    inputMethod: UserTerminology.inputMethodName(
+                        schemaID: snapshot.selectedSchemaID, schemas: snapshot.schemas),
+                    layout: snapshot.selectedLayout) ?? Self.keyboardSwitchHint
         } else {
             // Nothing published: the keyboard runs the built-in scheme's fallback input method.
-            schemeLine = UserTerminology.inUseSummary(
-                scheme: ProductionInputAvailability.builtinDisplayName,
-                inputMethod: ProductionInputAvailability.fallbackInputMethodName,
-                layout: nil)
+            inUseSchemeName = ProductionInputAvailability.builtinDisplayName
+            keyboardLine =
+                UserTerminology.currentKeyboardSummary(
+                    inputMethod: ProductionInputAvailability.fallbackInputMethodName, layout: nil)
+                ?? Self.keyboardSwitchHint
         }
     }
+
+    private static let keyboardSwitchHint = "长按「ABC/中文」键可切换"
 
     /// Number of installed sources (same data set as the input scheme page): **not** called the scheme count.
     private var installationSummary: String {
         let count = (imports.installed != nil ? 1 : 0) + schemeImports.installedPackages.count
-        return ProductionInputAvailability.installationSummary(sources: count)
+        return UserTerminology.installedSchemeSummary(count: count, inUse: inUseSchemeName)
     }
 
     /// Appearance summary: the name of the appearance in use (candidate-bar details live on the appearance page; the home page does not pile up technical parameters).

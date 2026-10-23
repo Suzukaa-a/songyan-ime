@@ -36,11 +36,6 @@ public enum ProductionInputAvailability: Sendable {
         return resourceID == builtinResourceID
     }
 
-    /// Installed source count summary (explicit "not configured" at 0; never called a "scheme count").
-    public static func installationSummary(sources: Int) -> String {
-        UserTerminology.installedSourceSummary(count: sources)
-    }
-
     // MARK: - Runtime text (keyboard extension / trial panel)
 
     /// Status title when nothing is published.

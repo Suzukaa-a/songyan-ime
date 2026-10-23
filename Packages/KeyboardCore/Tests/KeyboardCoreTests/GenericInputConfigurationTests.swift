@@ -281,7 +281,7 @@ final class UserTerminologyTests: XCTestCase {
         let summary = UserTerminology.installedSourceSummary(count: 3)
         XCTAssertFalse(summary.contains("来源"))
         XCTAssertFalse(summary.contains("方案数量"))
-        XCTAssertEqual(ProductionInputAvailability.installationSummary(sources: 3), "已安装 3 个输入方案")
+        XCTAssertEqual(UserTerminology.installedSourceSummary(count: 3), "已安装 3 个输入方案")
     }
 
     func testStatusWordsUnifiedAcrossHostAndKeyboard() {
