@@ -8,6 +8,12 @@ Songyan is a general-purpose Chinese keyboard for iOS built on the
 [RIME](https://rime.im) input method engine. It ships a host app for managing
 input schemes and a keyboard extension that runs the engine on device.
 
+<p>
+  <img src=".github/screenshots/keyboard-14.png" width="240" alt="14-key keyboard typing nihao">
+  <img src=".github/screenshots/keyboard-9.png" width="240" alt="9-key keyboard typing zhong">
+  <img src=".github/screenshots/home.png" width="240" alt="Host app home screen">
+</p>
+
 ## Features
 
 - RIME engine (librime 1.17) with the `lua`, `octagram` (grammar model) and
@@ -96,7 +102,8 @@ pinned in `Tools/BuildRime/VERSIONS.env`.
   Emoji keyboard and back, or quit and reopen the app you're typing in. Tracked
   in the
   [Apple Developer Forums](https://developer.apple.com/forums/thread/843093)
-  (FB24460699, FB25094825).
+  (FB24460699, FB25094825). Until Apple fixes it, Songyan's candidate area is
+  10 pt shorter so the keyboard doesn't look too tall when the strip appears.
 
 ## License
 

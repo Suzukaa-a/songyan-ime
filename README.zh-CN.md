@@ -6,6 +6,12 @@
 
 松烟是一款基于 [RIME 中州韵](https://rime.im) 引擎的 iOS 通用中文输入法：主 App 负责管理输入方案，键盘扩展直接在设备端运行引擎。
 
+<p>
+  <img src=".github/screenshots/keyboard-14.png" width="240" alt="14 键键盘输入 nihao">
+  <img src=".github/screenshots/keyboard-9.png" width="240" alt="9 键键盘输入 zhong">
+  <img src=".github/screenshots/home.png" width="240" alt="主 App 首页">
+</p>
+
 ## 功能
 
 - RIME 引擎（librime 1.17）直接在键盘扩展中运行，包含 `lua`、`octagram`（语法模型）与 `predict` 插件。
@@ -60,7 +66,7 @@
 
 ## 已知问题
 
-- **键盘上方偶尔多出 17pt 空白（iOS 26、27 的问题）。** 键盘弹出时切到别的 App 再回来，或者从带顶栏的系统键盘（英文、拼音）切到松烟，iOS 可能会在所有第三方键盘上方多加一条 17pt 的空白。键盘自身的尺寸和安全区都没有变化，所以松烟无法察觉，也无法修正。切到表情键盘再切回来，或者彻底关掉正在打字的 App 再打开，空白就会消失。详见 [Apple 开发者论坛](https://developer.apple.com/forums/thread/843093)（FB24460699、FB25094825）。
+- **键盘上方偶尔多出 17pt 空白（iOS 26、27 的问题）。** 键盘弹出时切到别的 App 再回来，或者从带顶栏的系统键盘（英文、拼音）切到松烟，iOS 可能会在所有第三方键盘上方多加一条 17pt 的空白。键盘自身的尺寸和安全区都没有变化，所以松烟无法察觉，也无法修正。切到表情键盘再切回来，或者彻底关掉正在打字的 App 再打开，空白就会消失。详见 [Apple 开发者论坛](https://developer.apple.com/forums/thread/843093)（FB24460699、FB25094825）。在 Apple 修复之前，松烟的候选区暂时矮 10pt，这样出现空白时键盘不会显得太高。
 
 ## 许可
 
