@@ -27,10 +27,10 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Bundled T9 moves Return into its large trailing rail. Other surfaces keep it
     /// in the bottom row. This is presentation only; the action remains `.enter`.
     public let includesBottomEnter: Bool
-    /// The bundled phone shell's column widths. When set, the bottom keys sit under
-    /// the columns above them (the first position under the rail, the second
-    /// under 1/4/7, the last under 3/6/9, space across the rest) instead of the
-    /// generic budget.
+    /// The bundled phone shell's column widths. When set, the first bottom key sits
+    /// under the rail and the rest share the grid's width with a wide space bar
+    /// (see `Metrics.init(width:columns:includesUtility:)`) instead of the generic
+    /// budget.
     public private(set) var phoneColumns: PhoneColumns?
 
     public struct PhoneColumns: Equatable, Sendable {
@@ -79,27 +79,17 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// moves one to the right, so the same spot leads in and back out, as on the
     /// system keyboard.
     ///
-    /// The bundled 9-key follows the mainstream 9-key row instead
-    /// (符号 | 123 | 空格 | 中/英, Sogou and iFlytek): its letter page opens
-    /// the symbol page in one tap from the bottom-left corner, and every
-    /// other page puts 返回 in that corner, so the corner always leads into
-    /// symbols and back out.
+    /// The bundled 9-key keeps 123 and the language key where every other layout
+    /// has them, and puts 符号 in the right-hand position (123 | 中/英 | 空格 | 符号),
+    /// so the symbol page is one tap away without moving the familiar keys; a long
+    /// press on 符号 types 0, which the letter page has no other key for.
     ///
     /// Every symbol page carries 锁定 in the utility position: its grid already
     /// types every mark, and the lock decides whether the page stays open after
     /// a symbol (Sogou and iFlytek return to letters unless locked).
     public func key(at slot: Slot) -> Slot {
         if page == .symbols && slot == .utility { return .symbolLock }
-        if isBundledPhonePad {
-            switch (page, slot) {
-            case (.letters, .page): return .symbolPage
-            case (.letters, .language): return .page
-            case (.letters, .utility): return .language
-            case (_, .page): return .language
-            case (_, .language): return .page
-            default: return slot
-            }
-        }
+        if isBundledPhonePad && page == .letters && slot == .utility { return .symbolPage }
         guard page != .letters else { return slot }
         switch slot {
         case .page: return .language
@@ -186,23 +176,27 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             space = max(0, content - page - language - globe - utility - enter)
         }
 
-        /// Column-aligned phone row: page = rail, language = one digit column,
-        /// 0 (123 page) = the last digit column, space takes the exact remainder.
-        /// Falls back to the generic budget when the columns cannot fit.
+        /// Phone row: the first key sits under the rail; the keys under the 3×3 grid
+        /// do not follow its columns. Like iFlytek's and Sogou's 9-key, the space bar
+        /// takes most of that span (side keys : space ≈ 1 : 2.4 : 1), since it is the
+        /// most-hit key of the row, and the two side switches stay wide enough to hit.
+        /// Falls back to the generic budget when the span cannot fit.
         public init(width: Double, columns: PhoneColumns, includesUtility: Bool) {
             let width = width.isFinite ? max(0, width) : 0
             let gaps = Double(includesUtility ? 3 : 2) * 4
-            let fixed = columns.rail + columns.digit * (includesUtility ? 2 : 1)
-            guard columns.rail >= 0, columns.digit >= 0, width - fixed - gaps >= 44 else {
+            let span = width - columns.rail - gaps
+            let sideShare = includesUtility ? 1 / 4.4 : 1 / 3.4
+            let side = span * sideShare
+            guard columns.rail >= 0, side >= 44, span - side * (includesUtility ? 2 : 1) >= 44 else {
                 self.init(
                     width: width, hasGlobe: false, includesEnter: false,
                     includesUtility: includesUtility)
                 return
             }
             self.init(
-                spacing: 4, page: columns.rail, language: columns.digit, globe: 0,
-                space: width - fixed - gaps,
-                utility: includesUtility ? columns.digit : 0, enter: 0)
+                spacing: 4, page: columns.rail, language: side, globe: 0,
+                space: span - side * (includesUtility ? 2 : 1),
+                utility: includesUtility ? side : 0, enter: 0)
         }
 
         private init(

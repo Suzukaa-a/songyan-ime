@@ -51,13 +51,17 @@ struct ControlRow<ModeKey: View>: View {
                 policy.pageTarget == .symbols
                     ? (policy.isBundledPhonePad ? "打开符号页" : "打开更多符号页") : "打开数字符号页")
         case .symbolPage:
+            // Long press types 0: the 9-key letter page has no other key for it.
             AlternateCharacterKey(
                 cap: KeyCap(
                     id: "control-symbol-page", title: KeyboardControlPolicy.symbolPageTitle,
                     action: .cycleLayout),
-                alternates: []
-            ) { _ in onPage(.symbols) }
+                alternates: [KeyCap(id: "control-symbol-page-0", title: "0", action: .literal("0"))]
+            ) { cap in
+                if case .literal = cap.action { onKey(cap.action) } else { onPage(.symbols) }
+            }
             .accessibilityLabel("打开符号页")
+            .accessibilityHint("长按输入 0")
         case .symbolLock:
             AlternateCharacterKey(
                 cap: KeyCap(id: "control-symbol-lock", title: "锁定", action: .cycleLayout),

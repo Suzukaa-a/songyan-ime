@@ -95,19 +95,19 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
     }
 
-    /// Bundled 9-key, as on Sogou / iFlytek: 符号 | 123 | 空格 | 中/英 on letters, so the symbol page is
-    /// one tap from the bottom-left corner; on 123 and 符号 that corner returns to letters.
-    func testBundledT9BottomRowLeadsWithSymbolKey() {
+    /// Bundled 9-key: 123 | 中/英 | 空格 | 符号 on letters, so 123 and the language key stay where every layout
+    /// has them and the symbol page is one tap away on the right; on 123 and 符号 the left corner returns to letters.
+    func testBundledT9BottomRowEndsWithSymbolKey() {
         func keys(_ page: KeyboardControlPolicy.Page, globe: Bool = false) -> [KeyboardControlPolicy.Slot] {
             let policy = KeyboardControlPolicy(
                 page: page, isEnglishMode: false, hasGlobe: globe, isPhoneLayout: true,
                 usesASCIIPunctuation: false, includesBottomEnter: false)
             return policy.slots.map(policy.key(at:))
         }
-        XCTAssertEqual(keys(.letters), [.symbolPage, .page, .space, .language])
+        XCTAssertEqual(keys(.letters), [.page, .language, .space, .symbolPage])
         XCTAssertEqual(keys(.numeric), [.language, .page, .space, .utility])
         XCTAssertEqual(keys(.symbols), [.language, .page, .space, .symbolLock])
-        XCTAssertEqual(keys(.letters, globe: true), [.symbolPage, .page, .globe, .space, .language])
+        XCTAssertEqual(keys(.letters, globe: true), [.page, .language, .globe, .space, .symbolPage])
         let letters = KeyboardControlPolicy(
             page: .letters, isEnglishMode: false, hasGlobe: false, isPhoneLayout: true,
             usesASCIIPunctuation: false, includesBottomEnter: false)
@@ -165,9 +165,9 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
     }
 
-    /// 9-key bottom row aligns with the columns above: first key = rail width, second = one digit column, the last
-    /// (中/英, 0 or 锁定) = one digit column, space takes the remainder.
-    func testBundledT9ControlRowAlignsWithColumns() {
+    /// 9-key bottom row: the first key sits under the rail; under the grid the space bar is about 2.4× each side
+    /// key (123 and 中/英, 0 or 锁定), wider than a digit column, and both side keys stay at least 44pt.
+    func testBundledT9ControlRowGivesSpaceMostOfTheGrid() {
         for width in [367.0, 382, 412, 430] {
             let m = PhoneKeypadMetrics.resolve(width: width, rowHeight: 54)
             let columns = KeyboardControlPolicy.PhoneColumns(rail: m.railWidth, digit: m.digitWidth)
@@ -180,9 +180,10 @@ final class KeyboardControlPolicyTests: XCTestCase {
                 ).aligned(to: columns)
                 let metrics = policy.metrics(width: control)
                 XCTAssertEqual(metrics.page, m.railWidth, accuracy: 0.0001)
-                XCTAssertEqual(metrics.language, m.digitWidth, accuracy: 0.0001)
-                let expectedSpace = m.digitWidth
-                XCTAssertEqual(metrics.space, expectedSpace, accuracy: 0.0001, "\(width) \(page)")
+                XCTAssertEqual(metrics.language, metrics.utility, accuracy: 0.0001)
+                XCTAssertEqual(metrics.space / metrics.language, 2.4, accuracy: 0.0001, "\(width) \(page)")
+                XCTAssertGreaterThan(metrics.space, m.digitWidth * 1.4, "\(width) \(page)")
+                XCTAssertGreaterThanOrEqual(metrics.language, 44, "\(width) \(page)")
                 let total =
                     policy.slots.reduce(0.0) { $0 + metrics[$1] }
                     + metrics.spacing * Double(max(0, policy.slots.count - 1))

@@ -29,7 +29,7 @@ extension KeyboardPanelView {
 
     /// The bundled 9-key, and every layout's categorised symbol page except an
     /// imported phone keypad's (which keeps its declared rails), draw the fixed
-    /// ⌫ / 重输 / ⏎ column and line the bottom row up under the columns above.
+    /// ⌫ / 重输 / ⏎ column and the phone bottom row (first key under the rail, wide space).
     var usesFixedEditingRail: Bool {
         isBuiltinPhonePad || (page == .symbols && !usesPhoneDefinition)
     }
