@@ -6,8 +6,9 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public enum Page: CaseIterable, Hashable, Sendable { case letters, numeric, symbols }
     public enum Slot: CaseIterable, Hashable, Sendable {
         case page, language, globe, space, utility, enter
-        /// A key, never a position: the bundled 9-key's direct 「符号」 key.
-        case symbolPage
+        /// Keys, never positions: the bundled 9-key's direct 「符号」 key, and the
+        /// symbol page's 锁定 toggle (in the utility position).
+        case symbolPage, symbolLock
     }
     public enum LanguageAction: Equatable, Sendable {
         case toggleLanguage, returnToLetters
@@ -63,12 +64,12 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Slot identities and count stay unchanged across all pages and languages
     /// **for one surface**. Only an actual system-keyboard availability change may
     /// add/remove globe, and only the bundled T9 (which moves Return into its own
-    /// trailing column) may drop `enter`. That surface uses the utility position for
-    /// 中/英 on letters and 0 on 123; its symbol page drops it and widens space.
+    /// trailing column) may drop `enter`. The utility position holds punctuation, 0 on
+    /// the 9-key 123 page, 中/英 on the 9-key letters and 锁定 on every symbol page.
     public var slots: [Slot] {
         Slot.allCases.filter {
-            $0 != .symbolPage && ($0 != .globe || hasGlobe) && ($0 != .enter || includesBottomEnter)
-                && ($0 != .utility || includesUtility)
+            $0 != .symbolPage && $0 != .symbolLock && ($0 != .globe || hasGlobe)
+                && ($0 != .enter || includesBottomEnter)
         }
     }
 
@@ -83,7 +84,12 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// the symbol page in one tap from the bottom-left corner, and every
     /// other page puts 返回 in that corner, so the corner always leads into
     /// symbols and back out.
+    ///
+    /// Every symbol page carries 锁定 in the utility position: its grid already
+    /// types every mark, and the lock decides whether the page stays open after
+    /// a symbol (Sogou and iFlytek return to letters unless locked).
     public func key(at slot: Slot) -> Slot {
+        if page == .symbols && slot == .utility { return .symbolLock }
         if isBundledPhonePad {
             switch (page, slot) {
             case (.letters, .page): return .symbolPage
@@ -102,13 +108,8 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         }
     }
 
-    public var includesUtility: Bool {
-        // The bundled 9-key's letter page holds 中/英 there and its digit pad
-        // holds 0; its symbol grid has nothing to add, so space takes the slot.
-        !(isBundledPhonePad && page == .symbols)
-    }
-
-    /// Only the bundled 9-key moves Return into its own trailing column.
+    /// The phone-pad row: the bundled 9-key, and every layout's categorised symbol
+    /// page, move Return into their own trailing column.
     public var isBundledPhonePad: Bool { isPhoneLayout && !includesBottomEnter }
 
     public var pageTarget: Page { page == .numeric ? .symbols : .numeric }
@@ -145,11 +146,11 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// on a supported >=320pt keyboard. Extremely small previews scale as a whole.
     public func metrics(width: Double) -> Metrics {
         if let phoneColumns, !hasGlobe, !includesBottomEnter {
-            return Metrics(width: width, columns: phoneColumns, includesUtility: includesUtility)
+            return Metrics(width: width, columns: phoneColumns, includesUtility: true)
         }
         return Metrics(
             width: width, hasGlobe: hasGlobe, includesEnter: includesBottomEnter,
-            includesUtility: includesUtility)
+            includesUtility: true)
     }
 
     public struct Metrics: Equatable, Sendable {
@@ -226,6 +227,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             case .utility: return utility
             case .enter: return enter
             case .symbolPage: return page
+            case .symbolLock: return utility
             }
         }
     }

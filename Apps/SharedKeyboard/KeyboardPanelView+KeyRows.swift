@@ -173,10 +173,9 @@ extension KeyboardPanelView {
             readingKeys: CompactSpellingLayout.readingKeyMap(for: activeDefinition))
     }
 
+    /// The 123 rows; #+= opens the categorised symbol page instead of rows.
     var symbolRows: [KeyboardRow] {
-        page == .numeric
-            ? SymbolPageTable.numericRows(ascii: controller.usesASCIIPunctuation)
-            : SymbolPageTable.symbolRows(ascii: controller.usesASCIIPunctuation)
+        SymbolPageTable.numericRows(ascii: controller.usesASCIIPunctuation)
     }
 
     /// Only the untouched bundled 26-key definitions receive the standard system-key shell.

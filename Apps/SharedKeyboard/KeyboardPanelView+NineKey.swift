@@ -341,15 +341,19 @@ extension KeyboardPanelView {
             })
     }
 
-    /// The 9-key symbol page: categories in the leading rail, the open category's
-    /// symbols in a grid of digit-pad-height keys (four columns, two for kaomoji) that
-    /// scrolls vertically, and the 123 page's trailing column and control row, so a
+    /// The symbol page of every layout (#+= on 26/14/18-key, 符号 on 9-key):
+    /// categories in the leading rail, the open category's symbols in a grid of
+    /// digit-pad-height keys (four columns, two for kaomoji) that scrolls
+    /// vertically, the ⌫ / 重输 / ⏎ column and the phone-pad control row, so a
     /// thumb reaches every symbol without hunting through rows of narrow keys.
+    ///
+    /// Like Sogou and iFlytek, one symbol returns to the page the user types on
+    /// unless 锁定 is on; the lock lasts for this keyboard session.
     var phoneCategorySymbolKeypad: some View {
         let categories = phoneSymbolCategories
         let open = categories.first { $0.id == phoneSymbolCategoryID } ?? categories[0]
         return StablePhoneKeypadShell(
-            trailingSpansControlRow: isBuiltinPhonePad,
+            trailingSpansControlRow: usesFixedEditingRail,
             leading: { metrics in
                 phoneSymbolCategoryRail(categories, open: open.id, metrics: metrics)
             },
@@ -372,6 +376,9 @@ extension KeyboardPanelView {
                                     ) { cap in
                                         if handleKey(cap.action), case .literal(let text) = cap.action {
                                             pendingSymbolUses.append(text)
+                                            if !symbolPageLocked {
+                                                page = controller.hostPreferredInput == .numeric ? .numeric : .letters
+                                            }
                                         }
                                     }
                                     .frame(width: cell * CGFloat(caps.count) + spacing * CGFloat(caps.count - 1))
@@ -388,14 +395,18 @@ extension KeyboardPanelView {
                 .id(open.id)
             },
             trailing: { metrics in
-                if isBuiltinPhonePad { t9FixedEditingRail(metrics) } else { t9Rail(.trailing, metrics: metrics) }
+                if usesFixedEditingRail { t9FixedEditingRail(metrics) } else { t9Rail(.trailing, metrics: metrics) }
             },
             bottom: { metrics in
                 phoneControlRow(metrics)
             }
         )
-        // Picks up library edits made in the app and recents from the symbol panel.
-        .onAppear { symbolLibrary.reload() }
+        // Every visit opens on 常用. Also picks up library edits made in the app
+        // and recents from the symbol panel.
+        .onAppear {
+            phoneSymbolCategoryID = SymbolPageTable.commonCategoryID
+            symbolLibrary.reload()
+        }
         // Uses are recorded when the page closes, so 最近 never reorders under the
         // finger while several symbols are typed in a row.
         .onDisappear {
@@ -426,37 +437,14 @@ extension KeyboardPanelView {
         metrics: PhoneKeypadMetrics
     ) -> some View {
         let slot = (CGFloat(metrics.mainHeight) - CGFloat(metrics.spacing) * 3) / 3.5
-        return ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: CGFloat(metrics.spacing)) {
-                ForEach(categories, id: \.id) { category in
-                    let selected = category.id == open
-                    Button {
-                        emitKeyFeedback()
-                        phoneSymbolCategoryID = category.id
-                    } label: {
-                        Text(category.title)
-                            .font(appearance.font(16))
-                            .foregroundStyle(
-                                selected
-                                    ? appearance.accentForeground
-                                    : Color(uiColor: appearance.text(on: "control"))
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(height: slot)
-                            .background {
-                                if selected {
-                                    RoundedRectangle(cornerRadius: appearance.skin.keycap.cornerRadius)
-                                        .fill(appearance.color("key"))
-                                        .padding(.horizontal, appearance.skin.spacing.visualInsetX + 2)
-                                        .padding(.vertical, appearance.skin.spacing.visualInsetY + 2)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(KeyboardPressStyle())
-                    .accessibilityLabel("\(category.title)符号")
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
+        return ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                phoneSymbolCategoryList(categories, open: open, slot: slot, spacing: CGFloat(metrics.spacing))
+            }
+            // A tab chosen at the cut-off edge scrolls fully into view; a tab
+            // already visible stays put.
+            .onChange(of: open) { _, id in
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id) }
             }
         }
         .sharpCandidateScrollEdges()
@@ -465,6 +453,44 @@ extension KeyboardPanelView {
                 .fill(appearance.color("control"))
                 .padding(.horizontal, appearance.skin.spacing.visualInsetX)
                 .padding(.vertical, appearance.skin.spacing.visualInsetY)
+        }
+    }
+
+    private func phoneSymbolCategoryList(
+        _ categories: [SymbolPageTable.PhoneSymbolCategory], open: String,
+        slot: CGFloat, spacing: CGFloat
+    ) -> some View {
+        VStack(spacing: spacing) {
+            ForEach(categories, id: \.id) { category in
+                let selected = category.id == open
+                Button {
+                    emitKeyFeedback()
+                    phoneSymbolCategoryID = category.id
+                } label: {
+                    Text(category.title)
+                        .font(appearance.font(KeyboardToolsStyle.categoryRailTitleSize))
+                        .foregroundStyle(
+                            selected
+                                ? appearance.accentForeground
+                                : Color(uiColor: appearance.text(on: "control"))
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: slot)
+                        .background {
+                            if selected {
+                                RoundedRectangle(cornerRadius: appearance.skin.keycap.cornerRadius)
+                                    .fill(appearance.color("key"))
+                                    .padding(.horizontal, appearance.skin.spacing.visualInsetX + 2)
+                                    .padding(.vertical, appearance.skin.spacing.visualInsetY + 2)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(KeyboardPressStyle())
+                .accessibilityLabel("\(category.title)符号")
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .id(category.id)
+            }
         }
     }
 

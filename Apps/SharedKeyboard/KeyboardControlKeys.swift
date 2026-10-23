@@ -19,6 +19,9 @@ struct ControlRow<ModeKey: View>: View {
     let onPage: (KeyboardPage) -> Void
     let onKey: (KeyAction) -> Void
     var phoneColumns: KeyboardControlPolicy.PhoneColumns? = nil
+    /// Whether the symbol page stays open after a symbol is typed.
+    var symbolPageLocked = false
+    var onToggleSymbolLock: () -> Void = {}
 
     var body: some View {
         StableKeyboardControlRow(policy: policy.aligned(to: phoneColumns)) { slot in
@@ -55,6 +58,14 @@ struct ControlRow<ModeKey: View>: View {
                 alternates: []
             ) { _ in onPage(.symbols) }
             .accessibilityLabel("打开符号页")
+        case .symbolLock:
+            AlternateCharacterKey(
+                cap: KeyCap(id: "control-symbol-lock", title: "锁定", action: .cycleLayout),
+                alternates: [], visualRole: symbolPageLocked ? "selected" : "control"
+            ) { _ in onToggleSymbolLock() }
+            .accessibilityLabel("锁定符号页")
+            .accessibilityValue(symbolPageLocked ? "已开启" : "已关闭")
+            .accessibilityHint(symbolPageLocked ? "输入符号后留在符号页" : "输入一个符号后回到字母页")
         case .language:
             modeKey
         case .space:

@@ -23,8 +23,15 @@ extension KeyboardPanelView {
     /// under the rail and digit columns above them.
     func phoneControlRow(_ metrics: PhoneKeypadMetrics) -> some View {
         controlRow(
-            columns: isBuiltinPhonePad
+            columns: usesFixedEditingRail
                 ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil)
+    }
+
+    /// The bundled 9-key, and every layout's categorised symbol page except an
+    /// imported phone keypad's (which keeps its declared rails), draw the fixed
+    /// ⌫ / 重输 / ⏎ column and line the bottom row up under the columns above.
+    var usesFixedEditingRail: Bool {
+        isBuiltinPhonePad || (page == .symbols && !usesPhoneDefinition)
     }
 
     func controlRow(columns: KeyboardControlPolicy.PhoneColumns?) -> some View {
@@ -44,7 +51,12 @@ extension KeyboardPanelView {
                 showsAllCandidates = false
             },
             onKey: { handleKey($0) },
-            phoneColumns: columns
+            phoneColumns: columns,
+            symbolPageLocked: symbolPageLocked,
+            onToggleSymbolLock: {
+                emitKeyFeedback()
+                symbolPageLocked.toggle()
+            }
         )
     }
 
@@ -150,15 +162,16 @@ extension KeyboardPanelView {
         // The phone treatment belongs to the *visible* physical shell. An
         // English QWERTY letter page keeps its direct comma and bottom Return
         // even when the selected Chinese definition happens to be a phone pad.
-        let phoneShellVisible = usesStandardT9 || (usesPhoneDefinition && page != .letters)
+        let phoneShellVisible =
+            usesStandardT9 || (usesPhoneDefinition && page != .letters) || page == .symbols
         let trailingHasReturn =
-            !isBuiltinPhonePad && phoneShellVisible
+            !usesFixedEditingRail && phoneShellVisible
             && t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter }
         return KeyboardControlPolicy(
             page: page, isEnglishMode: controller.isEnglishMode,
             hasGlobe: systemKeyboardSwitch != nil,
             isPhoneLayout: phoneShellVisible,
             usesASCIIPunctuation: controller.usesASCIIPunctuation,
-            includesBottomEnter: !phoneShellVisible || (!isBuiltinPhonePad && !trailingHasReturn))
+            includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn))
     }
 }

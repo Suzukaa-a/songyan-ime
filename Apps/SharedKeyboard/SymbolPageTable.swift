@@ -139,6 +139,8 @@ enum SymbolPageTable {
         return [common] + recent + widths + themed
     }
 
+    /// The rows the 26/14/18-key #+= page used to show. #+= now opens the
+    /// categorised page; these stay as the set its built-in tabs must cover.
     static func symbolRows(ascii: Bool) -> [KeyboardRow] {
         [
             // Chinese symbol page: title marks, square brackets, em dash and & are directly visible (as on the system Chinese keyboard);

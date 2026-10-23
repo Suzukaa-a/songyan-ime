@@ -88,8 +88,10 @@ public struct KeyboardPanelView: View {
     /// Reports eligibility facts (physical definition content) to the host, not heights.
     let onReadingRowReport: ((CandidateReadingRowReport) -> Void)?
     @State var page: KeyboardPage = .letters
-    /// The 9-key symbol page's open category; kept across visits, like mainstream 9-key.
-    @State var phoneSymbolCategoryID = "common"
+    /// The symbol page's open category; every visit starts on 常用.
+    @State var phoneSymbolCategoryID = SymbolPageTable.commonCategoryID
+    /// 锁定 on the symbol page: stay there after a symbol. Session-only, never stored.
+    @State var symbolPageLocked = false
     /// Whether a symbol has been entered on the current number/symbol page (used to return to letters after space); reset on every page change.
     @State private var typedOnSymbolPage = false
     @StateObject var quickSymbols = T9QuickSymbolModel()
@@ -552,7 +554,7 @@ public struct KeyboardPanelView: View {
             VStack(spacing: 4) {
                 if usesPhoneDefinition && page == .numeric {
                     phoneSymbolKeypad
-                } else if usesPhoneDefinition && page == .symbols {
+                } else if page == .symbols {
                     phoneCategorySymbolKeypad
                 } else if usesStandardT9 {
                     standardT9Keypad

@@ -68,7 +68,9 @@ final class KeyboardControlPolicyTests: XCTestCase {
                 hasGlobe: true, isPhoneLayout: false, usesASCIIPunctuation: false)
             let keys = policy.slots.map(policy.key(at:))
             XCTAssertEqual(Array(keys.prefix(2)), page == .letters ? [.page, .language] : [.language, .page])
-            XCTAssertEqual(Set(keys), Set(policy.slots))
+            // The symbol page's utility position holds 锁定.
+            XCTAssertEqual(Set(keys.map { $0 == .symbolLock ? .utility : $0 }), Set(policy.slots))
+            XCTAssertEqual(keys.contains(.symbolLock), page == .symbols)
         }
     }
 
@@ -104,7 +106,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
         XCTAssertEqual(keys(.letters), [.symbolPage, .page, .space, .language])
         XCTAssertEqual(keys(.numeric), [.language, .page, .space, .utility])
-        XCTAssertEqual(keys(.symbols), [.language, .page, .space])
+        XCTAssertEqual(keys(.symbols), [.language, .page, .space, .symbolLock])
         XCTAssertEqual(keys(.letters, globe: true), [.symbolPage, .page, .globe, .space, .language])
         let letters = KeyboardControlPolicy(
             page: .letters, isEnglishMode: false, hasGlobe: false, isPhoneLayout: true,
@@ -151,9 +153,9 @@ final class KeyboardControlPolicyTests: XCTestCase {
                     includesBottomEnter: false)
                 XCTAssertFalse(
                     policy.slots.contains(.enter), "\(width): the 9-key bottom row must not repeat the confirm key")
-                XCTAssertEqual(
-                    policy.slots.contains(.utility), page != .symbols,
-                    "\(width): letters hold 中/英 and 123 holds 0 there; the symbol page widens space")
+                XCTAssertTrue(
+                    policy.slots.contains(.utility),
+                    "\(width): letters hold 中/英, 123 holds 0 and the symbol page holds 锁定 there")
                 let metrics = policy.metrics(width: control.width)
                 let total =
                     policy.slots.reduce(0.0) { $0 + metrics[$1] }
@@ -164,7 +166,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
     }
 
     /// 9-key bottom row aligns with the columns above: first key = rail width, second = one digit column, the last
-    /// (中/英 or 0) = one digit column, space takes the remainder (two columns on the symbol page).
+    /// (中/英, 0 or 锁定) = one digit column, space takes the remainder.
     func testBundledT9ControlRowAlignsWithColumns() {
         for width in [367.0, 382, 412, 430] {
             let m = PhoneKeypadMetrics.resolve(width: width, rowHeight: 54)
@@ -179,7 +181,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
                 let metrics = policy.metrics(width: control)
                 XCTAssertEqual(metrics.page, m.railWidth, accuracy: 0.0001)
                 XCTAssertEqual(metrics.language, m.digitWidth, accuracy: 0.0001)
-                let expectedSpace = page == .symbols ? m.digitWidth * 2 + m.spacing : m.digitWidth
+                let expectedSpace = m.digitWidth
                 XCTAssertEqual(metrics.space, expectedSpace, accuracy: 0.0001, "\(width) \(page)")
                 let total =
                     policy.slots.reduce(0.0) { $0 + metrics[$1] }
