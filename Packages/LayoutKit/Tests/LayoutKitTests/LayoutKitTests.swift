@@ -106,6 +106,8 @@ final class LayoutKitTests: XCTestCase {
             let example = try LayoutDefinition.decode(Data(contentsOf: file))
             XCTAssertEqual(example.input, builtin.input)
             XCTAssertEqual(example.rows.flatMap(\.keys).map(\.action), builtin.rows.flatMap(\.keys).map(\.action))
+            XCTAssertEqual(
+                example.rows.flatMap(\.keys).map(\.width), builtin.rows.flatMap(\.keys).map(\.width), builtin.id)
             if builtin.input.builtinLayout == .qwerty26 {
                 XCTAssertEqual(
                     example.rows.flatMap(\.keys).map(\.longPress), builtin.rows.flatMap(\.keys).map(\.longPress))

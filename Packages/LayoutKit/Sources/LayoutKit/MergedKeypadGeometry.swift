@@ -1,10 +1,10 @@
 import Foundation
 
 /// Key widths of the merged letter pad (14-key, 18-key). One unit is one 26-key letter:
-/// a key of weight `w` spans `w` units plus the `w - 1` gaps between them, so a two-letter
-/// key covers exactly the two letters it replaces. The upper rows share the widest row's
-/// unit and are centred, like the 26-key stagger; the last row sits between the separator
-/// and Delete keys and fills that space.
+/// a key of weight `w` spans `w` units plus the `w - 1` gaps between them (fractional
+/// weights included), so a row's width depends only on its total weight. The upper rows
+/// share the widest row's unit and are centred, like the 26-key stagger; the last row sits
+/// between the separator and Delete keys and fills that space.
 public enum MergedKeypadGeometry {
     public struct Row: Equatable, Sendable {
         /// Space before the first key (centring).

@@ -16,15 +16,20 @@ public enum BuiltinLayouts {
         ]) + [controls],
         note: "两个字母合用一个键，轻点输入。输入方案支持时，向左或向右滑动可只输入左边或右边的字母。")
 
-    /// Pairs are two units wide and single letters one, so every letter keeps its 26-key
-    /// position and width (rows of 10, 9 and 7 units).
+    /// Every key must be easy to hit, single letters included. Two-unit pairs would leave
+    /// the singles as the narrowest caps on the pad (about 38 pt on a 420 pt phone), so pairs
+    /// give width back: 1.7 units against 1.3, caps about 1.33 : 1, close to the widely shared
+    /// 18-key skin for Baidu's keyboard (stock Chinese keyboards ship no 18-key pad). Pairs
+    /// stay wider because one cap carries two letters and the sideways swipe. All upper-row
+    /// singles and pairs share one width each, so row 2 (9.0 units) sits centred under row 1
+    /// (10.3) half a single key in from each side, the same stagger as 26-key A under Q.
     public static let merged18 = LayoutDefinition(
         id: "merged18", name: "18 键", input: .init(builtinLayout: .merged18),
         rows: mergedRows(
             [
                 ["q", "we", "rt", "y", "u", "io", "p"], ["a", "sd", "fg", "h", "jk", "l"],
                 ["z", "xc", "v", "bn", "m"],
-            ], pairWidth: 2) + [controls],
+            ], singleWidth: 1.3, pairWidth: 1.7) + [controls],
         note: "部分键由两个字母合用，轻点输入。输入方案支持时，向左或向右滑动可只输入左边或右边的字母。")
 
     public static let phone9 = LayoutDefinition(
@@ -186,9 +191,11 @@ public enum BuiltinLayouts {
             longPress: [literalOption(digit)])
     }
 
-    private static func mergedRows(_ groups: [[String]], pairWidth: Double? = nil) -> [LayoutRow] {
+    private static func mergedRows(
+        _ groups: [[String]], singleWidth: Double? = nil, pairWidth: Double? = nil
+    ) -> [LayoutRow] {
         groups.map { row in
-            LayoutRow(keys: row.map { mergedKey($0, width: $0.count > 1 ? pairWidth : nil) })
+            LayoutRow(keys: row.map { mergedKey($0, width: $0.count > 1 ? pairWidth : singleWidth) })
         }
     }
 
