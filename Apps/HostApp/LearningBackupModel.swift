@@ -38,7 +38,7 @@ enum LearningBackupUserError: Error, Equatable {
     var message: String {
         switch self {
         case .noAppliedSource:
-            return "还没有正在使用的输入方案，请先在「输入方案」中选择使用一个方案。"
+            return "还没有正在使用的输入方案，请先在「我的键盘」中使用一个键盘。"
         case .containerUnavailable:
             // Reinstalling deletes the keyboard-private learning data, so it must never be offered as a routine recovery step.
             return "无法访问共享数据。请在系统设置中开启「允许完全访问」，然后重新打开此页。"

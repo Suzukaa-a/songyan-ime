@@ -7,7 +7,7 @@ extension KeyboardRecipeStore {
     /// Publish-time consistency checks; readers rely on them and surface a missing file as an ordinary error.
     private static func validatePublication(_ activation: Activation, build: URL) throws {
         if let selected = activation.selectedSchemaID, !activation.requiredSchemaIDs.contains(selected) {
-            throw StoreError(message: "所选输入方式不在已启用的列表中，请在「输入方案」中重新选择")
+            throw StoreError(message: "所选输入方式不在已启用的列表中，请在「我的键盘」中重新选择")
         }
         if activation.kind == .userScheme {
             guard activation.selectedSchemaID != nil,

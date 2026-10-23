@@ -33,7 +33,7 @@ public enum OperationFailureState: Equatable, Sendable {
         case .nothingCommitted:
             return "可重试，或改选其他文件。"
         case .installedNotApplied:
-            return "可重试，或打开已安装输入方案并轻点「\(UserTerminology.startUsing)」。"
+            return "可重试，或在「\(UserTerminology.userKeyboard)」中轻点「\(UserTerminology.startUsing)」。"
         case .unknown:
             return "请重新载入当前状态后再试。"
         }

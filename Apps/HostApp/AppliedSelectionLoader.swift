@@ -86,7 +86,7 @@ enum AppliedSelectionLoader {
                 var resourceError: String?
                 do { _ = try KeyboardRecipeStore.snapshot(selectedOnly: true) } catch {
                     HostLog.append("published resource validation failed: \(error.localizedDescription)")
-                    resourceError = "无法读取当前输入方案，请在「输入方案」中重新选择。"
+                    resourceError = "无法读取当前输入方案，请在「我的键盘」中重新选择。"
                 }
                 return (snapshot, nil, resourceError)
             }

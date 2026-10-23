@@ -180,7 +180,7 @@ struct LayoutManagementView: View {
             } header: {
                 Text("内置布局")
             } footer: {
-                Text("输入方式与词库请在「输入方案」中选择。")
+                Text("要换输入方式，请到「我的键盘」。")
             }
         }
     }

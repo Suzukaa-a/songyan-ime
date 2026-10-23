@@ -131,7 +131,9 @@ struct RimeSourceInstallView: View {
             if let id = center.lastInstalledPackageID, center.acquiredSources.isEmpty {
                 Section {
                     Label("安装完成 · \(UserTerminology.statusNotApplied)", systemImage: "checkmark.circle")
-                    NavigationLink("\(UserTerminology.startUsing)输入方案") { SchemePackageDetailView(packageID: id) }
+                    NavigationLink("选择键盘并开始使用") {
+                        UserKeyboardManagementView(source: .package(id), returnsToSource: true)
+                    }
                 }
             }
             if let error = center.error { Section { Text(error).foregroundStyle(.red).textSelection(.enabled) } }

@@ -269,7 +269,7 @@ struct SchemePackageImportView: View {
                 NavigationLink("查看方案详情") {
                     SchemePackageDetailView(packageID: packageID)
                 }
-                Text("选择所需键盘后轻点「保存」，即可应用到系统键盘。")
+                Text("轻点键盘下方的「使用」即可开始打字。")
                     .font(.footnote).foregroundStyle(.secondary)
             } else {
                 NavigationLink("查看方案") {
@@ -449,7 +449,7 @@ struct SchemePackageImportView: View {
         } header: {
             Text("方案信息")
         } footer: {
-            Text(center.preparedUpdatesInstalledPackage ? "更新后需重新选择使用。" : "安装后即可选择使用。")
+            Text(center.preparedUpdatesInstalledPackage ? "更新后在「我的键盘」中换用新版本。" : "安装后在「我的键盘」中选择使用。")
         }
     }
 
@@ -505,7 +505,7 @@ struct SchemePackageImportView: View {
         } header: {
             Text("检查结果")
         } footer: {
-            Text(isInstalledMode ? "更新后需重新选择使用。" : "安装后即可选择使用。")
+            Text(isInstalledMode ? "更新后在「我的键盘」中换用新版本。" : "安装后在「我的键盘」中选择使用。")
         }
     }
 

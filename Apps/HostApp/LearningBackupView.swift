@@ -113,7 +113,7 @@ struct LearningBackupView: View {
                     .foregroundStyle(.secondary)
             case .missing:
                 Text("未选择输入方案")
-                Text("请先在「输入方案」中选择并使用一个方案，再备份学习数据。")
+                Text("请先在「我的键盘」中使用一个键盘，再备份学习数据。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             case .failed:
