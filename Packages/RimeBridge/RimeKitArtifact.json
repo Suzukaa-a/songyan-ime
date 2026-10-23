@@ -1,0 +1,23 @@
+{
+  "formatVersion": 1,
+  "module": "RimeKit",
+  "artifactPath": "Vendored/RimeKit.xcframework",
+  "generator": "Tools/BuildRimeIOS/scripts/43-build-rimekit.py",
+  "export": "Tools/BuildRimeIOS/scripts/export-rimekit.py",
+  "pins": [
+    "Tools/BuildRime/VERSIONS.env",
+    "Tools/BuildRimeIOS/LUA-VERSIONS.env",
+    "Tools/BuildRimeIOS/GRAMMAR-VERSIONS.env",
+    "Tools/BuildRimeIOS/PREDICT-VERSIONS.env"
+  ],
+  "slices": {
+    "ios-arm64": {
+      "archive": "ios-arm64/RimeKit.framework/RimeKit",
+      "sha256": "a1124283fee0512184017bf4293a34525137282256f19f0afd38244f604fba96"
+    },
+    "ios-arm64-simulator": {
+      "archive": "ios-arm64-simulator/RimeKit.framework/RimeKit",
+      "sha256": "9018edd4d8ef74d4ed63db7c80aa52f5a2de789fcb5ff99dc09ee5c2d311ea24"
+    }
+  }
+}

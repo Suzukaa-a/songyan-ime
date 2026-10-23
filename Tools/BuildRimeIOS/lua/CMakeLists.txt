@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.20)
+project(RimeLuaIOS LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+file(GLOB LUA_SOURCES "${LUA_SOURCE}/src/*.c")
+list(FILTER LUA_SOURCES EXCLUDE REGEX "/(lua|luac)\\.c$")
+add_library(lua STATIC ${LUA_SOURCES})
+target_include_directories(lua PUBLIC "${LUA_SOURCE}/src")
+target_compile_definitions(lua PRIVATE LUA_COMPAT_5_3)
+# Plain C Lua interpreter: no JIT, dlopen, readline, or POSIX subprocess APIs.
+# Standard date/math/UTF-8/io APIs and Lua source require remain available.
+target_compile_options(lua PRIVATE -fapplication-extension -include "${CMAKE_CURRENT_SOURCE_DIR}/ios-lua-config.h")
+file(GLOB PLUGIN_SOURCES "${PLUGIN_SOURCE}/src/*.cc" "${PLUGIN_SOURCE}/src/lib/*.cc" "${PLUGIN_SOURCE}/src/lib/*.c")
+add_library(rime-lua STATIC ${PLUGIN_SOURCES})
+target_include_directories(rime-lua PRIVATE "${RIME_SOURCE}/src" "${RIME_SOURCE}/include" "${RIME_GENERATED_INCLUDE}" "${CMAKE_INSTALL_PREFIX}/include" "${BOOST_SOURCE}")
+target_link_libraries(rime-lua PRIVATE lua)
+target_compile_definitions(rime-lua PRIVATE GLOG_USE_GLOG_EXPORT)
+target_compile_options(rime-lua PRIVATE -fapplication-extension)
+install(TARGETS lua rime-lua ARCHIVE DESTINATION lib)

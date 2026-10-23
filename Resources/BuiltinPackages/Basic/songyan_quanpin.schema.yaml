@@ -1,0 +1,48 @@
+# Rime schema - songyan_quanpin (built-in full pinyin)
+# encoding: utf-8
+#
+# - Dictionary songyan_basic; own prism; user_dict songyan_shared is shared with songyan_flypy.
+# - speller/algebra is intentionally empty: dictionary readings are the spellings.
+#   Compact layouts are generated from this file.
+# - script_translator always composes sentences and does not read enable_sentence, so the key is not set.
+schema:
+  schema_id: songyan_quanpin
+  name: 内置全拼
+  version: "0.1.0"
+  description: |
+    26 键全拼，与内置小鹤双拼共用词库和学习记录。
+
+engine:
+  processors:
+    - speller
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - abc_segmentor
+    - fallback_segmentor
+  translators:
+    - script_translator
+  filters:
+    - uniquifier
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra: []
+
+translator:
+  dictionary: songyan_basic
+  prism: songyan_quanpin
+  user_dict: songyan_shared
+  db_class: userdb
+  enable_user_dict: true
+  enable_completion: false
+  enable_encoder: true
+  encode_commit_history: true
+  max_phrase_length: 8
+  initial_quality: 1.0
+
+# Explicitly declares this scheme a trusted canonical-pinyin canonical source (the generator grants 9-key canonical only on this basis;
+# the token-shape check is merely a necessary filter and cannot replace this declaration).
+keyboard_adapter_source: canonical_pinyin

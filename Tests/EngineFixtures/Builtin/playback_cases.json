@@ -1,0 +1,6306 @@
+[
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "你好",
+  "keys": "nihao",
+  "keys_with_delim": "ni'hao",
+  "expect_text": "你好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "你好",
+  "keys": "nihc",
+  "keys_with_delim": "ni'hc",
+  "expect_text": "你好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "你好",
+  "keys": "bugc",
+  "keys_with_delim": "bu'gc",
+  "expect_text": "你好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "你好",
+  "keys": "64426",
+  "keys_with_delim": "64426",
+  "expect_text": "你好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "我们",
+  "keys": "women",
+  "keys_with_delim": "wo'men",
+  "expect_text": "我们"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "我们",
+  "keys": "womf",
+  "keys_with_delim": "wo'mf",
+  "expect_text": "我们"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "我们",
+  "keys": "qomd",
+  "keys_with_delim": "qo'md",
+  "expect_text": "我们"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "我们",
+  "keys": "96636",
+  "keys_with_delim": "96636",
+  "expect_text": "我们"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "中国",
+  "keys": "zhongguo",
+  "keys_with_delim": "zhong'guo",
+  "expect_text": "中国"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "中国",
+  "keys": "vsgo",
+  "keys_with_delim": "vs'go",
+  "expect_text": "中国"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "中国",
+  "keys": "cago",
+  "keys_with_delim": "ca'go",
+  "expect_text": "中国"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "中国",
+  "keys": "94664486",
+  "keys_with_delim": "94664486",
+  "expect_text": "中国"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "中国人",
+  "keys": "zhongguoren",
+  "keys_with_delim": "zhong'guo'ren",
+  "expect_text": "中国人"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "中国人",
+  "keys": "vsgorf",
+  "keys_with_delim": "vs'go'rf",
+  "expect_text": "中国人"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "中国人",
+  "keys": "cagoed",
+  "keys_with_delim": "ca'go'ed",
+  "expect_text": "中国人"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "中国人",
+  "keys": "94664486736",
+  "keys_with_delim": "94664486736",
+  "expect_text": "中国人"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "大家",
+  "keys": "dajia",
+  "keys_with_delim": "da'jia",
+  "expect_text": "大家"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "大家",
+  "keys": "dajx",
+  "keys_with_delim": "da'jx",
+  "expect_text": "大家"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "大家",
+  "keys": "dajz",
+  "keys_with_delim": "da'jz",
+  "expect_text": "大家"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "大家",
+  "keys": "32542",
+  "keys_with_delim": "32542",
+  "expect_text": "大家"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "同学",
+  "keys": "tongxue",
+  "keys_with_delim": "tong'xue",
+  "expect_text": "同学"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "同学",
+  "keys": "tsxt",
+  "keys_with_delim": "ts'xt",
+  "expect_text": "同学"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "同学",
+  "keys": "tazt",
+  "keys_with_delim": "ta'zt",
+  "expect_text": "同学"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "同学",
+  "keys": "8664983",
+  "keys_with_delim": "8664983",
+  "expect_text": "同学"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "学习",
+  "keys": "xuexi",
+  "keys_with_delim": "xue'xi",
+  "expect_text": "学习"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "学习",
+  "keys": "xtxi",
+  "keys_with_delim": "xt'xi",
+  "expect_text": "学习"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "学习",
+  "keys": "ztzu",
+  "keys_with_delim": "zt'zu",
+  "expect_text": "学习"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "学习",
+  "keys": "98394",
+  "keys_with_delim": "98394",
+  "expect_text": "学习"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "工作",
+  "keys": "gongzuo",
+  "keys_with_delim": "gong'zuo",
+  "expect_text": "工作"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "工作",
+  "keys": "gszo",
+  "keys_with_delim": "gs'zo",
+  "expect_text": "工作"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "工作",
+  "keys": "gazo",
+  "keys_with_delim": "ga'zo",
+  "expect_text": "工作"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "工作",
+  "keys": "4664986",
+  "keys_with_delim": "4664986",
+  "expect_text": "工作"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "手机",
+  "keys": "shouji",
+  "keys_with_delim": "shou'ji",
+  "expect_text": "手机"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "手机",
+  "keys": "uzji",
+  "keys_with_delim": "uz'ji",
+  "expect_text": "手机"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "手机",
+  "keys": "uzju",
+  "keys_with_delim": "uz'ju",
+  "expect_text": "手机"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "手机",
+  "keys": "746854",
+  "keys_with_delim": "746854",
+  "expect_text": "手机"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "电脑",
+  "keys": "diannao",
+  "keys_with_delim": "dian'nao",
+  "expect_text": "电脑"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "电脑",
+  "keys": "dmnc",
+  "keys_with_delim": "dm'nc",
+  "expect_text": "电脑"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "电脑",
+  "keys": "dmbc",
+  "keys_with_delim": "dm'bc",
+  "expect_text": "电脑"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "电脑",
+  "keys": "3426626",
+  "keys_with_delim": "3426626",
+  "expect_text": "电脑"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "键盘",
+  "keys": "jianpan",
+  "keys_with_delim": "jian'pan",
+  "expect_text": "键盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "键盘",
+  "keys": "jmpj",
+  "keys_with_delim": "jm'pj",
+  "expect_text": "键盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "键盘",
+  "keys": "jmoj",
+  "keys_with_delim": "jm'oj",
+  "expect_text": "键盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "键盘",
+  "keys": "5426726",
+  "keys_with_delim": "5426726",
+  "expect_text": "键盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "公交车",
+  "keys": "gongjiaoche",
+  "keys_with_delim": "gong'jiao'che",
+  "expect_text": "公交车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "公交车",
+  "keys": "gsjnie",
+  "keys_with_delim": "gs'jn'ie",
+  "expect_text": "公交车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "公交车",
+  "keys": "gajbue",
+  "keys_with_delim": "ga'jb'ue",
+  "expect_text": "公交车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "公交车",
+  "keys": "46645426243",
+  "keys_with_delim": "46645426243",
+  "expect_text": "公交车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "音乐",
+  "keys": "yinyue",
+  "keys_with_delim": "yin'yue",
+  "expect_text": "音乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "音乐",
+  "keys": "ybyt",
+  "keys_with_delim": "yb'yt",
+  "expect_text": "音乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "音乐",
+  "keys": "tbtt",
+  "keys_with_delim": "tb'tt",
+  "expect_text": "音乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "音乐",
+  "keys": "946983",
+  "keys_with_delim": "946983",
+  "expect_text": "音乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "月亮",
+  "keys": "yueliang",
+  "keys_with_delim": "yue'liang",
+  "expect_text": "月亮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "月亮",
+  "keys": "ytll",
+  "keys_with_delim": "yt'll",
+  "expect_text": "月亮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "月亮",
+  "keys": "ttll",
+  "keys_with_delim": "tt'll",
+  "expect_text": "月亮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "月亮",
+  "keys": "98354264",
+  "keys_with_delim": "98354264",
+  "expect_text": "月亮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "学习拼音",
+  "keys": "xuexipinyin",
+  "keys_with_delim": "xue'xi'pin'yin",
+  "expect_text": "学习拼音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "学习拼音",
+  "keys": "xtxipbyb",
+  "keys_with_delim": "xt'xi'pb'yb",
+  "expect_text": "学习拼音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "学习拼音",
+  "keys": "ztzuobtb",
+  "keys_with_delim": "zt'zu'ob'tb",
+  "expect_text": "学习拼音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "学习拼音",
+  "keys": "98394746946",
+  "keys_with_delim": "98394746946",
+  "expect_text": "学习拼音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "双拼实验",
+  "keys": "shuangpinshiyan",
+  "keys_with_delim": "shuang'pin'shi'yan",
+  "expect_text": "双拼实验"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "双拼实验",
+  "keys": "ulpbuiyj",
+  "keys_with_delim": "ul'pb'ui'yj",
+  "expect_text": "双拼实验"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "双拼实验",
+  "keys": "ulobuutj",
+  "keys_with_delim": "ul'ob'uu'tj",
+  "expect_text": "双拼实验"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "双拼实验",
+  "keys": "748264746744926",
+  "keys_with_delim": "748264746744926",
+  "expect_text": "双拼实验"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "白键盘",
+  "keys": "baijianpan",
+  "keys_with_delim": "bai'jian'pan",
+  "expect_text": "白键盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "白键盘",
+  "keys": "bdjmpj",
+  "keys_with_delim": "bd'jm'pj",
+  "expect_text": "白键盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "白键盘",
+  "keys": "bdjmoj",
+  "keys_with_delim": "bd'jm'oj",
+  "expect_text": "白键盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "白键盘",
+  "keys": "2245426726",
+  "keys_with_delim": "2245426726",
+  "expect_text": "白键盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "银行",
+  "keys": "yinhang",
+  "keys_with_delim": "yin'hang",
+  "expect_text": "银行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "银行",
+  "keys": "ybhh",
+  "keys_with_delim": "yb'hh",
+  "expect_text": "银行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "银行",
+  "keys": "tbgg",
+  "keys_with_delim": "tb'gg",
+  "expect_text": "银行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "银行",
+  "keys": "9464264",
+  "keys_with_delim": "9464264",
+  "expect_text": "银行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长大",
+  "keys": "zhangda",
+  "keys_with_delim": "zhang'da",
+  "expect_text": "长大"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长大",
+  "keys": "vhda",
+  "keys_with_delim": "vh'da",
+  "expect_text": "长大"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长大",
+  "keys": "cgda",
+  "keys_with_delim": "cg'da",
+  "expect_text": "长大"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长大",
+  "keys": "9426432",
+  "keys_with_delim": "9426432",
+  "expect_text": "长大"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长度",
+  "keys": "changdu",
+  "keys_with_delim": "chang'du",
+  "expect_text": "长度"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长度",
+  "keys": "ihdu",
+  "keys_with_delim": "ih'du",
+  "expect_text": "长度"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长度",
+  "keys": "ugdu",
+  "keys_with_delim": "ug'du",
+  "expect_text": "长度"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长度",
+  "keys": "2426438",
+  "keys_with_delim": "2426438",
+  "expect_text": "长度"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "快乐",
+  "keys": "kuaile",
+  "keys_with_delim": "kuai'le",
+  "expect_text": "快乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "快乐",
+  "keys": "kkle",
+  "keys_with_delim": "kk'le",
+  "expect_text": "快乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "快乐",
+  "keys": "jjle",
+  "keys_with_delim": "jj'le",
+  "expect_text": "快乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "快乐",
+  "keys": "582453",
+  "keys_with_delim": "582453",
+  "expect_text": "快乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "行走",
+  "keys": "xingzou",
+  "keys_with_delim": "xing'zou",
+  "expect_text": "行走"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "行走",
+  "keys": "xkzz",
+  "keys_with_delim": "xk'zz",
+  "expect_text": "行走"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "行走",
+  "keys": "zjzz",
+  "keys_with_delim": "zj'zz",
+  "expect_text": "行走"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "行走",
+  "keys": "9464968",
+  "keys_with_delim": "9464968",
+  "expect_text": "行走"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "行列",
+  "keys": "hanglie",
+  "keys_with_delim": "hang'lie",
+  "expect_text": "行列"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "行列",
+  "keys": "hhlp",
+  "keys_with_delim": "hh'lp",
+  "expect_text": "行列"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "行列",
+  "keys": "gglo",
+  "keys_with_delim": "gg'lo",
+  "expect_text": "行列"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "行列",
+  "keys": "4264543",
+  "keys_with_delim": "4264543",
+  "expect_text": "行列"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "重要",
+  "keys": "zhongyao",
+  "keys_with_delim": "zhong'yao",
+  "expect_text": "重要"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "重要",
+  "keys": "vsyc",
+  "keys_with_delim": "vs'yc",
+  "expect_text": "重要"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "重要",
+  "keys": "catc",
+  "keys_with_delim": "ca'tc",
+  "expect_text": "重要"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "重要",
+  "keys": "94664926",
+  "keys_with_delim": "94664926",
+  "expect_text": "重要"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "重复",
+  "keys": "chongfu",
+  "keys_with_delim": "chong'fu",
+  "expect_text": "重复"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "重复",
+  "keys": "isfu",
+  "keys_with_delim": "is'fu",
+  "expect_text": "重复"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "重复",
+  "keys": "uadu",
+  "keys_with_delim": "ua'du",
+  "expect_text": "重复"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "重复",
+  "keys": "2466438",
+  "keys_with_delim": "2466438",
+  "expect_text": "重复"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "还是",
+  "keys": "haishi",
+  "keys_with_delim": "hai'shi",
+  "expect_text": "还是"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "还是",
+  "keys": "hdui",
+  "keys_with_delim": "hd'ui",
+  "expect_text": "还是"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "还是",
+  "keys": "gduu",
+  "keys_with_delim": "gd'uu",
+  "expect_text": "还是"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "还是",
+  "keys": "424744",
+  "keys_with_delim": "424744",
+  "expect_text": "还是"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "归还",
+  "keys": "guihuan",
+  "keys_with_delim": "gui'huan",
+  "expect_text": "归还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "归还",
+  "keys": "gvhr",
+  "keys_with_delim": "gv'hr",
+  "expect_text": "归还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "归还",
+  "keys": "gcge",
+  "keys_with_delim": "gc'ge",
+  "expect_text": "归还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "归还",
+  "keys": "4844826",
+  "keys_with_delim": "4844826",
+  "expect_text": "归还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "绿色",
+  "keys": "lvse",
+  "keys_with_delim": "lv'se",
+  "expect_text": "绿色"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "绿色",
+  "keys": "lvse",
+  "keys_with_delim": "lv'se",
+  "expect_text": "绿色"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "绿色",
+  "keys": "lcae",
+  "keys_with_delim": "lc'ae",
+  "expect_text": "绿色"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "绿色",
+  "keys": "5873",
+  "keys_with_delim": "5873",
+  "expect_text": "绿色"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "女孩",
+  "keys": "nvhai",
+  "keys_with_delim": "nv'hai",
+  "expect_text": "女孩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "女孩",
+  "keys": "nvhd",
+  "keys_with_delim": "nv'hd",
+  "expect_text": "女孩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "女孩",
+  "keys": "bcgd",
+  "keys_with_delim": "bc'gd",
+  "expect_text": "女孩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "女孩",
+  "keys": "68424",
+  "keys_with_delim": "68424",
+  "expect_text": "女孩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "二月",
+  "keys": "eryue",
+  "keys_with_delim": "er'yue",
+  "expect_text": "二月"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "二月",
+  "keys": "eryt",
+  "keys_with_delim": "er'yt",
+  "expect_text": "二月"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "二月",
+  "keys": "eett",
+  "keys_with_delim": "ee'tt",
+  "expect_text": "二月"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "二月",
+  "keys": "37983",
+  "keys_with_delim": "37983",
+  "expect_text": "二月"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "爱好",
+  "keys": "aihao",
+  "keys_with_delim": "ai'hao",
+  "expect_text": "爱好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "爱好",
+  "keys": "aihc",
+  "keys_with_delim": "ai'hc",
+  "expect_text": "爱好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "爱好",
+  "keys": "augc",
+  "keys_with_delim": "au'gc",
+  "expect_text": "爱好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "爱好",
+  "keys": "24426",
+  "keys_with_delim": "24426",
+  "expect_text": "爱好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "平安",
+  "keys": "pingan",
+  "keys_with_delim": "ping'an",
+  "expect_text": "平安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "平安",
+  "keys": "pkan",
+  "keys_with_delim": "pk'an",
+  "expect_text": "平安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "平安",
+  "keys": "ojab",
+  "keys_with_delim": "oj'ab",
+  "expect_text": "平安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "平安",
+  "keys": "746426",
+  "keys_with_delim": "746426",
+  "expect_text": "平安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "西安",
+  "keys": "xian",
+  "keys_with_delim": "xi'an",
+  "expect_text": "西安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "西安",
+  "keys": "xian",
+  "keys_with_delim": "xi'an",
+  "expect_text": "西安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "西安",
+  "keys": "zuab",
+  "keys_with_delim": "zu'ab",
+  "expect_text": "西安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "西安",
+  "keys": "9426",
+  "keys_with_delim": "9426",
+  "expect_text": "西安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "帮忙",
+  "keys": "bangmang",
+  "keys_with_delim": "bang'mang",
+  "expect_text": "帮忙"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "帮忙",
+  "keys": "bhmh",
+  "keys_with_delim": "bh'mh",
+  "expect_text": "帮忙"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "帮忙",
+  "keys": "bgmg",
+  "keys_with_delim": "bg'mg",
+  "expect_text": "帮忙"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "帮忙",
+  "keys": "22646264",
+  "keys_with_delim": "22646264",
+  "expect_text": "帮忙"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "声音",
+  "keys": "shengyin",
+  "keys_with_delim": "sheng'yin",
+  "expect_text": "声音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "声音",
+  "keys": "ugyb",
+  "keys_with_delim": "ug'yb",
+  "expect_text": "声音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "声音",
+  "keys": "ugtb",
+  "keys_with_delim": "ug'tb",
+  "expect_text": "声音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "声音",
+  "keys": "74364946",
+  "keys_with_delim": "74364946",
+  "expect_text": "声音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "明天",
+  "keys": "mingtian",
+  "keys_with_delim": "ming'tian",
+  "expect_text": "明天"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "明天",
+  "keys": "mktm",
+  "keys_with_delim": "mk'tm",
+  "expect_text": "明天"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "明天",
+  "keys": "mjtm",
+  "keys_with_delim": "mj'tm",
+  "expect_text": "明天"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "明天",
+  "keys": "64648426",
+  "keys_with_delim": "64648426",
+  "expect_text": "明天"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "生活",
+  "keys": "shenghuo",
+  "keys_with_delim": "sheng'huo",
+  "expect_text": "生活"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "生活",
+  "keys": "ugho",
+  "keys_with_delim": "ug'ho",
+  "expect_text": "生活"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "生活",
+  "keys": "uggo",
+  "keys_with_delim": "ug'go",
+  "expect_text": "生活"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "生活",
+  "keys": "74364486",
+  "keys_with_delim": "74364486",
+  "expect_text": "生活"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "健康",
+  "keys": "jiankang",
+  "keys_with_delim": "jian'kang",
+  "expect_text": "健康"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "健康",
+  "keys": "jmkh",
+  "keys_with_delim": "jm'kh",
+  "expect_text": "健康"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "健康",
+  "keys": "jmjg",
+  "keys_with_delim": "jm'jg",
+  "expect_text": "健康"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "健康",
+  "keys": "54265264",
+  "keys_with_delim": "54265264",
+  "expect_text": "健康"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长城",
+  "keys": "changcheng",
+  "keys_with_delim": "chang'cheng",
+  "expect_text": "长城"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长城",
+  "keys": "ihig",
+  "keys_with_delim": "ih'ig",
+  "expect_text": "长城"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长城",
+  "keys": "ugug",
+  "keys_with_delim": "ug'ug",
+  "expect_text": "长城"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长城",
+  "keys": "2426424364",
+  "keys_with_delim": "2426424364",
+  "expect_text": "长城"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长江",
+  "keys": "changjiang",
+  "keys_with_delim": "chang'jiang",
+  "expect_text": "长江"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长江",
+  "keys": "ihjl",
+  "keys_with_delim": "ih'jl",
+  "expect_text": "长江"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长江",
+  "keys": "ugjl",
+  "keys_with_delim": "ug'jl",
+  "expect_text": "长江"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长江",
+  "keys": "2426454264",
+  "keys_with_delim": "2426454264",
+  "expect_text": "长江"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "成长",
+  "keys": "chengzhang",
+  "keys_with_delim": "cheng'zhang",
+  "expect_text": "成长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "成长",
+  "keys": "igvh",
+  "keys_with_delim": "ig'vh",
+  "expect_text": "成长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "成长",
+  "keys": "ugcg",
+  "keys_with_delim": "ug'cg",
+  "expect_text": "成长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "成长",
+  "keys": "2436494264",
+  "keys_with_delim": "2436494264",
+  "expect_text": "成长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "山水",
+  "keys": "shanshui",
+  "keys_with_delim": "shan'shui",
+  "expect_text": "山水"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "山水",
+  "keys": "ujuv",
+  "keys_with_delim": "uj'uv",
+  "expect_text": "山水"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "山水",
+  "keys": "ujuc",
+  "keys_with_delim": "uj'uc",
+  "expect_text": "山水"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "山水",
+  "keys": "74267484",
+  "keys_with_delim": "74267484",
+  "expect_text": "山水"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "上车",
+  "keys": "shangche",
+  "keys_with_delim": "shang'che",
+  "expect_text": "上车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "上车",
+  "keys": "uhie",
+  "keys_with_delim": "uh'ie",
+  "expect_text": "上车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "上车",
+  "keys": "ugue",
+  "keys_with_delim": "ug'ue",
+  "expect_text": "上车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "上车",
+  "keys": "74264243",
+  "keys_with_delim": "74264243",
+  "expect_text": "上车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "早上",
+  "keys": "zaoshang",
+  "keys_with_delim": "zao'shang",
+  "expect_text": "早上"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "早上",
+  "keys": "zcuh",
+  "keys_with_delim": "zc'uh",
+  "expect_text": "早上"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "早上",
+  "keys": "zcug",
+  "keys_with_delim": "zc'ug",
+  "expect_text": "早上"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "早上",
+  "keys": "92674264",
+  "keys_with_delim": "92674264",
+  "expect_text": "早上"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "早上好",
+  "keys": "zaoshanghao",
+  "keys_with_delim": "zao'shang'hao",
+  "expect_text": "早上好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "早上好",
+  "keys": "zcuhhc",
+  "keys_with_delim": "zc'uh'hc",
+  "expect_text": "早上好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "早上好",
+  "keys": "zcuggc",
+  "keys_with_delim": "zc'ug'gc",
+  "expect_text": "早上好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "早上好",
+  "keys": "92674264426",
+  "keys_with_delim": "92674264426",
+  "expect_text": "早上好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "你",
+  "keys": "ni",
+  "keys_with_delim": "ni",
+  "expect_text": "你"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "你",
+  "keys": "ni",
+  "keys_with_delim": "ni",
+  "expect_text": "你"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "你",
+  "keys": "bu",
+  "keys_with_delim": "bu",
+  "expect_text": "你"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "你",
+  "keys": "64",
+  "keys_with_delim": "64",
+  "expect_text": "你"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "好",
+  "keys": "hao",
+  "keys_with_delim": "hao",
+  "expect_text": "好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "好",
+  "keys": "hc",
+  "keys_with_delim": "hc",
+  "expect_text": "好"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "好",
+  "keys": "gc",
+  "keys_with_delim": "gc",
+  "expect_text": "好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "好",
+  "keys": "426",
+  "keys_with_delim": "426",
+  "expect_text": "好"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "我",
+  "keys": "wo",
+  "keys_with_delim": "wo",
+  "expect_text": "我"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "我",
+  "keys": "wo",
+  "keys_with_delim": "wo",
+  "expect_text": "我"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "我",
+  "keys": "qo",
+  "keys_with_delim": "qo",
+  "expect_text": "我"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "我",
+  "keys": "96",
+  "keys_with_delim": "96",
+  "expect_text": "我"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "是",
+  "keys": "shi",
+  "keys_with_delim": "shi",
+  "expect_text": "是"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "是",
+  "keys": "ui",
+  "keys_with_delim": "ui",
+  "expect_text": "是"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "是",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "是"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "是",
+  "keys": "744",
+  "keys_with_delim": "744",
+  "expect_text": "是"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "的",
+  "keys": "de",
+  "keys_with_delim": "de",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "的",
+  "keys": "de",
+  "keys_with_delim": "de",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "的",
+  "keys": "de",
+  "keys_with_delim": "de",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "的",
+  "keys": "33",
+  "keys_with_delim": "33",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "的",
+  "keys": "di",
+  "keys_with_delim": "di",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "的",
+  "keys": "di",
+  "keys_with_delim": "di",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "的",
+  "keys": "du",
+  "keys_with_delim": "du",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "的",
+  "keys": "34",
+  "keys_with_delim": "34",
+  "expect_text": "的"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "一",
+  "keys": "yi",
+  "keys_with_delim": "yi",
+  "expect_text": "一"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "一",
+  "keys": "yi",
+  "keys_with_delim": "yi",
+  "expect_text": "一"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "一",
+  "keys": "tu",
+  "keys_with_delim": "tu",
+  "expect_text": "一"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "一",
+  "keys": "94",
+  "keys_with_delim": "94",
+  "expect_text": "一"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "不",
+  "keys": "bu",
+  "keys_with_delim": "bu",
+  "expect_text": "不"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "不",
+  "keys": "bu",
+  "keys_with_delim": "bu",
+  "expect_text": "不"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "不",
+  "keys": "bu",
+  "keys_with_delim": "bu",
+  "expect_text": "不"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "不",
+  "keys": "28",
+  "keys_with_delim": "28",
+  "expect_text": "不"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "了",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "了",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "了",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "了",
+  "keys": "53",
+  "keys_with_delim": "53",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "了",
+  "keys": "liao",
+  "keys_with_delim": "liao",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "了",
+  "keys": "ln",
+  "keys_with_delim": "ln",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "了",
+  "keys": "lb",
+  "keys_with_delim": "lb",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "了",
+  "keys": "5426",
+  "keys_with_delim": "5426",
+  "expect_text": "了"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "在",
+  "keys": "zai",
+  "keys_with_delim": "zai",
+  "expect_text": "在"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "在",
+  "keys": "zd",
+  "keys_with_delim": "zd",
+  "expect_text": "在"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "在",
+  "keys": "zd",
+  "keys_with_delim": "zd",
+  "expect_text": "在"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "在",
+  "keys": "924",
+  "keys_with_delim": "924",
+  "expect_text": "在"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "人",
+  "keys": "ren",
+  "keys_with_delim": "ren",
+  "expect_text": "人"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "人",
+  "keys": "rf",
+  "keys_with_delim": "rf",
+  "expect_text": "人"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "人",
+  "keys": "ed",
+  "keys_with_delim": "ed",
+  "expect_text": "人"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "人",
+  "keys": "736",
+  "keys_with_delim": "736",
+  "expect_text": "人"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "和",
+  "keys": "he",
+  "keys_with_delim": "he",
+  "expect_text": "和"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "和",
+  "keys": "he",
+  "keys_with_delim": "he",
+  "expect_text": "和"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "和",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "和"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "和",
+  "keys": "43",
+  "keys_with_delim": "43",
+  "expect_text": "和"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "中",
+  "keys": "zhong",
+  "keys_with_delim": "zhong",
+  "expect_text": "中"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "中",
+  "keys": "vs",
+  "keys_with_delim": "vs",
+  "expect_text": "中"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "中",
+  "keys": "ca",
+  "keys_with_delim": "ca",
+  "expect_text": "中"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "中",
+  "keys": "94664",
+  "keys_with_delim": "94664",
+  "expect_text": "中"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "国",
+  "keys": "guo",
+  "keys_with_delim": "guo",
+  "expect_text": "国"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "国",
+  "keys": "go",
+  "keys_with_delim": "go",
+  "expect_text": "国"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "国",
+  "keys": "go",
+  "keys_with_delim": "go",
+  "expect_text": "国"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "国",
+  "keys": "486",
+  "keys_with_delim": "486",
+  "expect_text": "国"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "这",
+  "keys": "zhe",
+  "keys_with_delim": "zhe",
+  "expect_text": "这"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "这",
+  "keys": "ve",
+  "keys_with_delim": "ve",
+  "expect_text": "这"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "这",
+  "keys": "ce",
+  "keys_with_delim": "ce",
+  "expect_text": "这"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "这",
+  "keys": "943",
+  "keys_with_delim": "943",
+  "expect_text": "这"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "为",
+  "keys": "wei",
+  "keys_with_delim": "wei",
+  "expect_text": "为"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "为",
+  "keys": "ww",
+  "keys_with_delim": "ww",
+  "expect_text": "为"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "为",
+  "keys": "qq",
+  "keys_with_delim": "qq",
+  "expect_text": "为"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "为",
+  "keys": "934",
+  "keys_with_delim": "934",
+  "expect_text": "为"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "上",
+  "keys": "shang",
+  "keys_with_delim": "shang",
+  "expect_text": "上"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "上",
+  "keys": "uh",
+  "keys_with_delim": "uh",
+  "expect_text": "上"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "上",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "上"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "上",
+  "keys": "74264",
+  "keys_with_delim": "74264",
+  "expect_text": "上"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "个",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "个"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "个",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "个"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "个",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "个"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "个",
+  "keys": "43",
+  "keys_with_delim": "43",
+  "expect_text": "个"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "大",
+  "keys": "da",
+  "keys_with_delim": "da",
+  "expect_text": "大"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "大",
+  "keys": "da",
+  "keys_with_delim": "da",
+  "expect_text": "大"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "大",
+  "keys": "da",
+  "keys_with_delim": "da",
+  "expect_text": "大"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "大",
+  "keys": "32",
+  "keys_with_delim": "32",
+  "expect_text": "大"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "到",
+  "keys": "dao",
+  "keys_with_delim": "dao",
+  "expect_text": "到"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "到",
+  "keys": "dc",
+  "keys_with_delim": "dc",
+  "expect_text": "到"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "到",
+  "keys": "dc",
+  "keys_with_delim": "dc",
+  "expect_text": "到"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "到",
+  "keys": "326",
+  "keys_with_delim": "326",
+  "expect_text": "到"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "说",
+  "keys": "shuo",
+  "keys_with_delim": "shuo",
+  "expect_text": "说"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "说",
+  "keys": "uo",
+  "keys_with_delim": "uo",
+  "expect_text": "说"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "说",
+  "keys": "uo",
+  "keys_with_delim": "uo",
+  "expect_text": "说"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "说",
+  "keys": "7486",
+  "keys_with_delim": "7486",
+  "expect_text": "说"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "要",
+  "keys": "yao",
+  "keys_with_delim": "yao",
+  "expect_text": "要"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "要",
+  "keys": "yc",
+  "keys_with_delim": "yc",
+  "expect_text": "要"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "要",
+  "keys": "tc",
+  "keys_with_delim": "tc",
+  "expect_text": "要"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "要",
+  "keys": "926",
+  "keys_with_delim": "926",
+  "expect_text": "要"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "就",
+  "keys": "jiu",
+  "keys_with_delim": "jiu",
+  "expect_text": "就"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "就",
+  "keys": "jq",
+  "keys_with_delim": "jq",
+  "expect_text": "就"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "就",
+  "keys": "jq",
+  "keys_with_delim": "jq",
+  "expect_text": "就"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "就",
+  "keys": "548",
+  "keys_with_delim": "548",
+  "expect_text": "就"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "去",
+  "keys": "qu",
+  "keys_with_delim": "qu",
+  "expect_text": "去"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "去",
+  "keys": "qu",
+  "keys_with_delim": "qu",
+  "expect_text": "去"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "去",
+  "keys": "qu",
+  "keys_with_delim": "qu",
+  "expect_text": "去"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "去",
+  "keys": "78",
+  "keys_with_delim": "78",
+  "expect_text": "去"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "能",
+  "keys": "neng",
+  "keys_with_delim": "neng",
+  "expect_text": "能"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "能",
+  "keys": "ng",
+  "keys_with_delim": "ng",
+  "expect_text": "能"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "能",
+  "keys": "bg",
+  "keys_with_delim": "bg",
+  "expect_text": "能"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "能",
+  "keys": "6364",
+  "keys_with_delim": "6364",
+  "expect_text": "能"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "会",
+  "keys": "hui",
+  "keys_with_delim": "hui",
+  "expect_text": "会"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "会",
+  "keys": "hv",
+  "keys_with_delim": "hv",
+  "expect_text": "会"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "会",
+  "keys": "gc",
+  "keys_with_delim": "gc",
+  "expect_text": "会"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "会",
+  "keys": "484",
+  "keys_with_delim": "484",
+  "expect_text": "会"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "年",
+  "keys": "nian",
+  "keys_with_delim": "nian",
+  "expect_text": "年"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "年",
+  "keys": "nm",
+  "keys_with_delim": "nm",
+  "expect_text": "年"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "年",
+  "keys": "bm",
+  "keys_with_delim": "bm",
+  "expect_text": "年"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "年",
+  "keys": "6426",
+  "keys_with_delim": "6426",
+  "expect_text": "年"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "学",
+  "keys": "xue",
+  "keys_with_delim": "xue",
+  "expect_text": "学"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "学",
+  "keys": "xt",
+  "keys_with_delim": "xt",
+  "expect_text": "学"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "学",
+  "keys": "zt",
+  "keys_with_delim": "zt",
+  "expect_text": "学"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "学",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "学"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "工",
+  "keys": "gong",
+  "keys_with_delim": "gong",
+  "expect_text": "工"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "工",
+  "keys": "gs",
+  "keys_with_delim": "gs",
+  "expect_text": "工"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "工",
+  "keys": "ga",
+  "keys_with_delim": "ga",
+  "expect_text": "工"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "工",
+  "keys": "4664",
+  "keys_with_delim": "4664",
+  "expect_text": "工"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "开",
+  "keys": "kai",
+  "keys_with_delim": "kai",
+  "expect_text": "开"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "开",
+  "keys": "kd",
+  "keys_with_delim": "kd",
+  "expect_text": "开"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "开",
+  "keys": "jd",
+  "keys_with_delim": "jd",
+  "expect_text": "开"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "开",
+  "keys": "524",
+  "keys_with_delim": "524",
+  "expect_text": "开"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "小",
+  "keys": "xiao",
+  "keys_with_delim": "xiao",
+  "expect_text": "小"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "小",
+  "keys": "xn",
+  "keys_with_delim": "xn",
+  "expect_text": "小"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "小",
+  "keys": "zb",
+  "keys_with_delim": "zb",
+  "expect_text": "小"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "小",
+  "keys": "9426",
+  "keys_with_delim": "9426",
+  "expect_text": "小"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "成",
+  "keys": "cheng",
+  "keys_with_delim": "cheng",
+  "expect_text": "成"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "成",
+  "keys": "ig",
+  "keys_with_delim": "ig",
+  "expect_text": "成"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "成",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "成"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "成",
+  "keys": "24364",
+  "keys_with_delim": "24364",
+  "expect_text": "成"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "家",
+  "keys": "jia",
+  "keys_with_delim": "jia",
+  "expect_text": "家"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "家",
+  "keys": "jx",
+  "keys_with_delim": "jx",
+  "expect_text": "家"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "家",
+  "keys": "jz",
+  "keys_with_delim": "jz",
+  "expect_text": "家"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "家",
+  "keys": "542",
+  "keys_with_delim": "542",
+  "expect_text": "家"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "电",
+  "keys": "dian",
+  "keys_with_delim": "dian",
+  "expect_text": "电"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "电",
+  "keys": "dm",
+  "keys_with_delim": "dm",
+  "expect_text": "电"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "电",
+  "keys": "dm",
+  "keys_with_delim": "dm",
+  "expect_text": "电"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "电",
+  "keys": "3426",
+  "keys_with_delim": "3426",
+  "expect_text": "电"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "手",
+  "keys": "shou",
+  "keys_with_delim": "shou",
+  "expect_text": "手"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "手",
+  "keys": "uz",
+  "keys_with_delim": "uz",
+  "expect_text": "手"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "手",
+  "keys": "uz",
+  "keys_with_delim": "uz",
+  "expect_text": "手"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "手",
+  "keys": "7468",
+  "keys_with_delim": "7468",
+  "expect_text": "手"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "机",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "机"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "机",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "机"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "机",
+  "keys": "ju",
+  "keys_with_delim": "ju",
+  "expect_text": "机"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "机",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "机"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "车",
+  "keys": "che",
+  "keys_with_delim": "che",
+  "expect_text": "车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "车",
+  "keys": "ie",
+  "keys_with_delim": "ie",
+  "expect_text": "车"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "车",
+  "keys": "ue",
+  "keys_with_delim": "ue",
+  "expect_text": "车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "车",
+  "keys": "243",
+  "keys_with_delim": "243",
+  "expect_text": "车"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "路",
+  "keys": "lu",
+  "keys_with_delim": "lu",
+  "expect_text": "路"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "路",
+  "keys": "lu",
+  "keys_with_delim": "lu",
+  "expect_text": "路"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "路",
+  "keys": "lu",
+  "keys_with_delim": "lu",
+  "expect_text": "路"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "路",
+  "keys": "58",
+  "keys_with_delim": "58",
+  "expect_text": "路"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "天",
+  "keys": "tian",
+  "keys_with_delim": "tian",
+  "expect_text": "天"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "天",
+  "keys": "tm",
+  "keys_with_delim": "tm",
+  "expect_text": "天"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "天",
+  "keys": "tm",
+  "keys_with_delim": "tm",
+  "expect_text": "天"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "天",
+  "keys": "8426",
+  "keys_with_delim": "8426",
+  "expect_text": "天"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "妈",
+  "keys": "ma",
+  "keys_with_delim": "ma",
+  "expect_text": "妈"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "妈",
+  "keys": "ma",
+  "keys_with_delim": "ma",
+  "expect_text": "妈"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "妈",
+  "keys": "ma",
+  "keys_with_delim": "ma",
+  "expect_text": "妈"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "妈",
+  "keys": "62",
+  "keys_with_delim": "62",
+  "expect_text": "妈"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "爸",
+  "keys": "ba",
+  "keys_with_delim": "ba",
+  "expect_text": "爸"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "爸",
+  "keys": "ba",
+  "keys_with_delim": "ba",
+  "expect_text": "爸"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "爸",
+  "keys": "ba",
+  "keys_with_delim": "ba",
+  "expect_text": "爸"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "爸",
+  "keys": "22",
+  "keys_with_delim": "22",
+  "expect_text": "爸"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "饭",
+  "keys": "fan",
+  "keys_with_delim": "fan",
+  "expect_text": "饭"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "饭",
+  "keys": "fj",
+  "keys_with_delim": "fj",
+  "expect_text": "饭"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "饭",
+  "keys": "dj",
+  "keys_with_delim": "dj",
+  "expect_text": "饭"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "饭",
+  "keys": "326",
+  "keys_with_delim": "326",
+  "expect_text": "饭"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "吃",
+  "keys": "chi",
+  "keys_with_delim": "chi",
+  "expect_text": "吃"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "吃",
+  "keys": "ii",
+  "keys_with_delim": "ii",
+  "expect_text": "吃"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "吃",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "吃"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "吃",
+  "keys": "244",
+  "keys_with_delim": "244",
+  "expect_text": "吃"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "想",
+  "keys": "xiang",
+  "keys_with_delim": "xiang",
+  "expect_text": "想"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "想",
+  "keys": "xl",
+  "keys_with_delim": "xl",
+  "expect_text": "想"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "想",
+  "keys": "zl",
+  "keys_with_delim": "zl",
+  "expect_text": "想"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "想",
+  "keys": "94264",
+  "keys_with_delim": "94264",
+  "expect_text": "想"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "见",
+  "keys": "jian",
+  "keys_with_delim": "jian",
+  "expect_text": "见"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "见",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "见"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "见",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "见"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "见",
+  "keys": "5426",
+  "keys_with_delim": "5426",
+  "expect_text": "见"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "同",
+  "keys": "tong",
+  "keys_with_delim": "tong",
+  "expect_text": "同"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "同",
+  "keys": "ts",
+  "keys_with_delim": "ts",
+  "expect_text": "同"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "同",
+  "keys": "ta",
+  "keys_with_delim": "ta",
+  "expect_text": "同"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "同",
+  "keys": "8664",
+  "keys_with_delim": "8664",
+  "expect_text": "同"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "盘",
+  "keys": "pan",
+  "keys_with_delim": "pan",
+  "expect_text": "盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "盘",
+  "keys": "pj",
+  "keys_with_delim": "pj",
+  "expect_text": "盘"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "盘",
+  "keys": "oj",
+  "keys_with_delim": "oj",
+  "expect_text": "盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "盘",
+  "keys": "726",
+  "keys_with_delim": "726",
+  "expect_text": "盘"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "键",
+  "keys": "jian",
+  "keys_with_delim": "jian",
+  "expect_text": "键"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "键",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "键"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "键",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "键"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "键",
+  "keys": "5426",
+  "keys_with_delim": "5426",
+  "expect_text": "键"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "双",
+  "keys": "shuang",
+  "keys_with_delim": "shuang",
+  "expect_text": "双"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "双",
+  "keys": "ul",
+  "keys_with_delim": "ul",
+  "expect_text": "双"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "双",
+  "keys": "ul",
+  "keys_with_delim": "ul",
+  "expect_text": "双"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "双",
+  "keys": "748264",
+  "keys_with_delim": "748264",
+  "expect_text": "双"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "拼",
+  "keys": "pin",
+  "keys_with_delim": "pin",
+  "expect_text": "拼"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "拼",
+  "keys": "pb",
+  "keys_with_delim": "pb",
+  "expect_text": "拼"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "拼",
+  "keys": "ob",
+  "keys_with_delim": "ob",
+  "expect_text": "拼"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "拼",
+  "keys": "746",
+  "keys_with_delim": "746",
+  "expect_text": "拼"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "音",
+  "keys": "yin",
+  "keys_with_delim": "yin",
+  "expect_text": "音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "音",
+  "keys": "yb",
+  "keys_with_delim": "yb",
+  "expect_text": "音"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "音",
+  "keys": "tb",
+  "keys_with_delim": "tb",
+  "expect_text": "音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "音",
+  "keys": "946",
+  "keys_with_delim": "946",
+  "expect_text": "音"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "验",
+  "keys": "yan",
+  "keys_with_delim": "yan",
+  "expect_text": "验"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "验",
+  "keys": "yj",
+  "keys_with_delim": "yj",
+  "expect_text": "验"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "验",
+  "keys": "tj",
+  "keys_with_delim": "tj",
+  "expect_text": "验"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "验",
+  "keys": "926",
+  "keys_with_delim": "926",
+  "expect_text": "验"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "实",
+  "keys": "shi",
+  "keys_with_delim": "shi",
+  "expect_text": "实"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "实",
+  "keys": "ui",
+  "keys_with_delim": "ui",
+  "expect_text": "实"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "实",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "实"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "实",
+  "keys": "744",
+  "keys_with_delim": "744",
+  "expect_text": "实"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "试",
+  "keys": "shi",
+  "keys_with_delim": "shi",
+  "expect_text": "试"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "试",
+  "keys": "ui",
+  "keys_with_delim": "ui",
+  "expect_text": "试"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "试",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "试"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "试",
+  "keys": "744",
+  "keys_with_delim": "744",
+  "expect_text": "试"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "空",
+  "keys": "kong",
+  "keys_with_delim": "kong",
+  "expect_text": "空"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "空",
+  "keys": "ks",
+  "keys_with_delim": "ks",
+  "expect_text": "空"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "空",
+  "keys": "ja",
+  "keys_with_delim": "ja",
+  "expect_text": "空"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "空",
+  "keys": "5664",
+  "keys_with_delim": "5664",
+  "expect_text": "空"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "白",
+  "keys": "bai",
+  "keys_with_delim": "bai",
+  "expect_text": "白"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "白",
+  "keys": "bd",
+  "keys_with_delim": "bd",
+  "expect_text": "白"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "白",
+  "keys": "bd",
+  "keys_with_delim": "bd",
+  "expect_text": "白"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "白",
+  "keys": "224",
+  "keys_with_delim": "224",
+  "expect_text": "白"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "典",
+  "keys": "dian",
+  "keys_with_delim": "dian",
+  "expect_text": "典"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "典",
+  "keys": "dm",
+  "keys_with_delim": "dm",
+  "expect_text": "典"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "典",
+  "keys": "dm",
+  "keys_with_delim": "dm",
+  "expect_text": "典"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "典",
+  "keys": "3426",
+  "keys_with_delim": "3426",
+  "expect_text": "典"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "移",
+  "keys": "yi",
+  "keys_with_delim": "yi",
+  "expect_text": "移"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "移",
+  "keys": "yi",
+  "keys_with_delim": "yi",
+  "expect_text": "移"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "移",
+  "keys": "tu",
+  "keys_with_delim": "tu",
+  "expect_text": "移"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "移",
+  "keys": "94",
+  "keys_with_delim": "94",
+  "expect_text": "移"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "动",
+  "keys": "dong",
+  "keys_with_delim": "dong",
+  "expect_text": "动"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "动",
+  "keys": "ds",
+  "keys_with_delim": "ds",
+  "expect_text": "动"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "动",
+  "keys": "da",
+  "keys_with_delim": "da",
+  "expect_text": "动"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "动",
+  "keys": "3664",
+  "keys_with_delim": "3664",
+  "expect_text": "动"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "鸟",
+  "keys": "niao",
+  "keys_with_delim": "niao",
+  "expect_text": "鸟"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "鸟",
+  "keys": "nn",
+  "keys_with_delim": "nn",
+  "expect_text": "鸟"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "鸟",
+  "keys": "bb",
+  "keys_with_delim": "bb",
+  "expect_text": "鸟"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "鸟",
+  "keys": "6426",
+  "keys_with_delim": "6426",
+  "expect_text": "鸟"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "鱼",
+  "keys": "yu",
+  "keys_with_delim": "yu",
+  "expect_text": "鱼"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "鱼",
+  "keys": "yu",
+  "keys_with_delim": "yu",
+  "expect_text": "鱼"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "鱼",
+  "keys": "tu",
+  "keys_with_delim": "tu",
+  "expect_text": "鱼"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "鱼",
+  "keys": "98",
+  "keys_with_delim": "98",
+  "expect_text": "鱼"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "月",
+  "keys": "yue",
+  "keys_with_delim": "yue",
+  "expect_text": "月"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "月",
+  "keys": "yt",
+  "keys_with_delim": "yt",
+  "expect_text": "月"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "月",
+  "keys": "tt",
+  "keys_with_delim": "tt",
+  "expect_text": "月"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "月",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "月"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "日",
+  "keys": "ri",
+  "keys_with_delim": "ri",
+  "expect_text": "日"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "日",
+  "keys": "ri",
+  "keys_with_delim": "ri",
+  "expect_text": "日"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "日",
+  "keys": "eu",
+  "keys_with_delim": "eu",
+  "expect_text": "日"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "日",
+  "keys": "74",
+  "keys_with_delim": "74",
+  "expect_text": "日"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "云",
+  "keys": "yun",
+  "keys_with_delim": "yun",
+  "expect_text": "云"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "云",
+  "keys": "yy",
+  "keys_with_delim": "yy",
+  "expect_text": "云"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "云",
+  "keys": "tt",
+  "keys_with_delim": "tt",
+  "expect_text": "云"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "云",
+  "keys": "986",
+  "keys_with_delim": "986",
+  "expect_text": "云"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "雨",
+  "keys": "yu",
+  "keys_with_delim": "yu",
+  "expect_text": "雨"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "雨",
+  "keys": "yu",
+  "keys_with_delim": "yu",
+  "expect_text": "雨"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "雨",
+  "keys": "tu",
+  "keys_with_delim": "tu",
+  "expect_text": "雨"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "雨",
+  "keys": "98",
+  "keys_with_delim": "98",
+  "expect_text": "雨"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "风",
+  "keys": "feng",
+  "keys_with_delim": "feng",
+  "expect_text": "风"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "风",
+  "keys": "fg",
+  "keys_with_delim": "fg",
+  "expect_text": "风"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "风",
+  "keys": "dg",
+  "keys_with_delim": "dg",
+  "expect_text": "风"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "风",
+  "keys": "3364",
+  "keys_with_delim": "3364",
+  "expect_text": "风"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "河",
+  "keys": "he",
+  "keys_with_delim": "he",
+  "expect_text": "河"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "河",
+  "keys": "he",
+  "keys_with_delim": "he",
+  "expect_text": "河"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "河",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "河"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "河",
+  "keys": "43",
+  "keys_with_delim": "43",
+  "expect_text": "河"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "湖",
+  "keys": "hu",
+  "keys_with_delim": "hu",
+  "expect_text": "湖"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "湖",
+  "keys": "hu",
+  "keys_with_delim": "hu",
+  "expect_text": "湖"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "湖",
+  "keys": "gu",
+  "keys_with_delim": "gu",
+  "expect_text": "湖"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "湖",
+  "keys": "48",
+  "keys_with_delim": "48",
+  "expect_text": "湖"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "海",
+  "keys": "hai",
+  "keys_with_delim": "hai",
+  "expect_text": "海"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "海",
+  "keys": "hd",
+  "keys_with_delim": "hd",
+  "expect_text": "海"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "海",
+  "keys": "gd",
+  "keys_with_delim": "gd",
+  "expect_text": "海"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "海",
+  "keys": "424",
+  "keys_with_delim": "424",
+  "expect_text": "海"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "山",
+  "keys": "shan",
+  "keys_with_delim": "shan",
+  "expect_text": "山"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "山",
+  "keys": "uj",
+  "keys_with_delim": "uj",
+  "expect_text": "山"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "山",
+  "keys": "uj",
+  "keys_with_delim": "uj",
+  "expect_text": "山"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "山",
+  "keys": "7426",
+  "keys_with_delim": "7426",
+  "expect_text": "山"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "林",
+  "keys": "lin",
+  "keys_with_delim": "lin",
+  "expect_text": "林"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "林",
+  "keys": "lb",
+  "keys_with_delim": "lb",
+  "expect_text": "林"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "林",
+  "keys": "lb",
+  "keys_with_delim": "lb",
+  "expect_text": "林"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "林",
+  "keys": "546",
+  "keys_with_delim": "546",
+  "expect_text": "林"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "水",
+  "keys": "shui",
+  "keys_with_delim": "shui",
+  "expect_text": "水"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "水",
+  "keys": "uv",
+  "keys_with_delim": "uv",
+  "expect_text": "水"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "水",
+  "keys": "uc",
+  "keys_with_delim": "uc",
+  "expect_text": "水"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "水",
+  "keys": "7484",
+  "keys_with_delim": "7484",
+  "expect_text": "水"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "火",
+  "keys": "huo",
+  "keys_with_delim": "huo",
+  "expect_text": "火"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "火",
+  "keys": "ho",
+  "keys_with_delim": "ho",
+  "expect_text": "火"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "火",
+  "keys": "go",
+  "keys_with_delim": "go",
+  "expect_text": "火"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "火",
+  "keys": "486",
+  "keys_with_delim": "486",
+  "expect_text": "火"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "王",
+  "keys": "wang",
+  "keys_with_delim": "wang",
+  "expect_text": "王"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "王",
+  "keys": "wh",
+  "keys_with_delim": "wh",
+  "expect_text": "王"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "王",
+  "keys": "qg",
+  "keys_with_delim": "qg",
+  "expect_text": "王"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "王",
+  "keys": "9264",
+  "keys_with_delim": "9264",
+  "expect_text": "王"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "力",
+  "keys": "li",
+  "keys_with_delim": "li",
+  "expect_text": "力"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "力",
+  "keys": "li",
+  "keys_with_delim": "li",
+  "expect_text": "力"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "力",
+  "keys": "lu",
+  "keys_with_delim": "lu",
+  "expect_text": "力"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "力",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "力"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "立",
+  "keys": "li",
+  "keys_with_delim": "li",
+  "expect_text": "立"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "立",
+  "keys": "li",
+  "keys_with_delim": "li",
+  "expect_text": "立"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "立",
+  "keys": "lu",
+  "keys_with_delim": "lu",
+  "expect_text": "立"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "立",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "立"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "绿",
+  "keys": "lv",
+  "keys_with_delim": "lv",
+  "expect_text": "绿"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "绿",
+  "keys": "lv",
+  "keys_with_delim": "lv",
+  "expect_text": "绿"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "绿",
+  "keys": "lc",
+  "keys_with_delim": "lc",
+  "expect_text": "绿"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "绿",
+  "keys": "58",
+  "keys_with_delim": "58",
+  "expect_text": "绿"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "女",
+  "keys": "nv",
+  "keys_with_delim": "nv",
+  "expect_text": "女"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "女",
+  "keys": "nv",
+  "keys_with_delim": "nv",
+  "expect_text": "女"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "女",
+  "keys": "bc",
+  "keys_with_delim": "bc",
+  "expect_text": "女"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "女",
+  "keys": "68",
+  "keys_with_delim": "68",
+  "expect_text": "女"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长",
+  "keys": "chang",
+  "keys_with_delim": "chang",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长",
+  "keys": "ih",
+  "keys_with_delim": "ih",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长",
+  "keys": "24264",
+  "keys_with_delim": "24264",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "长",
+  "keys": "zhang",
+  "keys_with_delim": "zhang",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "长",
+  "keys": "vh",
+  "keys_with_delim": "vh",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "长",
+  "keys": "cg",
+  "keys_with_delim": "cg",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "长",
+  "keys": "94264",
+  "keys_with_delim": "94264",
+  "expect_text": "长"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "行",
+  "keys": "xing",
+  "keys_with_delim": "xing",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "行",
+  "keys": "xk",
+  "keys_with_delim": "xk",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "行",
+  "keys": "zj",
+  "keys_with_delim": "zj",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "行",
+  "keys": "9464",
+  "keys_with_delim": "9464",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "行",
+  "keys": "hang",
+  "keys_with_delim": "hang",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "行",
+  "keys": "hh",
+  "keys_with_delim": "hh",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "行",
+  "keys": "gg",
+  "keys_with_delim": "gg",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "行",
+  "keys": "4264",
+  "keys_with_delim": "4264",
+  "expect_text": "行"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "乐",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "乐",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "乐",
+  "keys": "le",
+  "keys_with_delim": "le",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "乐",
+  "keys": "53",
+  "keys_with_delim": "53",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "乐",
+  "keys": "yue",
+  "keys_with_delim": "yue",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "乐",
+  "keys": "yt",
+  "keys_with_delim": "yt",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "乐",
+  "keys": "tt",
+  "keys_with_delim": "tt",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "乐",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "乐"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "重",
+  "keys": "zhong",
+  "keys_with_delim": "zhong",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "重",
+  "keys": "vs",
+  "keys_with_delim": "vs",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "重",
+  "keys": "ca",
+  "keys_with_delim": "ca",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "重",
+  "keys": "94664",
+  "keys_with_delim": "94664",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "重",
+  "keys": "chong",
+  "keys_with_delim": "chong",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "重",
+  "keys": "is",
+  "keys_with_delim": "is",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "重",
+  "keys": "ua",
+  "keys_with_delim": "ua",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "重",
+  "keys": "24664",
+  "keys_with_delim": "24664",
+  "expect_text": "重"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "还",
+  "keys": "hai",
+  "keys_with_delim": "hai",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "还",
+  "keys": "hd",
+  "keys_with_delim": "hd",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "还",
+  "keys": "gd",
+  "keys_with_delim": "gd",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "还",
+  "keys": "424",
+  "keys_with_delim": "424",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "还",
+  "keys": "huan",
+  "keys_with_delim": "huan",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "还",
+  "keys": "hr",
+  "keys_with_delim": "hr",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "还",
+  "keys": "ge",
+  "keys_with_delim": "ge",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "还",
+  "keys": "4826",
+  "keys_with_delim": "4826",
+  "expect_text": "还"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "只",
+  "keys": "zhi",
+  "keys_with_delim": "zhi",
+  "expect_text": "只"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "只",
+  "keys": "vi",
+  "keys_with_delim": "vi",
+  "expect_text": "只"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "只",
+  "keys": "cu",
+  "keys_with_delim": "cu",
+  "expect_text": "只"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "只",
+  "keys": "944",
+  "keys_with_delim": "944",
+  "expect_text": "只"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "记",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "记"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "记",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "记"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "记",
+  "keys": "ju",
+  "keys_with_delim": "ju",
+  "expect_text": "记"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "记",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "记"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "计",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "计"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "计",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "计"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "计",
+  "keys": "ju",
+  "keys_with_delim": "ju",
+  "expect_text": "计"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "计",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "计"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "及",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "及"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "及",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "及"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "及",
+  "keys": "ju",
+  "keys_with_delim": "ju",
+  "expect_text": "及"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "及",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "及"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "级",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "级"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "级",
+  "keys": "ji",
+  "keys_with_delim": "ji",
+  "expect_text": "级"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "级",
+  "keys": "ju",
+  "keys_with_delim": "ju",
+  "expect_text": "级"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "级",
+  "keys": "54",
+  "keys_with_delim": "54",
+  "expect_text": "级"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "帮",
+  "keys": "bang",
+  "keys_with_delim": "bang",
+  "expect_text": "帮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "帮",
+  "keys": "bh",
+  "keys_with_delim": "bh",
+  "expect_text": "帮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "帮",
+  "keys": "bg",
+  "keys_with_delim": "bg",
+  "expect_text": "帮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "帮",
+  "keys": "2264",
+  "keys_with_delim": "2264",
+  "expect_text": "帮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "忙",
+  "keys": "mang",
+  "keys_with_delim": "mang",
+  "expect_text": "忙"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "忙",
+  "keys": "mh",
+  "keys_with_delim": "mh",
+  "expect_text": "忙"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "忙",
+  "keys": "mg",
+  "keys_with_delim": "mg",
+  "expect_text": "忙"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "忙",
+  "keys": "6264",
+  "keys_with_delim": "6264",
+  "expect_text": "忙"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "声",
+  "keys": "sheng",
+  "keys_with_delim": "sheng",
+  "expect_text": "声"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "声",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "声"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "声",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "声"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "声",
+  "keys": "74364",
+  "keys_with_delim": "74364",
+  "expect_text": "声"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "冷",
+  "keys": "leng",
+  "keys_with_delim": "leng",
+  "expect_text": "冷"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "冷",
+  "keys": "lg",
+  "keys_with_delim": "lg",
+  "expect_text": "冷"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "冷",
+  "keys": "lg",
+  "keys_with_delim": "lg",
+  "expect_text": "冷"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "冷",
+  "keys": "5364",
+  "keys_with_delim": "5364",
+  "expect_text": "冷"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "等",
+  "keys": "deng",
+  "keys_with_delim": "deng",
+  "expect_text": "等"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "等",
+  "keys": "dg",
+  "keys_with_delim": "dg",
+  "expect_text": "等"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "等",
+  "keys": "dg",
+  "keys_with_delim": "dg",
+  "expect_text": "等"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "等",
+  "keys": "3364",
+  "keys_with_delim": "3364",
+  "expect_text": "等"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "半",
+  "keys": "ban",
+  "keys_with_delim": "ban",
+  "expect_text": "半"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "半",
+  "keys": "bj",
+  "keys_with_delim": "bj",
+  "expect_text": "半"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "半",
+  "keys": "bj",
+  "keys_with_delim": "bj",
+  "expect_text": "半"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "半",
+  "keys": "226",
+  "keys_with_delim": "226",
+  "expect_text": "半"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "看",
+  "keys": "kan",
+  "keys_with_delim": "kan",
+  "expect_text": "看"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "看",
+  "keys": "kj",
+  "keys_with_delim": "kj",
+  "expect_text": "看"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "看",
+  "keys": "jj",
+  "keys_with_delim": "jj",
+  "expect_text": "看"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "看",
+  "keys": "526",
+  "keys_with_delim": "526",
+  "expect_text": "看"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "分",
+  "keys": "fen",
+  "keys_with_delim": "fen",
+  "expect_text": "分"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "分",
+  "keys": "ff",
+  "keys_with_delim": "ff",
+  "expect_text": "分"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "分",
+  "keys": "dd",
+  "keys_with_delim": "dd",
+  "expect_text": "分"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "分",
+  "keys": "336",
+  "keys_with_delim": "336",
+  "expect_text": "分"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "很",
+  "keys": "hen",
+  "keys_with_delim": "hen",
+  "expect_text": "很"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "很",
+  "keys": "hf",
+  "keys_with_delim": "hf",
+  "expect_text": "很"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "很",
+  "keys": "gd",
+  "keys_with_delim": "gd",
+  "expect_text": "很"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "很",
+  "keys": "436",
+  "keys_with_delim": "436",
+  "expect_text": "很"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "书",
+  "keys": "shu",
+  "keys_with_delim": "shu",
+  "expect_text": "书"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "书",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "书"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "书",
+  "keys": "uu",
+  "keys_with_delim": "uu",
+  "expect_text": "书"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "书",
+  "keys": "748",
+  "keys_with_delim": "748",
+  "expect_text": "书"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "爱",
+  "keys": "ai",
+  "keys_with_delim": "ai",
+  "expect_text": "爱"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "爱",
+  "keys": "ai",
+  "keys_with_delim": "ai",
+  "expect_text": "爱"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "爱",
+  "keys": "au",
+  "keys_with_delim": "au",
+  "expect_text": "爱"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "爱",
+  "keys": "24",
+  "keys_with_delim": "24",
+  "expect_text": "爱"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "安",
+  "keys": "an",
+  "keys_with_delim": "an",
+  "expect_text": "安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "安",
+  "keys": "an",
+  "keys_with_delim": "an",
+  "expect_text": "安"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "安",
+  "keys": "ab",
+  "keys_with_delim": "ab",
+  "expect_text": "安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "安",
+  "keys": "26",
+  "keys_with_delim": "26",
+  "expect_text": "安"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "昂",
+  "keys": "ang",
+  "keys_with_delim": "ang",
+  "expect_text": "昂"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "昂",
+  "keys": "ah",
+  "keys_with_delim": "ah",
+  "expect_text": "昂"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "昂",
+  "keys": "ag",
+  "keys_with_delim": "ag",
+  "expect_text": "昂"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "昂",
+  "keys": "264",
+  "keys_with_delim": "264",
+  "expect_text": "昂"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "恩",
+  "keys": "en",
+  "keys_with_delim": "en",
+  "expect_text": "恩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "恩",
+  "keys": "en",
+  "keys_with_delim": "en",
+  "expect_text": "恩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "恩",
+  "keys": "eb",
+  "keys_with_delim": "eb",
+  "expect_text": "恩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "恩",
+  "keys": "36",
+  "keys_with_delim": "36",
+  "expect_text": "恩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "二",
+  "keys": "er",
+  "keys_with_delim": "er",
+  "expect_text": "二"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "二",
+  "keys": "er",
+  "keys_with_delim": "er",
+  "expect_text": "二"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "二",
+  "keys": "ee",
+  "keys_with_delim": "ee",
+  "expect_text": "二"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "二",
+  "keys": "37",
+  "keys_with_delim": "37",
+  "expect_text": "二"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "啊",
+  "keys": "a",
+  "keys_with_delim": "a",
+  "expect_text": "啊"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "啊",
+  "keys": "aa",
+  "keys_with_delim": "aa",
+  "expect_text": "啊"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "啊",
+  "keys": "aa",
+  "keys_with_delim": "aa",
+  "expect_text": "啊"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "啊",
+  "keys": "2",
+  "keys_with_delim": "2",
+  "expect_text": "啊"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "哦",
+  "keys": "o",
+  "keys_with_delim": "o",
+  "expect_text": "哦"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "哦",
+  "keys": "oo",
+  "keys_with_delim": "oo",
+  "expect_text": "哦"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "哦",
+  "keys": "oo",
+  "keys_with_delim": "oo",
+  "expect_text": "哦"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "哦",
+  "keys": "6",
+  "keys_with_delim": "6",
+  "expect_text": "哦"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "鹅",
+  "keys": "e",
+  "keys_with_delim": "e",
+  "expect_text": "鹅"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "鹅",
+  "keys": "ee",
+  "keys_with_delim": "ee",
+  "expect_text": "鹅"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "鹅",
+  "keys": "ee",
+  "keys_with_delim": "ee",
+  "expect_text": "鹅"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "鹅",
+  "keys": "3",
+  "keys_with_delim": "3",
+  "expect_text": "鹅"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "觉",
+  "keys": "jue",
+  "keys_with_delim": "jue",
+  "expect_text": "觉"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "觉",
+  "keys": "jt",
+  "keys_with_delim": "jt",
+  "expect_text": "觉"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "觉",
+  "keys": "jt",
+  "keys_with_delim": "jt",
+  "expect_text": "觉"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "觉",
+  "keys": "583",
+  "keys_with_delim": "583",
+  "expect_text": "觉"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "确",
+  "keys": "que",
+  "keys_with_delim": "que",
+  "expect_text": "确"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "确",
+  "keys": "qt",
+  "keys_with_delim": "qt",
+  "expect_text": "确"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "确",
+  "keys": "qt",
+  "keys_with_delim": "qt",
+  "expect_text": "确"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "确",
+  "keys": "783",
+  "keys_with_delim": "783",
+  "expect_text": "确"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "雪",
+  "keys": "xue",
+  "keys_with_delim": "xue",
+  "expect_text": "雪"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "雪",
+  "keys": "xt",
+  "keys_with_delim": "xt",
+  "expect_text": "雪"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "雪",
+  "keys": "zt",
+  "keys_with_delim": "zt",
+  "expect_text": "雪"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "雪",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "雪"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "约",
+  "keys": "yue",
+  "keys_with_delim": "yue",
+  "expect_text": "约"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "约",
+  "keys": "yt",
+  "keys_with_delim": "yt",
+  "expect_text": "约"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "约",
+  "keys": "tt",
+  "keys_with_delim": "tt",
+  "expect_text": "约"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "约",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "约"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "略",
+  "keys": "lve",
+  "keys_with_delim": "lve",
+  "expect_text": "略"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "略",
+  "keys": "lt",
+  "keys_with_delim": "lt",
+  "expect_text": "略"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "略",
+  "keys": "lt",
+  "keys_with_delim": "lt",
+  "expect_text": "略"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "略",
+  "keys": "583",
+  "keys_with_delim": "583",
+  "expect_text": "略"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "决",
+  "keys": "jue",
+  "keys_with_delim": "jue",
+  "expect_text": "决"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "决",
+  "keys": "jt",
+  "keys_with_delim": "jt",
+  "expect_text": "决"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "决",
+  "keys": "jt",
+  "keys_with_delim": "jt",
+  "expect_text": "决"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "决",
+  "keys": "583",
+  "keys_with_delim": "583",
+  "expect_text": "决"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "缺",
+  "keys": "que",
+  "keys_with_delim": "que",
+  "expect_text": "缺"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "缺",
+  "keys": "qt",
+  "keys_with_delim": "qt",
+  "expect_text": "缺"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "缺",
+  "keys": "qt",
+  "keys_with_delim": "qt",
+  "expect_text": "缺"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "缺",
+  "keys": "783",
+  "keys_with_delim": "783",
+  "expect_text": "缺"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "写",
+  "keys": "xie",
+  "keys_with_delim": "xie",
+  "expect_text": "写"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "写",
+  "keys": "xp",
+  "keys_with_delim": "xp",
+  "expect_text": "写"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "写",
+  "keys": "zo",
+  "keys_with_delim": "zo",
+  "expect_text": "写"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "写",
+  "keys": "943",
+  "keys_with_delim": "943",
+  "expect_text": "写"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "血",
+  "keys": "xue",
+  "keys_with_delim": "xue",
+  "expect_text": "血"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "血",
+  "keys": "xt",
+  "keys_with_delim": "xt",
+  "expect_text": "血"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "血",
+  "keys": "zt",
+  "keys_with_delim": "zt",
+  "expect_text": "血"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "血",
+  "keys": "983",
+  "keys_with_delim": "983",
+  "expect_text": "血"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "们",
+  "keys": "men",
+  "keys_with_delim": "men",
+  "expect_text": "们"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "们",
+  "keys": "mf",
+  "keys_with_delim": "mf",
+  "expect_text": "们"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "们",
+  "keys": "md",
+  "keys_with_delim": "md",
+  "expect_text": "们"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "们",
+  "keys": "636",
+  "keys_with_delim": "636",
+  "expect_text": "们"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "呀",
+  "keys": "ya",
+  "keys_with_delim": "ya",
+  "expect_text": "呀"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "呀",
+  "keys": "ya",
+  "keys_with_delim": "ya",
+  "expect_text": "呀"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "呀",
+  "keys": "ta",
+  "keys_with_delim": "ta",
+  "expect_text": "呀"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "呀",
+  "keys": "92",
+  "keys_with_delim": "92",
+  "expect_text": "呀"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "走",
+  "keys": "zou",
+  "keys_with_delim": "zou",
+  "expect_text": "走"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "走",
+  "keys": "zz",
+  "keys_with_delim": "zz",
+  "expect_text": "走"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "走",
+  "keys": "zz",
+  "keys_with_delim": "zz",
+  "expect_text": "走"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "走",
+  "keys": "968",
+  "keys_with_delim": "968",
+  "expect_text": "走"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "度",
+  "keys": "du",
+  "keys_with_delim": "du",
+  "expect_text": "度"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "度",
+  "keys": "du",
+  "keys_with_delim": "du",
+  "expect_text": "度"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "度",
+  "keys": "du",
+  "keys_with_delim": "du",
+  "expect_text": "度"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "度",
+  "keys": "38",
+  "keys_with_delim": "38",
+  "expect_text": "度"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "亮",
+  "keys": "liang",
+  "keys_with_delim": "liang",
+  "expect_text": "亮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "亮",
+  "keys": "ll",
+  "keys_with_delim": "ll",
+  "expect_text": "亮"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "亮",
+  "keys": "ll",
+  "keys_with_delim": "ll",
+  "expect_text": "亮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "亮",
+  "keys": "54264",
+  "keys_with_delim": "54264",
+  "expect_text": "亮"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "快",
+  "keys": "kuai",
+  "keys_with_delim": "kuai",
+  "expect_text": "快"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "快",
+  "keys": "kk",
+  "keys_with_delim": "kk",
+  "expect_text": "快"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "快",
+  "keys": "jj",
+  "keys_with_delim": "jj",
+  "expect_text": "快"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "快",
+  "keys": "5824",
+  "keys_with_delim": "5824",
+  "expect_text": "快"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "色",
+  "keys": "se",
+  "keys_with_delim": "se",
+  "expect_text": "色"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "色",
+  "keys": "se",
+  "keys_with_delim": "se",
+  "expect_text": "色"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "色",
+  "keys": "ae",
+  "keys_with_delim": "ae",
+  "expect_text": "色"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "色",
+  "keys": "73",
+  "keys_with_delim": "73",
+  "expect_text": "色"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "孩",
+  "keys": "hai",
+  "keys_with_delim": "hai",
+  "expect_text": "孩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "孩",
+  "keys": "hd",
+  "keys_with_delim": "hd",
+  "expect_text": "孩"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "孩",
+  "keys": "gd",
+  "keys_with_delim": "gd",
+  "expect_text": "孩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "孩",
+  "keys": "424",
+  "keys_with_delim": "424",
+  "expect_text": "孩"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "归",
+  "keys": "gui",
+  "keys_with_delim": "gui",
+  "expect_text": "归"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "归",
+  "keys": "gv",
+  "keys_with_delim": "gv",
+  "expect_text": "归"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "归",
+  "keys": "gc",
+  "keys_with_delim": "gc",
+  "expect_text": "归"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "归",
+  "keys": "484",
+  "keys_with_delim": "484",
+  "expect_text": "归"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "银",
+  "keys": "yin",
+  "keys_with_delim": "yin",
+  "expect_text": "银"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "银",
+  "keys": "yb",
+  "keys_with_delim": "yb",
+  "expect_text": "银"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "银",
+  "keys": "tb",
+  "keys_with_delim": "tb",
+  "expect_text": "银"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "银",
+  "keys": "946",
+  "keys_with_delim": "946",
+  "expect_text": "银"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "雄",
+  "keys": "xiong",
+  "keys_with_delim": "xiong",
+  "expect_text": "雄"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "雄",
+  "keys": "xs",
+  "keys_with_delim": "xs",
+  "expect_text": "雄"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "雄",
+  "keys": "za",
+  "keys_with_delim": "za",
+  "expect_text": "雄"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "雄",
+  "keys": "94664",
+  "keys_with_delim": "94664",
+  "expect_text": "雄"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "反",
+  "keys": "fan",
+  "keys_with_delim": "fan",
+  "expect_text": "反"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "反",
+  "keys": "fj",
+  "keys_with_delim": "fj",
+  "expect_text": "反"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "反",
+  "keys": "dj",
+  "keys_with_delim": "dj",
+  "expect_text": "反"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "反",
+  "keys": "326",
+  "keys_with_delim": "326",
+  "expect_text": "反"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "复",
+  "keys": "fu",
+  "keys_with_delim": "fu",
+  "expect_text": "复"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "复",
+  "keys": "fu",
+  "keys_with_delim": "fu",
+  "expect_text": "复"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "复",
+  "keys": "du",
+  "keys_with_delim": "du",
+  "expect_text": "复"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "复",
+  "keys": "38",
+  "keys_with_delim": "38",
+  "expect_text": "复"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "明",
+  "keys": "ming",
+  "keys_with_delim": "ming",
+  "expect_text": "明"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "明",
+  "keys": "mk",
+  "keys_with_delim": "mk",
+  "expect_text": "明"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "明",
+  "keys": "mj",
+  "keys_with_delim": "mj",
+  "expect_text": "明"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "明",
+  "keys": "6464",
+  "keys_with_delim": "6464",
+  "expect_text": "明"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "生",
+  "keys": "sheng",
+  "keys_with_delim": "sheng",
+  "expect_text": "生"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "生",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "生"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "生",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "生"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "生",
+  "keys": "74364",
+  "keys_with_delim": "74364",
+  "expect_text": "生"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "活",
+  "keys": "huo",
+  "keys_with_delim": "huo",
+  "expect_text": "活"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "活",
+  "keys": "ho",
+  "keys_with_delim": "ho",
+  "expect_text": "活"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "活",
+  "keys": "go",
+  "keys_with_delim": "go",
+  "expect_text": "活"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "活",
+  "keys": "486",
+  "keys_with_delim": "486",
+  "expect_text": "活"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "康",
+  "keys": "kang",
+  "keys_with_delim": "kang",
+  "expect_text": "康"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "康",
+  "keys": "kh",
+  "keys_with_delim": "kh",
+  "expect_text": "康"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "康",
+  "keys": "jg",
+  "keys_with_delim": "jg",
+  "expect_text": "康"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "康",
+  "keys": "5264",
+  "keys_with_delim": "5264",
+  "expect_text": "康"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "江",
+  "keys": "jiang",
+  "keys_with_delim": "jiang",
+  "expect_text": "江"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "江",
+  "keys": "jl",
+  "keys_with_delim": "jl",
+  "expect_text": "江"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "江",
+  "keys": "jl",
+  "keys_with_delim": "jl",
+  "expect_text": "江"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "江",
+  "keys": "54264",
+  "keys_with_delim": "54264",
+  "expect_text": "江"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "程",
+  "keys": "cheng",
+  "keys_with_delim": "cheng",
+  "expect_text": "程"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "程",
+  "keys": "ig",
+  "keys_with_delim": "ig",
+  "expect_text": "程"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "程",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "程"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "程",
+  "keys": "24364",
+  "keys_with_delim": "24364",
+  "expect_text": "程"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "兴",
+  "keys": "xing",
+  "keys_with_delim": "xing",
+  "expect_text": "兴"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "兴",
+  "keys": "xk",
+  "keys_with_delim": "xk",
+  "expect_text": "兴"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "兴",
+  "keys": "zj",
+  "keys_with_delim": "zj",
+  "expect_text": "兴"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "兴",
+  "keys": "9464",
+  "keys_with_delim": "9464",
+  "expect_text": "兴"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "公",
+  "keys": "gong",
+  "keys_with_delim": "gong",
+  "expect_text": "公"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "公",
+  "keys": "gs",
+  "keys_with_delim": "gs",
+  "expect_text": "公"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "公",
+  "keys": "ga",
+  "keys_with_delim": "ga",
+  "expect_text": "公"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "公",
+  "keys": "4664",
+  "keys_with_delim": "4664",
+  "expect_text": "公"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "交",
+  "keys": "jiao",
+  "keys_with_delim": "jiao",
+  "expect_text": "交"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "交",
+  "keys": "jn",
+  "keys_with_delim": "jn",
+  "expect_text": "交"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "交",
+  "keys": "jb",
+  "keys_with_delim": "jb",
+  "expect_text": "交"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "交",
+  "keys": "5426",
+  "keys_with_delim": "5426",
+  "expect_text": "交"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "城",
+  "keys": "cheng",
+  "keys_with_delim": "cheng",
+  "expect_text": "城"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "城",
+  "keys": "ig",
+  "keys_with_delim": "ig",
+  "expect_text": "城"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "城",
+  "keys": "ug",
+  "keys_with_delim": "ug",
+  "expect_text": "城"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "城",
+  "keys": "24364",
+  "keys_with_delim": "24364",
+  "expect_text": "城"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "平",
+  "keys": "ping",
+  "keys_with_delim": "ping",
+  "expect_text": "平"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "平",
+  "keys": "pk",
+  "keys_with_delim": "pk",
+  "expect_text": "平"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "平",
+  "keys": "oj",
+  "keys_with_delim": "oj",
+  "expect_text": "平"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "平",
+  "keys": "7464",
+  "keys_with_delim": "7464",
+  "expect_text": "平"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "西",
+  "keys": "xi",
+  "keys_with_delim": "xi",
+  "expect_text": "西"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "西",
+  "keys": "xi",
+  "keys_with_delim": "xi",
+  "expect_text": "西"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "西",
+  "keys": "zu",
+  "keys_with_delim": "zu",
+  "expect_text": "西"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "西",
+  "keys": "94",
+  "keys_with_delim": "94",
+  "expect_text": "西"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "健",
+  "keys": "jian",
+  "keys_with_delim": "jian",
+  "expect_text": "健"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "健",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "健"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "健",
+  "keys": "jm",
+  "keys_with_delim": "jm",
+  "expect_text": "健"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "健",
+  "keys": "5426",
+  "keys_with_delim": "5426",
+  "expect_text": "健"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "早",
+  "keys": "zao",
+  "keys_with_delim": "zao",
+  "expect_text": "早"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "早",
+  "keys": "zc",
+  "keys_with_delim": "zc",
+  "expect_text": "早"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "早",
+  "keys": "zc",
+  "keys_with_delim": "zc",
+  "expect_text": "早"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "早",
+  "keys": "926",
+  "keys_with_delim": "926",
+  "expect_text": "早"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "习",
+  "keys": "xi",
+  "keys_with_delim": "xi",
+  "expect_text": "习"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "习",
+  "keys": "xi",
+  "keys_with_delim": "xi",
+  "expect_text": "习"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "习",
+  "keys": "zu",
+  "keys_with_delim": "zu",
+  "expect_text": "习"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "习",
+  "keys": "94",
+  "keys_with_delim": "94",
+  "expect_text": "习"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "作",
+  "keys": "zuo",
+  "keys_with_delim": "zuo",
+  "expect_text": "作"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "作",
+  "keys": "zo",
+  "keys_with_delim": "zo",
+  "expect_text": "作"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "作",
+  "keys": "zo",
+  "keys_with_delim": "zo",
+  "expect_text": "作"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "作",
+  "keys": "986",
+  "keys_with_delim": "986",
+  "expect_text": "作"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "脑",
+  "keys": "nao",
+  "keys_with_delim": "nao",
+  "expect_text": "脑"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "脑",
+  "keys": "nc",
+  "keys_with_delim": "nc",
+  "expect_text": "脑"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "脑",
+  "keys": "bc",
+  "keys_with_delim": "bc",
+  "expect_text": "脑"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "脑",
+  "keys": "626",
+  "keys_with_delim": "626",
+  "expect_text": "脑"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "qwerty26",
+  "text": "列",
+  "keys": "lie",
+  "keys_with_delim": "lie",
+  "expect_text": "列"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "qwerty26",
+  "text": "列",
+  "keys": "lp",
+  "keys_with_delim": "lp",
+  "expect_text": "列"
+ },
+ {
+  "schema": "songyan_flypy",
+  "layout": "merged14",
+  "text": "列",
+  "keys": "lo",
+  "keys_with_delim": "lo",
+  "expect_text": "列"
+ },
+ {
+  "schema": "songyan_quanpin",
+  "layout": "phone9",
+  "text": "列",
+  "keys": "543",
+  "keys_with_delim": "543",
+  "expect_text": "列"
+ }
+]

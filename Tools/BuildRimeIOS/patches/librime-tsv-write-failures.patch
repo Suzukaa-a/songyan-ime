@@ -1,0 +1,204 @@
+diff --git a/src/rime/dict/db.h b/src/rime/dict/db.h
+--- a/src/rime/dict/db.h
++++ b/src/rime/dict/db.h
+@@ -22,6 +22,7 @@
+   virtual bool Reset() = 0;
+   virtual bool Jump(const string& key) = 0;
+   virtual bool GetNextRecord(string* key, string* value) = 0;
+   virtual bool exhausted() = 0;
++  virtual bool HasError() const { return false; }
+ 
+  protected:
+diff --git a/src/rime/dict/level_db.h b/src/rime/dict/level_db.h
+--- a/src/rime/dict/level_db.h
++++ b/src/rime/dict/level_db.h
+@@ -25,6 +25,7 @@
+   bool Reset() override;
+   bool Jump(const string& key) override;
+   bool GetNextRecord(string* key, string* value) override;
+   bool exhausted() override;
++  bool HasError() const override;
+ 
+  private:
+diff --git a/src/rime/dict/level_db.cc b/src/rime/dict/level_db.cc
+--- a/src/rime/dict/level_db.cc
++++ b/src/rime/dict/level_db.cc
+@@ -25,6 +25,9 @@
+     iterator = db->NewIterator(options);
+   }
+ 
+   bool IsValid() const { return iterator && iterator->Valid(); }
++  bool HasError() const {
++    return !iterator || !iterator->status().ok();
++  }
+ 
+   string GetKey() const { return iterator->key().ToString(); }
+@@ -135,6 +138,10 @@
+ 
+ bool LevelDbAccessor::exhausted() {
+   return !cursor_->IsValid() || !MatchesPrefix(cursor_->GetKey());
+ }
+ 
++bool LevelDbAccessor::HasError() const {
++  return !cursor_ || cursor_->HasError();
++}
++
+ // LevelDb members
+diff --git a/src/rime/dict/db_utils.h b/src/rime/dict/db_utils.h
+--- a/src/rime/dict/db_utils.h
++++ b/src/rime/dict/db_utils.h
+@@ -25,6 +25,7 @@
+   virtual ~Source() = default;
+   virtual bool MetaGet(string* key, string* value) = 0;
+   virtual bool Get(string* key, string* value) = 0;
++  virtual bool HasError() const { return false; }
+ 
+   template <class SinkType>
+   int operator>>(SinkType& sink);
+@@ -61,6 +62,7 @@
+   explicit DbSource(Db* db);
+ 
+   virtual bool MetaGet(string* key, string* value);
+   virtual bool Get(string* key, string* value);
++  bool HasError() const override;
+ 
+  protected:
+diff --git a/src/rime/dict/db_utils.cc b/src/rime/dict/db_utils.cc
+--- a/src/rime/dict/db_utils.cc
++++ b/src/rime/dict/db_utils.cc
+@@ -43,7 +43,11 @@
+ }
+ 
+ bool DbSource::Get(string* key, string* value) {
+   return data_ && data_->GetNextRecord(key, value);
+ }
+ 
++bool DbSource::HasError() const {
++  return !metadata_ || !data_ || metadata_->HasError() || data_->HasError();
++}
++
+ }  // namespace rime
+diff --git a/src/rime/dict/tsv.h b/src/rime/dict/tsv.h
+--- a/src/rime/dict/tsv.h
++++ b/src/rime/dict/tsv.h
+@@ -35,15 +35,18 @@
+ 
+ class TsvWriter {
+  public:
+-  TsvWriter(const path& file_path, TsvFormatter formatter)
+-      : file_path_(file_path), formatter_(formatter) {}
++  TsvWriter(const path& file_path, TsvFormatter formatter,
++            bool strict_formatter = false)
++      : file_path_(file_path), formatter_(formatter),
++        strict_formatter_(strict_formatter) {}
+-  // return number of records written
++  // return record count, or -1 on I/O, source, or strict format errors
+   int operator()(Source* source);
+ 
+  protected:
+   path file_path_;
+   TsvFormatter formatter_;
++  bool strict_formatter_;
+ 
+  public:
+   string file_description;
+ };
+diff --git a/src/rime/dict/tsv.cc b/src/rime/dict/tsv.cc
+--- a/src/rime/dict/tsv.cc
++++ b/src/rime/dict/tsv.cc
+@@ -59,29 +59,46 @@
+ int TsvWriter::operator()(Source* source) {
+   if (!source)
+-    return 0;
++    return -1;
+   LOG(INFO) << "writing tsv file: " << file_path_;
+   std::ofstream fout(file_path_.c_str());
++  if (!fout.is_open() || !fout)
++    return -1;
+   if (!file_description.empty()) {
+     fout << "# " << file_description << std::endl;
+   }
++  if (!fout)
++    return -1;
+   string key, value;
+   while (source->MetaGet(&key, &value)) {
+     fout << "#@" << key << '\t' << value << std::endl;
++    if (!fout)
++      return -1;
+   }
++  if (source->HasError())
++    return -1;
+   Tsv row;
+   int num_entries = 0;
+   while (source->Get(&key, &value)) {
+     row.clear();
+-    if (formatter_(key, value, &row) && !row.empty()) {
+-      for (auto it = row.cbegin(); it != row.cend(); ++it) {
+-        if (it != row.cbegin())
+-          fout << '\t';
+-        fout << *it;
+-      }
+-      fout << std::endl;
+-      ++num_entries;
++    if (!formatter_(key, value, &row) || row.empty()) {
++      if (strict_formatter_)
++        return -1;
++      continue;
++    }
++    for (auto it = row.cbegin(); it != row.cend(); ++it) {
++      if (it != row.cbegin())
++        fout << '\t';
++      fout << *it;
+     }
++    fout << std::endl;
++    if (!fout)
++      return -1;
++    ++num_entries;
+   }
++  if (source->HasError())
++    return -1;
++  fout.flush();
++  const bool complete = static_cast<bool>(fout);
+   fout.close();
+-  return num_entries;
++  return complete && fout ? num_entries : -1;
+ }
+diff --git a/src/rime/dict/user_db.cc b/src/rime/dict/user_db.cc
+--- a/src/rime/dict/user_db.cc
++++ b/src/rime/dict/user_db.cc
+@@ -114,11 +114,12 @@
+ 
+ bool UserDbHelper::UniformBackup(const path& snapshot_file) {
+   LOG(INFO) << "backing up userdb '" << db_->name() << "' to " << snapshot_file;
+-  TsvWriter writer(snapshot_file, plain_userdb_format.formatter);
++  TsvWriter writer(snapshot_file, plain_userdb_format.formatter, true);
+   writer.file_description = plain_userdb_format.file_description;
+   DbSource source(db_);
+   try {
+-    writer << source;
++    if ((writer << source) < 0)
++      return false;
+   } catch (std::exception& ex) {
+     LOG(ERROR) << ex.what();
+     return false;
+diff --git a/src/rime/dict/text_db.cc b/src/rime/dict/text_db.cc
+--- a/src/rime/dict/text_db.cc
++++ b/src/rime/dict/text_db.cc
+@@ -218,7 +218,7 @@
+ bool TextDb::SaveToFile(const path& file) {
+-  TsvWriter writer(file, format_.formatter);
++  TsvWriter writer(file, format_.formatter, db_type_ == "userdb");
+   writer.file_description = format_.file_description;
+   DbSource source(this);
+   int entries = 0;
+   try {
+     entries = writer << source;
+@@ -226,6 +226,8 @@
+     LOG(ERROR) << ex.what();
+     return false;
+   }
++  if (entries < 0)
++    return false;
+   DLOG(INFO) << entries << " entries saved.";
+   return true;
+ }

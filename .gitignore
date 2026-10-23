@@ -1,0 +1,40 @@
+# Local dependency sources and build outputs
+.local/
+.scratch/
+.worktrees/
+.claude/worktrees/
+docs/
+.build/
+.build-*/
+build/
+.swiftpm/
+*.dSYM/
+*.xcarchive/
+*.ipa
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# macOS / Xcode
+.DS_Store
+DerivedData/
+xcuserdata/
+Songyan.xcodeproj/-Xcc/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Local signing material and environment secrets
+*.mobileprovision
+*.p12
+*.cer
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Local Xcode identity overrides
+Config/Local.xcconfig

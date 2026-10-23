@@ -1,0 +1,19 @@
+# Manifest of the built-in schemes
+formatVersion: 1
+id: songyan-builtin
+version: 1.0.0
+kind: schema
+name: 内置输入方案
+minimumAppVersion: 0.1.0
+requires:
+  engineFeatures:
+    - script_translator
+entrypoints:
+  schemas:
+    - songyan_quanpin
+    - songyan_flypy
+dictionaries:
+  - name: songyan_basic
+    file: songyan_basic.dict.yaml
+    sharedUserDict: songyan_shared
+    note: 原创的小词库，不含任何上游词库数据。

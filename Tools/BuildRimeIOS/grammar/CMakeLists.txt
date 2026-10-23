@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.20)
+project(RimeGrammar LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+file(GLOB SOURCES "${PLUGIN_SOURCE}/src/*.cc")
+add_library(rime-octagram STATIC ${SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/../src/rime_grammar_diagnostics.cc")
+target_include_directories(rime-octagram PRIVATE "${RIME_SOURCE}/src" "${RIME_SOURCE}/include"
+    "${RIME_GENERATED_INCLUDE}" "${DEPENDENCY_PREFIX}/include" "${BOOST_SOURCE}" "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+target_compile_definitions(rime-octagram PRIVATE GLOG_USE_GLOG_EXPORT)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  target_compile_options(rime-octagram PRIVATE -fapplication-extension)
+endif()
+install(TARGETS rime-octagram ARCHIVE DESTINATION lib)

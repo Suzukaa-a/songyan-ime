@@ -1,0 +1,11 @@
+{
+  "librime": {"version": "1.17.0", "commit": "33e78140250125871856cdc5b42ddc6a5fcd3cd4"},
+  "librime-lua": {"commit": "ad1e4a6c98abf634dd34242a747f9b1d5d069fbe", "license": "BSD-3-Clause"},
+  "lua": {"version": "5.4.9", "sha256": "2335b6c582a52654f94612bf10d2f4672805d05329aa6568b1d8cd9e5c6fb8e6", "license": "MIT"},
+  "opencc": {"version": "1.1.9", "commit": "556ed22496d650bd0b13b6c163be9814637970ae", "license": "Apache-2.0", "data": "opencc/"},
+  "marisa": {"version": "0.3.1", "commit": "3e87d53b78e15f2f43783d5e376561a8c9722051"},
+  "librime-octagram": {"commit": "57d18b9f58e5284bd891d559f6bdd16cf60341e9", "license": "BSD-3-Clause", "diagnostics": "native GramDb load and opt-in decoder query samples"},
+  "librime-predict": {"commit": "920bd41ebf6f9bf6855d14fbe80212e54e749791", "license": "BSD-3-Clause", "data": "none bundled; predictor/db resolves from the user, then shared, data directory"},
+  "components": ["lua_processor", "lua_translator", "lua_filter", "lua_segmentor", "simplifier", "grammar", "t9_processor", "predictor", "predict_translator"],
+  "unsupported": ["Lua native dynamic modules", "shell subprocesses"]
+}

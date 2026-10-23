@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Songyan Keyboard Extension privacy manifest.
+
+	  Required reason APIs actually used by this target (verified against source):
+	    * NSUserDefaults / CFPreferences — UserDefaults.standard and the shared
+	      App Group suite `group.app.songyan.shared` (read and write when the user
+	      grants Full Access).
+	    * systemUptime / CACurrentMediaTime — elapsed-time measurement for the
+	      bounded on-device lifecycle/layout diagnostics only; never sent off-device.
+	    * File metadata (modification date, size, stat) — read only inside the
+	      keyboard's own container and the app's App Group container to validate
+	      shared resources/publications.
+	  Reason codes follow Apple's published list for each category:
+	    https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
+	  The extension has no network code, collects no data and does not track the user.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

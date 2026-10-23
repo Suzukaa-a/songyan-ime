@@ -1,0 +1,39 @@
+{
+  "id": "merged18",
+  "name": "18 键",
+  "input": {"builtinLayout": "merged18"},
+  "note": "部分键由两个字母合用，轻点输入。输入方案支持时，向左或向右滑动可只输入左边或右边的字母。",
+  "rows": [
+    {"keys": [
+      {"label":"Q","action":{"type":"code","value":"q"}},
+      {"label":"WE","width":2,"action":{"type":"code","value":"w"},"longPress":[{"label":"e","action":{"type":"literal","value":"e"}}]},
+      {"label":"RT","width":2,"action":{"type":"code","value":"r"},"longPress":[{"label":"t","action":{"type":"literal","value":"t"}}]},
+      {"label":"Y","action":{"type":"code","value":"y"}},
+      {"label":"U","action":{"type":"code","value":"u"}},
+      {"label":"IO","width":2,"action":{"type":"code","value":"i"},"longPress":[{"label":"o","action":{"type":"literal","value":"o"}}]},
+      {"label":"P","action":{"type":"code","value":"p"}}
+    ]},
+    {"keys": [
+      {"label":"A","action":{"type":"code","value":"a"}},
+      {"label":"SD","width":2,"action":{"type":"code","value":"s"},"longPress":[{"label":"d","action":{"type":"literal","value":"d"}}]},
+      {"label":"FG","width":2,"action":{"type":"code","value":"f"},"longPress":[{"label":"g","action":{"type":"literal","value":"g"}}]},
+      {"label":"H","action":{"type":"code","value":"h"}},
+      {"label":"JK","width":2,"action":{"type":"code","value":"j"},"longPress":[{"label":"k","action":{"type":"literal","value":"k"}}]},
+      {"label":"L","action":{"type":"code","value":"l"},"longPress":[{"label":"，","action":{"type":"literal","value":"，"}}]}
+    ]},
+    {"keys": [
+      {"label":"Z","action":{"type":"code","value":"z"}},
+      {"label":"XC","width":2,"action":{"type":"code","value":"x"},"longPress":[{"label":"c","action":{"type":"literal","value":"c"}}]},
+      {"label":"V","action":{"type":"code","value":"v"}},
+      {"label":"BN","width":2,"action":{"type":"code","value":"b"},"longPress":[{"label":"n","action":{"type":"literal","value":"n"}}]},
+      {"label":"M","action":{"type":"code","value":"m"},"longPress":[{"label":"。","action":{"type":"literal","value":"。"}}]}
+    ]},
+    {"keys": [
+      {"label":"布局","action":{"type":"modeSwitch","value":"nextLayout"}},
+      {"label":"🌐","action":{"type":"globe"}},
+      {"label":"空格","width":4,"action":{"type":"space"}},
+      {"label":"⌫","action":{"type":"backspace"}},
+      {"label":"⏎","action":{"type":"enter"}}
+    ]}
+  ]
+}

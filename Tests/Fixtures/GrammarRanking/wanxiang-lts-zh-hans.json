@@ -1,0 +1,13 @@
+{
+  "source_url": "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+  "model_sha256": "20b425ef65151c418248d2e9610fa5ebccddb846510c8282c8d25b5f108e5a3a",
+  "model_bytes": 413109292,
+  "cases": [
+    {"code": "woshi", "enabled_prefix": ["我是", "窝", "卧", "我"], "disabled_prefix": ["窝市", "窝", "卧", "我"]},
+    {"code": "womenxuexi", "enabled_prefix": ["我们学习", "我门", "我们", "窝", "卧"], "disabled_prefix": ["我门学西", "我门", "我们", "窝", "卧"]},
+    {"code": "woshizhongguoren", "enabled_prefix": ["我是中国人", "窝", "卧", "我"], "disabled_prefix": ["窝市中果仁", "窝", "卧", "我"]},
+    {"code": "zhongguorenmin", "enabled_prefix": ["中国人敏", "中果", "中国", "钟", "种"], "disabled_prefix": ["中果人敏", "中果", "中国", "钟", "种"]},
+    {"code": "woshixuesheng", "enabled_prefix": ["我是学生", "窝", "卧", "我"], "disabled_prefix": ["窝市雪生", "窝", "卧", "我"]},
+    {"code": "nihaozhongguoren", "enabled_prefix": ["你好中国人", "泥好", "你好", "泥", "你"], "disabled_prefix": ["泥好中果仁", "泥好", "你好", "泥", "你"]}
+  ]
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "word": "工程车",
+    "pinyin": "gong cheng che",
+    "layouts": {
+      "flypy26": "gs ig ie",
+      "flypy14": "ga ug ue",
+      "pinyin_26": "gong cheng che",
+      "t9": "466424364243"
+    },
+    "expect": {
+      "first_in_baseline": false
+    }
+  },
+  {
+    "word": "键盘拼音实验",
+    "pinyin": "jian pan pin yin shi yan",
+    "layouts": {
+      "flypy26": "jm pj pb yb ui yj",
+      "flypy14": "jm oj ob tb uu tj",
+      "pinyin_26": "jian pan pin yin shi yan",
+      "t9": "5426726746946744926"
+    },
+    "expect": {
+      "first_in_baseline": false
+    }
+  },
+  {
+    "word": "学拼音车",
+    "pinyin": "xue pin yin che",
+    "layouts": {
+      "flypy26": "xt pb yb ie",
+      "flypy14": "zt ob tb ue",
+      "pinyin_26": "xue pin yin che",
+      "t9": "983746946243"
+    },
+    "expect": {
+      "first_in_baseline": false
+    }
+  },
+  {
+    "word": "乐行车",
+    "pinyin": "le xing che",
+    "layouts": {
+      "flypy26": "le xk ie",
+      "flypy14": "le zj ue",
+      "pinyin_26": "le xing che",
+      "t9": "539464243"
+    },
+    "expect": {
+      "first_in_baseline": false
+    }
+  }
+]

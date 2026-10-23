@@ -1,0 +1,5 @@
+shell=bash
+external-sources=true
+source-path=SCRIPTDIR
+# Harness helpers pass optional extra compiler flags through "$@"; calling them bare is intended.
+disable=SC2119

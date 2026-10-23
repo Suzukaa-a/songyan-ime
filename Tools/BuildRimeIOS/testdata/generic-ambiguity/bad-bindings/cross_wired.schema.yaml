@@ -1,0 +1,31 @@
+# The rewrite declaration names a DIFFERENT adapter schema; it must not authorize.
+schema:
+  schema_id: cross_wired
+  name: Cross wired
+  version: '1'
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [script_translator]
+  filters: [uniquifier]
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz0123456789
+  initials: abcdefghijklmnopqrstuvwxyz0123456789
+  algebra:
+    - derive/^abc$/9000/
+    - derive/^abd$/9001/
+    - derive/^abc$/ab/
+    - derive/^abd$/ab/
+translator:
+  dictionary: cross_wired
+  enable_user_dict: false
+  enable_completion: false
+keyboard_rewrite:
+  version: 2
+  lock: bounded_token_alias_rewrite_v2
+  adapter_schema: some_other_adapter
+  source_schema: cross_wired
+  translator_namespace: translator
+  lock_map:
+    abc: '9000'
+    abd: '9001'

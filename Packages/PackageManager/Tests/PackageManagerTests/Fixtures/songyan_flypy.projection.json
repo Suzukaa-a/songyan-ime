@@ -1,0 +1,891 @@
+{
+  "algebra": [
+    "derive/^([jqxy])u$/$1v/",
+    "xform/^([aoe])(ng)?$/$1$1$2/",
+    "xform/iu$/Q/",
+    "xform/(.)ei$/$1W/",
+    "xform/uan$/R/",
+    "xform/[uv]e$/T/",
+    "xform/un$/Y/",
+    "xform/^sh/U/",
+    "xform/^ch/I/",
+    "xform/^zh/V/",
+    "xform/uo$/O/",
+    "xform/ie$/P/",
+    "xform/i?ong$/S/",
+    "xform/ing$|uai$/K/",
+    "xform/(.)ai$/$1D/",
+    "xform/(.)en$/$1F/",
+    "xform/(.)eng$/$1G/",
+    "xform/[iu]ang$/L/",
+    "xform/(.)ang$/$1H/",
+    "xform/ian$/M/",
+    "xform/(.)an$/$1J/",
+    "xform/(.)ou$/$1Z/",
+    "xform/[iu]a$/X/",
+    "xform/iao$/N/",
+    "xform/(.)ao$/$1C/",
+    "xform/ui$/V/",
+    "xform/in$/B/",
+    "xlit/QWRTYUIOPSDFGHJKLZXCVBNM/qwrtyuiopsdfghjklzxcvbnm/"
+  ],
+  "alphabet": "zyxwvutsrqponmlkjihgfedcba",
+  "declaration": "canonical_pinyin",
+  "dictionary": "songyan_basic",
+  "producer_class": "script_translator",
+  "separator": " ",
+  "source_schema": "songyan_flypy",
+  "syllables": {
+    "a": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "aa"
+      }
+    ],
+    "ai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ai"
+      }
+    ],
+    "an": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "an"
+      }
+    ],
+    "ang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ah"
+      }
+    ],
+    "ba": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ba"
+      }
+    ],
+    "bai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "bd"
+      }
+    ],
+    "ban": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "bj"
+      }
+    ],
+    "bang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "bh"
+      }
+    ],
+    "bu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "bu"
+      }
+    ],
+    "chang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ih"
+      }
+    ],
+    "che": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ie"
+      }
+    ],
+    "cheng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ig"
+      }
+    ],
+    "chi": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ii"
+      }
+    ],
+    "chong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "is"
+      }
+    ],
+    "da": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "da"
+      }
+    ],
+    "dao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "dc"
+      }
+    ],
+    "de": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "de"
+      }
+    ],
+    "deng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "dg"
+      }
+    ],
+    "di": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "di"
+      }
+    ],
+    "dian": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "dm"
+      }
+    ],
+    "dong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ds"
+      }
+    ],
+    "du": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "du"
+      }
+    ],
+    "e": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ee"
+      }
+    ],
+    "en": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "en"
+      }
+    ],
+    "er": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "er"
+      }
+    ],
+    "fan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "fj"
+      }
+    ],
+    "fen": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ff"
+      }
+    ],
+    "feng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "fg"
+      }
+    ],
+    "fu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "fu"
+      }
+    ],
+    "ge": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ge"
+      }
+    ],
+    "gong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "gs"
+      }
+    ],
+    "gui": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "gv"
+      }
+    ],
+    "guo": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "go"
+      }
+    ],
+    "hai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hd"
+      }
+    ],
+    "hang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hh"
+      }
+    ],
+    "hao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hc"
+      }
+    ],
+    "he": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "he"
+      }
+    ],
+    "hen": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hf"
+      }
+    ],
+    "hu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hu"
+      }
+    ],
+    "huan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hr"
+      }
+    ],
+    "hui": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "hv"
+      }
+    ],
+    "huo": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ho"
+      }
+    ],
+    "ji": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ji"
+      }
+    ],
+    "jia": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jx"
+      }
+    ],
+    "jian": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jm"
+      }
+    ],
+    "jiang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jl"
+      }
+    ],
+    "jiao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jn"
+      }
+    ],
+    "jiu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jq"
+      }
+    ],
+    "jue": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "jt"
+      }
+    ],
+    "kai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "kd"
+      }
+    ],
+    "kan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "kj"
+      }
+    ],
+    "kang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "kh"
+      }
+    ],
+    "kong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ks"
+      }
+    ],
+    "kuai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "kk"
+      }
+    ],
+    "le": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "le"
+      }
+    ],
+    "leng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lg"
+      }
+    ],
+    "li": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "li"
+      }
+    ],
+    "liang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ll"
+      }
+    ],
+    "liao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ln"
+      }
+    ],
+    "lie": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lp"
+      }
+    ],
+    "lin": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lb"
+      }
+    ],
+    "lu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lu"
+      }
+    ],
+    "lv": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lv"
+      }
+    ],
+    "lve": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "lt"
+      }
+    ],
+    "ma": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ma"
+      }
+    ],
+    "mang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "mh"
+      }
+    ],
+    "men": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "mf"
+      }
+    ],
+    "ming": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "mk"
+      }
+    ],
+    "nao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "nc"
+      }
+    ],
+    "neng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ng"
+      }
+    ],
+    "ni": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ni"
+      }
+    ],
+    "nian": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "nm"
+      }
+    ],
+    "niao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "nn"
+      }
+    ],
+    "nv": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "nv"
+      }
+    ],
+    "o": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "oo"
+      }
+    ],
+    "pan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "pj"
+      }
+    ],
+    "pin": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "pb"
+      }
+    ],
+    "ping": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "pk"
+      }
+    ],
+    "qu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "qu"
+      },
+      {
+        "correction": false,
+        "normal": true,
+        "text": "qv"
+      }
+    ],
+    "que": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "qt"
+      }
+    ],
+    "ren": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "rf"
+      }
+    ],
+    "ri": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ri"
+      }
+    ],
+    "se": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "se"
+      }
+    ],
+    "shan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uj"
+      }
+    ],
+    "shang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uh"
+      }
+    ],
+    "sheng": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ug"
+      }
+    ],
+    "shi": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ui"
+      }
+    ],
+    "shou": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uz"
+      }
+    ],
+    "shu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uu"
+      }
+    ],
+    "shuang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ul"
+      }
+    ],
+    "shui": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uv"
+      }
+    ],
+    "shuo": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "uo"
+      }
+    ],
+    "tian": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "tm"
+      }
+    ],
+    "tong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ts"
+      }
+    ],
+    "wang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "wh"
+      }
+    ],
+    "wei": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ww"
+      }
+    ],
+    "wo": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "wo"
+      }
+    ],
+    "xi": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xi"
+      }
+    ],
+    "xiang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xl"
+      }
+    ],
+    "xiao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xn"
+      }
+    ],
+    "xie": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xp"
+      }
+    ],
+    "xing": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xk"
+      }
+    ],
+    "xiong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xs"
+      }
+    ],
+    "xue": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "xt"
+      }
+    ],
+    "ya": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ya"
+      }
+    ],
+    "yan": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yj"
+      }
+    ],
+    "yao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yc"
+      }
+    ],
+    "yi": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yi"
+      }
+    ],
+    "yin": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yb"
+      }
+    ],
+    "yu": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yu"
+      },
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yv"
+      }
+    ],
+    "yue": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yt"
+      }
+    ],
+    "yun": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "yy"
+      }
+    ],
+    "zai": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "zd"
+      }
+    ],
+    "zao": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "zc"
+      }
+    ],
+    "zhang": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "vh"
+      }
+    ],
+    "zhe": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "ve"
+      }
+    ],
+    "zhi": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "vi"
+      }
+    ],
+    "zhong": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "vs"
+      }
+    ],
+    "zou": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "zz"
+      }
+    ],
+    "zuo": [
+      {
+        "correction": false,
+        "normal": true,
+        "text": "zo"
+      }
+    ]
+  },
+  "translator_namespace": "translator"
+}

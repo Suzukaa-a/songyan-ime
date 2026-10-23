@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pin one Xcode from the macos-26 image so every job builds with the same SDK.
+  # The cache keys below carry the same version; bump both together.
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install shellcheck
+        run: brew install shellcheck
+      - name: Lint
+        run: Tools/CI/ci.sh lint
+
+  tests:
+    name: Tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Restore Swift build caches
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .local/swiftpm-cache
+            .local/ci/swift-package-builds
+            .local/swift-probes
+          key: tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved', 'Tests/IOS/swift_probe.py') }}
+          restore-keys: |
+            tests-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
+      - name: Run tests
+        run: Tools/CI/ci.sh fast
+      - name: Save Swift build caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .local/swiftpm-cache
+            .local/ci/swift-package-builds
+            .local/swift-probes
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Upload failed package logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swift-package-test-logs
+          path: .local/ci/swift-packages/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    name: Build (${{ matrix.configuration }}, ${{ matrix.platform }})
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Release turns warnings into errors, so it is built too.
+        configuration: [Debug, Release]
+        platform: [simulator, device]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Restore Xcode build caches
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .local/ci/app-builds
+            .local/ci/xcode-source-packages
+            .local/xcode-package-cache
+          key: build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-26.6-${{ hashFiles('Songyan.xcodeproj/project.pbxproj', '**/Package.resolved') }}
+          restore-keys: |
+            build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ matrix.platform }}-xcode-26.6-
+      # The HostApp scheme also builds the embedded keyboard extension. These
+      # unsigned products check compiling and linking only; they cannot run.
+      - name: Build host app and keyboard extension
+        run: Tools/CI/scripts/build-app.sh "${{ matrix.configuration }}" "${{ matrix.platform }}"
+      - name: Save Xcode build caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .local/ci/app-builds
+            .local/ci/xcode-source-packages
+            .local/xcode-package-cache
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Upload failed build logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-${{ matrix.configuration }}-${{ matrix.platform }}-logs
+          path: .local/ci/app-${{ matrix.configuration }}-${{ matrix.platform }}/**/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7

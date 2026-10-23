@@ -1,0 +1,65 @@
+# Rime dictionary — engine self-test fixture.
+# Synthetic pinyin dictionary written for this project's engine verification.
+# Not derived from any external corpus; see testdata/shared/README.md.
+# Each pinyin syllable used below maps to exactly one single-character entry,
+# which keeps candidate indexes deterministic for the self tests.
+---
+name: engine_test_dict
+version: "0.1.0"
+sort: by_weight
+use_preset_vocabulary: false
+columns:
+  - text
+  - code
+  - weight
+...
+# single characters (syllable code = full pinyin of that one syllable)
+你	ni	100
+好	hao	100
+世	shi	100
+界	jie	100
+森	sen	100
+林	lin	100
+中	zhong	100
+文	wen	100
+拼	pin	100
+音	yin	100
+学	xue	100
+习	xi	100
+龙	long	100
+明	ming	100
+天	tian	100
+上	shang	100
+海	hai	100
+北	bei	100
+京	jing	100
+工	gong	100
+作	zuo	100
+快	kuai	100
+乐	le	100
+大	da	100
+国	guo	100
+人	ren	100
+民	min	100
+一	yi	100
+起	qi	100
+猫	mao	100
+咪	mi	100
+
+# phrases already present in the (tiny) dictionary
+你好	ni hao	200
+世界	shi jie	200
+中文	zhong wen	200
+拼音	pin yin	200
+学习	xue xi	200
+明天	ming tian	200
+上海	shang hai	200
+北京	bei jing	200
+工作	gong zuo	200
+快乐	kuai le	200
+大学	da xue	200
+中国	zhong guo	200
+人民	ren min	200
+一起	yi qi	200
+猫咪	mao mi	200
+你好世界	ni hao shi jie	100

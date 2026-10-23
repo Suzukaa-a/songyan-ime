@@ -1,0 +1,18 @@
+# Engine self-test default configuration.
+# Config for a fresh user dir: which schemas are available / default.
+# Real packages bring their own default.yaml; see testdata/shared/README.md.
+config_version: '0.1'
+
+schema_list:
+  - schema: engine_test_pinyin26
+  - schema: engine_test_mirror
+
+switcher:
+  caption: 〔方案切換〕
+  hotkeys:
+    - F4
+
+menu:
+  page_size: 5
+
+# Recognizer & key binding defaults are not needed by the self-test schemas.

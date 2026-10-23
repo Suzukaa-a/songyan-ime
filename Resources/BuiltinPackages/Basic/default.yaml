@@ -1,0 +1,20 @@
+# Default configuration of the built-in schemes (required file).
+#
+# librime's deploy reads default.yaml in the shared directory and prebuilds every scheme in schema_list;
+# without it a cold deploy into a fresh user directory builds nothing.
+# The keyboard_* entries are the generated 14-, 18- and 9-key companions of the two schemes
+# (BuiltinTemplateSchemas.adapters), listed so the keyboard deploys them without the app's help.
+config_version: "1"
+
+menu:
+  page_size: 5
+
+schema_list:
+  - schema: songyan_quanpin
+  - schema: songyan_flypy
+  - schema: keyboard_47246213a538cb99d374_14
+  - schema: keyboard_47246213a538cb99d374_18
+  - schema: keyboard_47246213a538cb99d374_9
+  - schema: keyboard_3d7821f984693864ae91_14
+  - schema: keyboard_3d7821f984693864ae91_18
+  - schema: keyboard_3d7821f984693864ae91_9

@@ -1,0 +1,25 @@
+# Table-shaped companion declaring the v3 DIRECT lock with a
+# cross-wired adapter: the bridge must refuse it.
+schema:
+  schema_id: direct_unbound
+  name: Direct unbound
+  version: '1'
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [table_translator]
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz
+  initials: abcdefghijklmnopqrstuvwxyz
+  algebra:
+    - derive/w/q/
+translator:
+  dictionary: direct_unbound
+  enable_user_dict: false
+keyboard_rewrite:
+  version: 3
+  lock: direct_token_rewrite_v3
+  adapter_schema: some_other_adapter
+  source_schema: direct_unbound
+  translator_namespace: translator
+  direct_tokens: ['abc', 'abd']

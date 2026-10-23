@@ -1,0 +1,7 @@
+---
+name: cross_wired
+version: "1"
+sort: by_weight
+...
+甲	abc	100
+乙	abd	90

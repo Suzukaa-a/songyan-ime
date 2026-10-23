@@ -1,0 +1,4 @@
+config_version: '1'
+schema_list:
+  - schema: cross_wired
+  - schema: direct_unbound

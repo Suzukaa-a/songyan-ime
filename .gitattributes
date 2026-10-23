@@ -1,0 +1,2 @@
+# Unified-diff blank context lines contain a required space.
+Tools/BuildRimeIOS/patches/librime-tsv-write-failures.patch whitespace=-blank-at-eol

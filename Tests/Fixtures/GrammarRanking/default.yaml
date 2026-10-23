@@ -1,0 +1,5 @@
+schema_list:
+  - schema: songyan_quanpin
+  - schema: capability_probe
+menu:
+  page_size: 5

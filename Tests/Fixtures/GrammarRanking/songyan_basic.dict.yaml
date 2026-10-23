@@ -1,0 +1,51 @@
+---
+name: songyan_basic
+version: "grammar-ranking-1"
+sort: by_weight
+use_preset_vocabulary: false
+columns: [text, code, weight]
+...
+我	wo	8000
+窝	wo	10000
+卧	wo	9000
+是	shi	8000
+市	shi	10000
+事	shi	9500
+们	men	8000
+门	men	10000
+闷	men	9000
+学	xue	9000
+雪	xue	10000
+穴	xue	8000
+习	xi	8000
+西	xi	10000
+溪	xi	9000
+中	zhong	9000
+钟	zhong	10000
+种	zhong	9500
+国	guo	9000
+果	guo	10000
+过	guo	9500
+人	ren	9000
+仁	ren	10000
+任	ren	9500
+民	min	9000
+敏	min	10000
+好	hao	9000
+号	hao	10000
+你	ni	9000
+泥	ni	10000
+生	sheng	9000
+声	sheng	10000
+我们	wo men	10000
+我门	wo men	10500
+学习	xue xi	10000
+学西	xue xi	10500
+中国	zhong guo	10000
+中果	zhong guo	10500
+人民	ren min	10000
+人敏	ren min	10500
+学生	xue sheng	10000
+雪生	xue sheng	10500
+你好	ni hao	10000
+泥好	ni hao	10500

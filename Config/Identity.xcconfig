@@ -1,0 +1,7 @@
+// Product identity shared by both targets. To build under your own Apple team,
+// create Config/Local.xcconfig (git-ignored) and override any of these values.
+SONGYAN_BUNDLE_ID = app.songyan.ime
+SONGYAN_APP_GROUP = group.app.songyan.shared
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

@@ -1,0 +1,86 @@
+# Rime schema - songyan_flypy (built-in Flypy double pinyin)
+# encoding: utf-8
+#
+# Rule source: double_pinyin_flypy.schema.yaml from rime/rime-double-pinyin
+# (commit 01a13287cbd2, GPL-3.0) and clover_flypy_14.schema.yaml from forfudan/rime-clover-flypy
+# (commit c69e96898b6b, LGPL-3.0).
+# Modified by this project: the derive anchors were changed, and the upstream 14-key merged xlit was
+# replaced by an uppercase-to-lowercase xlit; compact layouts are generated from this file.
+# Full license texts: root LICENSE and Resources/Legal/licenses/LGPL-3.0.txt.
+#
+# Design notes:
+# - Dictionary songyan_basic (canonical full-pinyin readings, including the v series), shared with songyan_quanpin.
+# - Own prism; user_dict songyan_shared is shared with songyan_quanpin, so learning carries across schemes.
+# - speller/algebra mirrors the core Flypy rules of clover_flypy_14, order-sensitive, with uppercase
+#   placeholders in between to prevent second matches.
+# - Per-syllable rules follow rime-double-pinyin Flypy: zero-initial two-letter syllables keep full pinyin,
+#   three-letter ones use first letter + final key (ang->ah, eng->eg, ong->os); ao/ai/an/en/er/ou keep full pinyin.
+# - script_translator always composes sentences and does not read enable_sentence, so the key is not set.
+schema:
+  schema_id: songyan_flypy
+  name: 内置小鹤双拼
+  version: "0.1.0"
+  description: |
+    26 键小鹤双拼，与内置全拼共用词库和学习记录。
+
+engine:
+  processors:
+    - speller
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - abc_segmentor
+    - fallback_segmentor
+  translators:
+    - script_translator
+  filters:
+    - uniquifier
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra:
+    # Mirrors the core Flypy rules of clover_flypy_14 / rime-double-pinyin flypy (order-sensitive)
+    - derive/^([jqxy])u$/$1v/          # ju -> jv derive (keeps the original ju spelling)
+    - xform/^([aoe])(ng)?$/$1$1$2/     # a→aa e→ee o→oo ang→aang eng→eeng ong→oong
+    - xform/iu$/Q/
+    - xform/(.)ei$/$1W/
+    - xform/uan$/R/
+    - xform/[uv]e$/T/                  # ue/ve→T（jue/que/xue/yue/lve/nve）
+    - xform/un$/Y/
+    - xform/^sh/U/
+    - xform/^ch/I/
+    - xform/^zh/V/
+    - xform/uo$/O/
+    - xform/ie$/P/
+    - xform/i?ong$/S/
+    - xform/ing$|uai$/K/
+    - xform/(.)ai$/$1D/
+    - xform/(.)en$/$1F/
+    - xform/(.)eng$/$1G/
+    - xform/[iu]ang$/L/
+    - xform/(.)ang$/$1H/
+    - xform/ian$/M/
+    - xform/(.)an$/$1J/
+    - xform/(.)ou$/$1Z/
+    - xform/[iu]a$/X/
+    - xform/iao$/N/
+    - xform/(.)ao$/$1C/
+    - xform/ui$/V/
+    - xform/in$/B/
+    - xlit/QWRTYUIOPSDFGHJKLZXCVBNM/qwrtyuiopsdfghjklzxcvbnm/  # uppercase intermediate codes -> lowercase
+
+translator:
+  dictionary: songyan_basic
+  prism: songyan_flypy
+  user_dict: songyan_shared
+  db_class: userdb
+  enable_user_dict: true
+  enable_completion: false
+  max_phrase_length: 8
+  initial_quality: 1.0
+
+# Explicitly declares this scheme a trusted canonical-pinyin canonical source (the generator grants 9-key canonical only on this basis;
+# the token-shape check is merely a necessary filter and cannot replace this declaration).
+keyboard_adapter_source: canonical_pinyin

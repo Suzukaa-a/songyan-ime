@@ -1,0 +1,10 @@
+// ---------------------------------------------------------------------------
+// RimeKit.modulemap — Clang module map used by the macOS host smoke build so
+// the wrapper's `import RimeKit` resolves to the same C headers/bridge the iOS
+// framework ships. The iOS XCFramework carries an equivalent module map.
+// ---------------------------------------------------------------------------
+module RimeKit {
+    umbrella header "RimeKit.h"
+    export *
+    module * { export * }
+}

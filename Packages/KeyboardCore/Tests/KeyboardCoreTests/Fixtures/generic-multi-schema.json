@@ -1,0 +1,23 @@
+{
+  "name": "通用形码与方言示例包",
+  "comment": "非拼音、多 schema 的通用来源 fixture：用于证明信息架构与选择流程不依赖任何特定来源、schema ID 或品牌。",
+  "schemas": [
+    { "id": "cangjie5", "name": "倉頡五代", "alphabet": "abcdefghijklmnopqrstuvwxyz" },
+    { "id": "wubi86", "name": "五笔86", "alphabet": "abcdefghijklmnopqrstuvwxyz" },
+    { "id": "jyut6ping3", "name": "粵語 Jyutping", "alphabet": "abcdefghijklmnopqrstuvwxyz" },
+    { "id": "bopomofo", "name": "注音符號", "alphabet": "abcdefghijklmnopqrstuvwxyz," },
+    { "id": "stroke_hspnz", "name": "筆畫輸入", "alphabet": "hspnz" },
+    { "id": "numeric_radical", "name": "數字部首", "alphabet": "1234567890" }
+  ],
+  "layoutEntries": [
+    { "layout": "qwerty26", "schemaID": "cangjie5" },
+    { "layout": "qwerty26", "schemaID": "wubi86" },
+    { "layout": "phone9", "schemaID": "jyut6ping3" },
+    { "layout": "qwerty26", "schemaID": "bopomofo" },
+    { "layout": "qwerty26", "schemaID": "stroke_hspnz" }
+  ],
+  "preferredLayouts": {
+    "cangjie5": "qwerty26",
+    "jyut6ping3": "phone9"
+  }
+}

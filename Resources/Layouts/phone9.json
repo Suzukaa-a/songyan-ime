@@ -1,0 +1,36 @@
+{
+  "id": "phone9",
+  "name": "9 键",
+  "input": {"builtinLayout": "phone9"},
+  "note": "2–9 键按所选的输入方案输入。输入中轻点首键可分词；未输入时，左栏前三个符号可直接输入，连续点按首键可轮换其余符号。长按首键输入 1，长按 2–9 输入对应数字。",
+  "rows": [
+    {"keys": [
+      {"label":"，。？","secondaryLabel":"1","action":{"type":"literal","value":"，"},"longPress":[{"label":"1","action":{"type":"literal","value":"1"}}]},
+      {"label":"ABC","secondaryLabel":"2","action":{"type":"code","value":"2"},"longPress":[{"label":"2","action":{"type":"literal","value":"2"}}]},
+      {"label":"DEF","secondaryLabel":"3","action":{"type":"code","value":"3"},"longPress":[{"label":"3","action":{"type":"literal","value":"3"}}]}
+    ]},
+    {"keys": [
+      {"label":"GHI","secondaryLabel":"4","action":{"type":"code","value":"4"},"longPress":[{"label":"4","action":{"type":"literal","value":"4"}}]},
+      {"label":"JKL","secondaryLabel":"5","action":{"type":"code","value":"5"},"longPress":[{"label":"5","action":{"type":"literal","value":"5"}}]},
+      {"label":"MNO","secondaryLabel":"6","action":{"type":"code","value":"6"},"longPress":[{"label":"6","action":{"type":"literal","value":"6"}}]}
+    ]},
+    {"keys": [
+      {"label":"PQRS","secondaryLabel":"7","action":{"type":"code","value":"7"},"longPress":[{"label":"7","action":{"type":"literal","value":"7"}}]},
+      {"label":"TUV","secondaryLabel":"8","action":{"type":"code","value":"8"},"longPress":[{"label":"8","action":{"type":"literal","value":"8"}}]},
+      {"label":"WXYZ","secondaryLabel":"9","action":{"type":"code","value":"9"},"longPress":[{"label":"9","action":{"type":"literal","value":"9"}}]}
+    ]},
+    {"keys": [
+      {"label":"布局","action":{"type":"modeSwitch","value":"nextLayout"}},
+      {"label":"空格","width":4,"action":{"type":"space"}},
+      {"label":"🌐","action":{"type":"globe"}}
+    ]}
+  ],
+  "auxiliaryAreas": [
+    {"position":"trailing","role":"editing","keys":[
+      {"label":"⌫","action":{"type":"backspace"}},
+      {"label":"分词","action":{"type":"code","value":"'"}},
+      {"label":"⏎","action":{"type":"enter"}}
+    ]},
+    {"position":"leading","role":"disambiguation","keys":[]}
+  ]
+}
