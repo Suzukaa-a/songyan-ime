@@ -181,8 +181,14 @@ public extension KeyboardPanelGeometry {
             + (candidateArea ? candidateAreaBonus - (reading ? readingLayoutBonusCut : 0) : 0)
     }
 
-    /// Extra height the candidate area gets beyond the configured budget (the configured budget alone leaves it too narrow).
-    static let candidateAreaBonus: Double = 16
+    /// Extra height the candidate area gets beyond the configured budget (the configured budget alone leaves it too narrow),
+    /// minus the temporary `hostGapWorkaroundCut`.
+    static let candidateAreaBonus: Double = 16 - hostGapWorkaroundCut
+    /// TEMPORARY: iOS often adds a 17pt blank band above a third-party keyboard (after switching from a system
+    /// keyboard or returning to the app; FB24460699 / FB25094825), which the extension cannot detect. Until Apple
+    /// fixes it, every layout's candidate area gives up 10pt so the keyboard does not look too tall with the band.
+    /// Set back to 0 once the band is gone.
+    static let hostGapWorkaroundCut: Double = 10
     /// How much less candidate-area bonus a definition with a reading row (14-key) gets.
     static let readingLayoutBonusCut: Double = 4
     /// The share of spare height a reading row takes when present (the rest goes to the word row).
