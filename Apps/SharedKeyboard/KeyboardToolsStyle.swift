@@ -35,8 +35,8 @@ enum KeyboardToolsStyle {
 // MARK: - Panel dismiss button
 
 /// The one way out of a keyboard panel, top-right: 「完成」 in the settings panel,
-/// 「返回」 in the quick-content panel. Drawn like the Return key, as the panel's
-/// primary action, on a 44pt hit frame.
+/// 「返回」 in the quick-content panel. Drawn the way iOS draws a sheet's Done: tinted
+/// semibold text with no fill, dimmed while pressed, on a 44pt-wide hit frame.
 struct KeyboardToolsDismissButton: View {
     let title: String
     var accessibilityHint: String?
@@ -47,14 +47,62 @@ struct KeyboardToolsDismissButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .lineLimit(1)
-                .padding(.horizontal, 14)
+                .fixedSize()
+                .padding(.horizontal, 6)
                 .frame(minWidth: 44, minHeight: minHeight)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(KeyboardToolsKeyButtonStyle(role: "accent"))
+        .buttonStyle(KeyboardToolsTextButtonStyle())
         .accessibilityHint(accessibilityHint ?? "")
+    }
+}
+
+/// iOS bar-button look: the label in the accent colour, dimmed while pressed or disabled.
+struct KeyboardToolsTextButtonStyle: ButtonStyle {
+    @Environment(\.keyboardAppearance) private var appearance
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(appearance.accentForeground)
+            .opacity(!isEnabled ? 0.3 : configuration.isPressed ? 0.35 : 1)
+            .keyboardChromePressTiming(isPressed: configuration.isPressed)
+    }
+}
+
+// MARK: - Panel title bar
+
+/// The title bar shared by the keyboard's panels (键盘设置, 快捷内容): the title on the
+/// leading edge, the panel's controls on the trailing edge.
+struct KeyboardToolsTitleBar<Title: View, Trailing: View>: View {
+    @ViewBuilder var title: () -> Title
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 4) {
+            title()
+            Spacer(minLength: 8)
+            trailing()
+        }
+        .padding(.leading, KeyboardToolsStyle.contentHorizontalInset)
+        // The trailing control's own padding already gives its text the inset.
+        .padding(.trailing, KeyboardToolsStyle.contentHorizontalInset - 6)
+    }
+}
+
+/// The panel title's text style.
+struct KeyboardToolsTitle: View {
+    @Environment(\.keyboardAppearance) private var appearance
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.headline)
+            .foregroundStyle(Color(uiColor: appearance.text(on: "panel")))
+            .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

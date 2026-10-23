@@ -65,25 +65,15 @@ extension KeyboardPanelView {
 
     /// Stable title bar: does not scroll and, like the candidate bar, draws no rule; the back action is still a pure UI dismiss.
     private var toolsTitleBar: some View {
-        VStack(spacing: 0) {
-            // System-sheet-style title bar: title centered, "Done" on the right (as in iOS Settings/forms).
-            ZStack {
-                Text("键盘设置")
-                    .font(.headline)
-                    .foregroundStyle(Color(uiColor: appearance.text(on: "panel")))
-                    .lineLimit(1)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($utilitiesTitleFocused)
-                HStack {
-                    Spacer(minLength: 8)
-                    KeyboardToolsDismissButton(title: "完成", accessibilityHint: "返回键盘", minHeight: 40) {
-                        showsUtilitiesMenu = false
-                    }
-                }
+        KeyboardToolsTitleBar {
+            KeyboardToolsTitle(text: "键盘设置")
+                .accessibilityFocused($utilitiesTitleFocused)
+        } trailing: {
+            KeyboardToolsDismissButton(title: "完成", accessibilityHint: "返回键盘", minHeight: 40) {
+                showsUtilitiesMenu = false
             }
-            .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
-            .frame(minHeight: 40)
         }
+        .frame(minHeight: 40)
     }
 
     /// Status error/hint: still a tappable 44pt row that opens details and recovery actions.

@@ -306,24 +306,17 @@ public struct SymbolLibraryView: View {
 
     // MARK: Header (title / search toggle / back)
 
-    /// Same arrangement as the keyboard settings panel: the title centred, the way
-    /// out top-right in the 完成 style, search just left of it.
+    /// Same title bar as the keyboard settings panel: the title top-left, the way out
+    /// top-right in the 完成 style, search just left of it.
     private func headerBar(_ layout: QuickContentLayout) -> some View {
-        ZStack {
-            Text(model.searchKeyboardVisible ? "搜索" : "快捷内容")
-                .font(appearance.font(appearance.controlTextSize))
-                .foregroundStyle(Color(uiColor: appearance.text(on: "panel")))
-                .lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 4) {
-                Spacer(minLength: 0)
-                searchToggle
-                KeyboardToolsDismissButton(
-                    title: "返回", accessibilityHint: "关闭快捷内容，回到之前的键盘页面",
-                    minHeight: min(44, layout.titleBarHeight), action: onClose)
-            }
+        KeyboardToolsTitleBar {
+            KeyboardToolsTitle(text: model.searchKeyboardVisible ? "搜索" : "快捷内容")
+        } trailing: {
+            searchToggle
+            KeyboardToolsDismissButton(
+                title: "返回", accessibilityHint: "关闭快捷内容，回到之前的键盘页面",
+                minHeight: min(44, layout.titleBarHeight), action: onClose)
         }
-        .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
     }
 
     private var searchToggle: some View {
@@ -336,7 +329,7 @@ public struct SymbolLibraryView: View {
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(SymbolPanelPressStyle())
+        .buttonStyle(KeyboardToolsTextButtonStyle())
         .disabled(section == "clipboard")
         .accessibilityIdentifier("quickContent.search")
         .accessibilityLabel(model.searchKeyboardVisible ? "退出搜索" : "搜索")
