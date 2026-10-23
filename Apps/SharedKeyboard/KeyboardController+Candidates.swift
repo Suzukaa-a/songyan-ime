@@ -105,10 +105,13 @@ extension KeyboardController {
             if pendingCandidateRead?.generation == generation && pendingCandidateRead?.page == page {
                 pendingCandidateRead = nil
             }
+            // One publish per read: each page assigned on its own re-renders the bar again mid-fling.
+            var browser = candidateBrowser
             for (offset, result) in results.enumerated() {
-                guard candidateBrowser.canAppend(pageIndex: page + offset) else { break }
-                candidateBrowser.append(pageIndex: page + offset, result: result, pageSize: size)
+                guard browser.canAppend(pageIndex: page + offset) else { break }
+                browser.append(pageIndex: page + offset, result: result, pageSize: size)
             }
+            candidateBrowser = browser
         }
     }
 

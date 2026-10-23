@@ -422,12 +422,25 @@ struct CollapsedCandidateRow: View {
                 stripDefinition.height, candidateSize: context.typography.candidateSize))
     }
 
+    /// Cells per lazy child. One lazy child per cell makes every appended page re-place
+    /// hundreds of children mid-fling; chunks keep that count small, as the expanded rows do.
+    static let chunkSize = 8
+
     var body: some View {
         let prefetch = context.prefetchIndex(entryCount: entries.count)
+        let count = entries.count
         LazyHStack(spacing: spacing) {
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                cell(entry, width: cellWidths.indices.contains(index) ? cellWidths[index] : 44)
-                    .modifier(CandidatePrefetch(context: context, isTrigger: index == prefetch, kind: .collapsedTail))
+            ForEach(Array(stride(from: 0, to: count, by: Self.chunkSize)), id: \.self) { start in
+                let chunk = start..<min(start + Self.chunkSize, count)
+                HStack(spacing: spacing) {
+                    ForEach(chunk, id: \.self) { index in
+                        cell(entries[index], width: cellWidths.indices.contains(index) ? cellWidths[index] : 44)
+                    }
+                }
+                .modifier(
+                    CandidatePrefetch(
+                        context: context, isTrigger: prefetch.map(chunk.contains) ?? false,
+                        kind: .collapsedTail))
             }
             tailSentinel
         }
