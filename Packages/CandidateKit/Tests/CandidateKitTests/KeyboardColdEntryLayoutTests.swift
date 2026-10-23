@@ -34,8 +34,8 @@ final class KeyboardColdEntryLayoutTests: XCTestCase {
                 candidateHeight: 44, keyHeight: 54,
                 readingRow: true))
         XCTAssertEqual(
-            fixed, 306, accuracy: 0.01,
-            "44 candidate budget - 2 (bonus minus cuts) + 32 reading row + 4x54 key rows (candidate area flush to the top) = 14-key shell height 306"
+            fixed, 313, accuracy: 0.01,
+            "44 candidate budget + 5 (bonus minus cuts) + 32 reading row + 4x54 key rows (candidate area flush to the top) = 14-key shell height 313"
         )
         XCTAssertEqual(
             try measuredHeight(

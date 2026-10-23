@@ -36,12 +36,14 @@ public enum CandidateReadingRowPolicy {
     public static func textTopPadding(rowHeight: Double) -> Double {
         min(textDrop * 2, max(0, rowHeight - minimumHeight))
     }
-    /// How far word-candidate text sits below its row center when a reading row is present.
-    /// Half of the 4pt the candidate band gives up below the text (`candidateAreaBonus` 16 → 12),
-    /// so the space above the text stays and only the gap to the keys shrinks.
-    public static let candidateDrop: Double = 3
-    /// How far word-candidate text sits below its row center when there is no reading row, closer to the key area.
-    public static let plainCandidateDrop: Double = 3
+    /// How far word-candidate text sits below its row center when a reading row is present: splits the
+    /// band so the text keeps the shared `candidateBottomSpace` above the keys.
+    public static let candidateDrop: Double =
+        (KeyboardPanelGeometry.readingCandidateSpace - KeyboardPanelGeometry.candidateBottomSpace) / 2
+    /// How far word-candidate text sits below its row center when there is no reading row: splits the band
+    /// into the shared `candidateTopSpace` above the text and `candidateBottomSpace` below it.
+    public static let plainCandidateDrop: Double =
+        (KeyboardPanelGeometry.candidateTopSpace - KeyboardPanelGeometry.candidateBottomSpace) / 2
     public static let candidateLift: Double = 0
 
     /// In landscape (compact height) the shell is shorter: the reading row and font each shrink one step to leave height for key rows.

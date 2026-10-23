@@ -487,7 +487,7 @@ final class KeyboardPanelGeometryTests: XCTestCase {
         let standard = KeyboardPanelGeometry.presentationShellHeight(
             candidateHeight: candidateHeight,
             keyHeight: 54, readingRow: false)
-        XCTAssertEqual(fourteen, 302)
+        XCTAssertEqual(fourteen, 309)
         XCTAssertEqual(
             fourteen - standard, CandidateReadingRowPolicy.height - KeyboardPanelGeometry.readingLayoutBonusCut)
         let reading = CandidateReadingRowPolicy.height

@@ -181,20 +181,33 @@ public extension KeyboardPanelGeometry {
             + (candidateArea ? candidateAreaBonus - (reading ? readingLayoutBonusCut : 0) : 0)
     }
 
-    /// Extra height the candidate area gets beyond the configured budget (the configured budget alone leaves it too narrow),
-    /// minus the temporary `hostGapWorkaroundCut`. The candidate text sits low in the band
-    /// (`CandidateReadingRowPolicy.candidateDrop`), so the band is short below the text, not above it.
-    static let candidateAreaBonus: Double = 12 - hostGapWorkaroundCut
+    /// The two gaps every layout shares, as space beyond half the configured candidate row
+    /// (the candidate text is centred in that row):
+    /// - `candidateBottomSpace`: between the candidate text and the keys;
+    /// - `candidateTopSpace`: above the first text row (candidates on 9/26-key, readings on 14/18-key),
+    ///   before `hostGapWorkaroundCut` comes off the top.
+    /// 9/26-key and 14/18-key derive their band heights and text offsets from these, so a change to
+    /// either gap moves every layout together.
+    static let candidateBottomSpace: Double = 3
+    static let candidateTopSpace: Double = 9
+    /// Extra height the candidate area gets beyond the configured budget: both shared gaps,
+    /// minus the temporary `hostGapWorkaroundCut`.
+    static let candidateAreaBonus: Double = candidateTopSpace + candidateBottomSpace - hostGapWorkaroundCut
     /// TEMPORARY: iOS often adds a 17pt blank band above a third-party keyboard (after switching from a system
     /// keyboard or returning to the app; FB24460699 / FB25094825), which the extension cannot detect. Until Apple
     /// fixes it, every layout's shell is 10pt shorter and `fit` takes those 10pt off the top of the topmost band
     /// only, so the keyboard does not look too tall with the band while the candidates keep their place above
     /// the keys. Set back to 0 once the band is gone.
     static let hostGapWorkaroundCut: Double = 10
-    /// How much less candidate-area bonus a definition with a reading row (14-key) gets.
-    static let readingLayoutBonusCut: Double = 4
-    /// The share of spare height a reading row takes when present (the rest goes to the word row).
-    static let readingRowSpareShare: Double = 6
+    /// 14/18-key: the reading row's share of the spare height. It puts the (smaller, lower-set) reading text
+    /// where the 9/26-key candidate text starts, i.e. the same `candidateTopSpace` look.
+    static let readingRowSpareShare: Double = 10
+    /// 14/18-key: space above the candidate text (beyond half its row) under the reading row.
+    static let readingCandidateSpace: Double = 2
+    /// How much less candidate-area bonus a definition with a reading row gets (negative: more): its spare
+    /// height is the reading row's share, the space under it and the shared `candidateBottomSpace`.
+    static let readingLayoutBonusCut: Double =
+        candidateTopSpace - readingRowSpareShare - readingCandidateSpace
 
     /// Lays out a page with the given top bands inside `shellHeight`: the four key rows (three main rows +
     /// control row) share the remaining height equally but never exceed `standardKeyHeight`; extra height goes to

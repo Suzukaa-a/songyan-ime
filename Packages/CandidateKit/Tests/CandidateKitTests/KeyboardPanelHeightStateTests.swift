@@ -50,11 +50,11 @@ final class KeyboardPanelHeightStateTests: XCTestCase {
             readingRowReserved: false, candidateAreaReserved: true)
         XCTAssertEqual(state.panelHeight, first.shellHeight)
         XCTAssertEqual(fit.keyHeight, 54)
-        XCTAssertEqual(fit.headerHeight, 70)
+        XCTAssertEqual(fit.headerHeight, 77)
         state.endPresentation()
         state.beginPresentation(height: next.shellHeight)
         XCTAssertEqual(state.panelHeight, next.shellHeight)
-        XCTAssertEqual(first.shellHeight - next.shellHeight, 28)
+        XCTAssertEqual(first.shellHeight - next.shellHeight, 35)
     }
 
     func testDisplayedSnapshotFitsTheFrozenShellWhenColdCacheDiffers() {
