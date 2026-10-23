@@ -86,6 +86,8 @@ private final class SymbolLibraryIOWorker: @unchecked Sendable {
         var persistenceNote: String?
         var updatesPersistenceNote = false
         var isRead = false
+        /// Set when a use could not be stored because the directory is read-only.
+        var unstoredUse: String?
     }
 
     /// Confined to SymbolLibraryWriteQueue, including first-use resolution.
@@ -127,8 +129,11 @@ private final class SymbolLibraryIOWorker: @unchecked Sendable {
     func record(_ text: String) async -> Outcome {
         await SymbolLibraryWriteQueue.async {
             let directory = self.resolveDirectory()
-            // Read-only: the insert stands, recents stay as stored.
-            guard SymbolLibraryStorage.allowsWrites(to: directory) else { return Outcome(directory: directory) }
+            // Read-only: the insert stands, the stored recents stay untouched and the
+            // use is kept for this keyboard session only.
+            guard SymbolLibraryStorage.allowsWrites(to: directory) else {
+                return Outcome(directory: directory, unstoredUse: text)
+            }
             let result = RecentSymbolStore(directory: directory).record(text)
             return Outcome(
                 directory: directory, texts: result.saveError == nil ? result.texts : nil,
@@ -202,6 +207,11 @@ public final class SymbolLibraryModel: ObservableObject {
     private var appliedToken = 0
     private var latestReloadToken = 0
     private var persistenceNoteFromRead = false
+    /// The last recents read from or written to the store.
+    private var storedRecents: [String] = []
+    /// Uses that could not be stored (no Full Access): shown first for the life of
+    /// this keyboard process, never written.
+    private var sessionRecents: [String] = []
     private let onInsert: (String) -> Bool
     /// Optional report of whether the insert succeeded: the host uses it for "feedback only on real success" side effects.
     /// Timing: called once after onInsert returns true and before recents are recorded.
@@ -216,10 +226,13 @@ public final class SymbolLibraryModel: ObservableObject {
     ///     exit, or input disabled); true does not guarantee the host document accepted it (the public
     ///     proxy gives no receipt). On false, recents are not recorded.
     ///   - onInserted: Optional report of the insert result (called once, before recents are recorded).
+    ///   - loadsImmediately: false defers the first read to an explicit `reload()`, for owners
+    ///     created with the keyboard that may never show the library.
     public init(
         storeDirectory: URL? = nil,
         onInsert: @escaping (String) -> Bool,
-        onInserted: ((Bool) -> Void)? = nil
+        onInserted: ((Bool) -> Void)? = nil,
+        loadsImmediately: Bool = true
     ) {
         self.storeDirectory = storeDirectory
         self.worker = SymbolLibraryIOWorker(directory: storeDirectory)
@@ -227,7 +240,7 @@ public final class SymbolLibraryModel: ObservableObject {
         self.onInserted = onInserted
         // Even bundledDefault() reads JSON. First paint must not touch disk.
         self.catalog = SymbolCatalog(categories: [], items: [])
-        reload()
+        if loadsImmediately { reload() } else { isLoading = false }
     }
 
     /// Re-reads the catalog and recents; returns a task for callers that need a stable result to await.
@@ -264,8 +277,13 @@ public final class SymbolLibraryModel: ObservableObject {
             self.catalog = catalog
             catalogReadError = outcome.catalogReadError
         }
-        if let texts = outcome.texts {
-            recents = Self.recentEntries(texts: texts, catalog: catalog)
+        if let use = outcome.unstoredUse {
+            sessionRecents = Array(([use] + sessionRecents.filter { $0 != use }).prefix(Self.recentLimit))
+        }
+        if let texts = outcome.texts { storedRecents = texts }
+        if outcome.unstoredUse != nil || outcome.texts != nil || outcome.catalog != nil {
+            let merged = sessionRecents + storedRecents.filter { !sessionRecents.contains($0) }
+            recents = Self.recentEntries(texts: Array(merged.prefix(Self.recentLimit)), catalog: catalog)
         }
         if outcome.updatesPersistenceNote {
             persistenceNote = outcome.persistenceNote
@@ -343,13 +361,23 @@ public final class SymbolLibraryModel: ObservableObject {
         let inserted = onInsert(text)
         onInserted?(inserted)
         guard inserted else { return }
+        recordUse(text)
+    }
+
+    /// Records a symbol another surface (the 9-key symbol page) already inserted,
+    /// so both share one recents list.
+    public func recordUse(_ text: String) {
         enqueue { await $0.record(text) }
     }
+
+    private static let recentLimit = 20
 
     /// Clears recents (keeps the old data and notes on failure); ordered after earlier insert records/refreshes.
     @discardableResult
     public func clearRecents() -> Task<Void, Never> {
-        enqueue { await $0.clear() }
+        sessionRecents = []
+        recents = Self.recentEntries(texts: storedRecents, catalog: catalog)
+        return enqueue { await $0.clear() }
     }
 
     private static func recentEntries(texts: [String], catalog: SymbolCatalog) -> [RecentEntry] {

@@ -260,7 +260,8 @@ final class AccessProbe: @unchecked Sendable {
             "PASS restore failure keeps accepted state; corrupt custom files remain removable but are labelled default and cannot silently export fallback"
         )
 
-        // Without Full Access: inserts stand, the stored recents are shown and never written.
+        // Without Full Access: inserts stand, the stored recents are shown and never written;
+        // this session's uses lead the list until the process ends.
         let shared = directory.appendingPathComponent("read-only", isDirectory: true)
         let sharedRecents = RecentSymbolStore(directory: shared)
         precondition(sharedRecents.save(["X"]) == nil)
@@ -270,10 +271,21 @@ final class AccessProbe: @unchecked Sendable {
         precondition(readOnly.recents.map(\.text) == ["X"])
         readOnly.insert(a)
         await readOnly.reload().value
-        precondition(readOnly.recents.map(\.text) == ["X"] && sharedRecents.read() == ["X"])
+        precondition(readOnly.recents.map(\.text) == ["A", "X"] && sharedRecents.read() == ["X"])
+        readOnly.recordUse("X")
+        await readOnly.reload().value
+        precondition(readOnly.recents.map(\.text) == ["X", "A"] && sharedRecents.read() == ["X"])
         await readOnly.clearRecents().value
+        precondition(readOnly.recents.map(\.text) == ["X"])
         precondition(sharedRecents.read() == ["X"] && readOnly.persistenceNote?.contains("允许完全访问") == true)
         SymbolLibraryStorage.writable = true
-        print("PASS without Full Access recents are read from the shared directory and never written")
+        print("PASS without Full Access recents are read from the shared directory, kept per session, never written")
+
+        // A deferred model reads nothing until asked.
+        let deferred = SymbolLibraryModel(storeDirectory: shared, onInsert: { _ in true }, loadsImmediately: false)
+        precondition(!deferred.isLoading && deferred.recents.isEmpty && deferred.catalog.items.isEmpty)
+        await deferred.reload().value
+        precondition(deferred.recents.map(\.text) == ["X"] && !deferred.catalog.items.isEmpty)
+        print("PASS a deferred symbol library loads on first reload")
     }
 }
