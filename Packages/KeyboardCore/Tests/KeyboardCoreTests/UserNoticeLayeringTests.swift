@@ -32,23 +32,9 @@ final class UserNoticeLayeringTests: XCTestCase {
             "no new install fact => no notice")
     }
 
-    /// "Start using" (apply) success notice: source + input method + layout, human-readable and without leaking internal terms.
-    func testAppliedNoticeUsesHumanNameAndFallsBackSafely() {
-        XCTAssertEqual(
-            UserNoticeLayering.appliedNotice(inputMethod: "倉頡五代", layout: "26 键", sourceName: "通用形码包"),
-            "正在使用：通用形码包 · 倉頡五代 · 26 键")
-        // Still produced when the input method/layout is missing (no placeholder invented).
-        XCTAssertEqual(
-            UserNoticeLayering.appliedNotice(inputMethod: nil, layout: nil, sourceName: "通用形码包"),
-            "正在使用：通用形码包")
-        XCTAssertNil(UserNoticeLayering.appliedNotice(inputMethod: "X", layout: nil, sourceName: nil))
-        XCTAssertNil(UserNoticeLayering.appliedNotice(inputMethod: "X", layout: nil, sourceName: ""))
-    }
-
     func testAllNoticeCopyAvoidsInternalTerminology() {
         let samples = [
             UserNoticeLayering.installationNextStep(installedPackageID: "x") ?? "",
-            UserNoticeLayering.appliedNotice(inputMethod: "倉頡五代", layout: "26 键", sourceName: "通用形码包") ?? "",
             "已安装并验证，未应用；来源修订与各步骤回执已归档。",
             "已准备所选键盘；其他输入方式、词库与学习数据保持不变。",
             "未能检查未完成的删除，已保留原有内容。",

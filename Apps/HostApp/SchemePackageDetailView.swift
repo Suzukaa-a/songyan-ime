@@ -7,8 +7,8 @@ import UniformTypeIdentifiers
 /// Scheme detail: detail page for a generic imported scheme.
 ///
 /// - Status: in use / not applied; when an old app and a new install coexist, each is shown separately.
-/// - Input methods: each deploy-verified entry is started explicitly (trial typing is per source and states whether it is in use); unenabled sources are collapsed.
-/// - Keyboard layout: preferred layout association; the 9/14-key code verification form lives in an "Advanced" subpage.
+/// - Input methods: a read-only list with the layouts each one supports and which one is in use; adding and
+///   switching keyboards happens only in 我的键盘 (the link at the top), so this page offers no second way to choose.
 /// - Update: a link or Rime source updates in one action from the same source; a local-file install picks an update file.
 /// - Companion configuration: reads the install's workspace to reselect configuration (`installedPackageID`).
 ///
@@ -18,18 +18,15 @@ struct SchemePackageDetailView: View {
     @ObservedObject private var center = SchemeImportCenter.shared
     @ObservedObject private var selectionCenter = KeyboardSelectionCenter.shared
     @Environment(\.dismiss) private var dismiss
-    /// The advanced keyboard association page, schema IDs, resource management and Rime source text appear only when developer options are on.
+    /// Schema IDs, resource management and Rime source text appear only when developer options are on.
     @AppStorage(HostAppKeys.developerOptionsEnabled) private var developerOptions = false
     let packageID: String
 
-    @State private var preferredLayoutDraft: [String: KeyboardLayoutKind] = [:]
     @State private var operationError: String?
     @State private var selectedKind: KeyboardRecipeStore.ResourceKind?
     @State private var selectedPackageID: String?
     @State private var selectedRevision: String?
     @State private var confirmsDeletion = false
-    /// This page started a "start using" action: shared progress/result text is shown only after that, so stale notices from elsewhere do not leak in.
-    @State private var requestedApply = false
     /// Addable "input method x keyboard layout" pairs (same source as "My keyboards").
     @State private var addableKeyboards: Set<PublishedKeyboard> = []
     /// Raw delete/operation error: shown only under developer options (the normal flow gets user-facing text only).
@@ -73,14 +70,6 @@ struct SchemePackageDetailView: View {
                         Label(UserTerminology.grammarModel, systemImage: "brain")
                     }
                 }
-                if developerOptions {
-                    Section {
-                        NavigationLink("高级：键盘关联与输入码验证") {
-                            List { preferenceSection(item) }
-                                .navigationTitle("高级设置")
-                        }
-                    }
-                }
                 // The built-in scheme comes with the app: it is updated with the app and cannot be deleted.
                 if !isBuiltin {
                     sourceSection(item)
@@ -116,7 +105,6 @@ struct SchemePackageDetailView: View {
             // On entering scheme detail (management path), first settle any previously interrupted deletion.
             await center.recoverInterruptedDeletions()
             await center.refresh()
-            if let item { preferredLayoutDraft = item.preferredLayouts }
             addableKeyboards = Set((try? await center.addableKeyboards(packageID: packageID)) ?? [])
             await reloadSelection()
         }
@@ -293,18 +281,10 @@ struct SchemePackageDetailView: View {
                     label: "安装时间",
                     value: item.active.installation.activatedAt.formatted(date: .abbreviated, time: .omitted))
             }
-            // "Start using" may generate and verify 14 / 9-key configuration: show progress and result inline instead of giving no feedback.
-            if requestedApply, center.busy {
-                ProgressView(center.message ?? "正在准备键盘…")
-            } else if requestedApply, let notice = center.userNotice {
-                Label(notice, systemImage: "checkmark.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.green)
-            }
         }
     }
 
-    // MARK: - Package schemes (actually imported schemas, selectable/applicable one by one)
+    // MARK: - Input methods (read-only; choices are made in 我的键盘)
 
     private func schemaSection(_ item: SchemeImportCenter.InstalledPackage) -> some View {
         Section {
@@ -338,11 +318,8 @@ struct SchemePackageDetailView: View {
         _ item: SchemeImportCenter.InstalledPackage,
         _ schema: KeyboardSchemaDescriptor
     ) -> some View {
-        let state = ActiveSchemaResolver.state(
-            of: schema.id, currentSchemaID: currentSchemaID,
-            revisionIsCurrent: revisionIsCurrent(item))
         // Same criterion as "My keyboards": a static association is available, or the engine can generate a 14 / 9-key adapter for this input method.
-        let availableLayouts = KeyboardLayoutKind.allCases.filter {
+        let layouts = KeyboardLayoutKind.allCases.filter {
             center.incompatibilityReason(packageID: packageID, schemaID: schema.id, layout: $0) == nil
                 || addableKeyboards.contains(PublishedKeyboard(schemaID: schema.id, layout: $0))
         }
@@ -352,65 +329,24 @@ struct SchemePackageDetailView: View {
                 // Developer mode: show the real name and internal ID for diagnosis.
                 Text(displayName(item, schema))
                     .font(.body)
-                if developerOptions {
-                    Text(schemaIDLine(item, schema))
+                if let line = UserTerminology.keyboardLayoutLine(layouts.map { UserTerminology.layoutName($0) }) {
+                    Text(line)
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                if developerOptions {
+                    Text(schema.id)
+                        .font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 8)
-            // Exactly one of 正在使用 or the start-using menu; another layout of the input method in use is chosen from 我的键盘.
-            if state == .inUse {
+            if schema.id == currentSchemaID {
                 Text(UserTerminology.statusInUse)
                     .font(.footnote)
                     .foregroundStyle(.green)
-            } else {
-                startUsingMenu(
-                    item, schema, availableLayouts: availableLayouts,
-                    title: state == .useNewVersion ? UserTerminology.startUsingNewVersion : UserTerminology.startUsing)
             }
         }
         .padding(.vertical, 2)
-    }
-
-    private func startUsingMenu(
-        _ item: SchemeImportCenter.InstalledPackage, _ schema: KeyboardSchemaDescriptor,
-        availableLayouts: [KeyboardLayoutKind], title: String
-    ) -> some View {
-        Menu {
-            Section("选择键盘布局") {
-                // Unsupported layouts are listed too (greyed out with an explanation) so options do not vanish silently.
-                ForEach(KeyboardLayoutKind.allCases) { layout in
-                    if availableLayouts.contains(layout) {
-                        Button(UserTerminology.layoutName(layout)) {
-                            operationError = nil
-                            center.userNotice = nil
-                            requestedApply = true
-                            center.apply(packageID: packageID, schemaID: schema.id, layout: layout)
-                        }
-                    } else {
-                        Button("\(UserTerminology.layoutName(layout))（当前输入方式不支持）") {}
-                            .disabled(true)
-                    }
-                }
-            }
-        } label: {
-            Text(title)
-        }
-        .buttonStyle(.borderless)
-        .frame(minWidth: 44, minHeight: 44)
-        .disabled(center.busy)
-        .accessibilityLabel("\(title) \(displayName(item, schema))，选择键盘布局")
-    }
-
-    private func schemaIDLine(
-        _ item: SchemeImportCenter.InstalledPackage,
-        _ schema: KeyboardSchemaDescriptor
-    ) -> String {
-        var parts: [String] = [schema.id]
-        if let preferred = item.preferredLayouts[schema.id] {
-            parts.append("首选布局 \(UserTerminology.layoutName(preferred))")
-        }
-        return parts.joined(separator: " · ")
+        .accessibilityElement(children: .combine)
     }
 
     /// Human-readable name of an input method.
@@ -425,68 +361,6 @@ struct SchemePackageDetailView: View {
         }
         return UserTerminology.inputMethodName(schemaID: schema.id, schemas: item.schemas)
             ?? (schema.name.isEmpty ? UserTerminology.inputMethod : schema.name)
-    }
-
-    // MARK: - Keyboard layout
-
-    private func preferenceSection(_ item: SchemeImportCenter.InstalledPackage) -> some View {
-        Section {
-            ForEach(item.schemas) { schema in
-                Menu {
-                    ForEach(KeyboardLayoutKind.allCases) { layout in
-                        layoutMenuButton(item, schema: schema, layout: layout)
-                    }
-                    Button("清除首选") {
-                        Task { await savePreferred(nil, schemaID: schema.id) }
-                    }
-                } label: {
-                    HStack {
-                        Text(displayName(item, schema))
-                        Spacer()
-                        Text(item.preferredLayouts[schema.id].map { UserTerminology.layoutName($0) } ?? "未设置")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            DisclosureGroup("输入码验证") {
-                InputBindingValidationForm(packageID: packageID)
-            }
-            if center.busy { ProgressView(center.message ?? "正在验证…") }
-        } header: {
-            Text("键盘布局")
-        } footer: {
-            Text("供方案制作者验证输入码与候选，并保存关联。")
-        }
-    }
-
-    @ViewBuilder
-    private func layoutMenuButton(
-        _ item: SchemeImportCenter.InstalledPackage,
-        schema: KeyboardSchemaDescriptor,
-        layout: KeyboardLayoutKind
-    ) -> some View {
-        let reason = center.incompatibilityReason(packageID: packageID, schemaID: schema.id, layout: layout)
-        Button {
-            Task { await savePreferred(layout, schemaID: schema.id) }
-        } label: {
-            if reason != nil {
-                Label("\(UserTerminology.layoutName(layout))（需验证）", systemImage: "exclamationmark.circle")
-            } else {
-                Text(UserTerminology.layoutName(layout))
-            }
-        }
-    }
-
-    private func savePreferred(_ layout: KeyboardLayoutKind?, schemaID: String) async {
-        operationError = nil
-        do {
-            try await center.setPreferredLayout(layout, packageID: packageID, schemaID: schemaID)
-            preferredLayoutDraft[schemaID] = layout
-        } catch {
-            HostLog.append("preferred layout save failed: \(error.localizedDescription)")
-            rawOperationError = error.localizedDescription
-            operationError = (error as? RecipeInstallError)?.userFacingDescription ?? "保存失败，请重试。"
-        }
     }
 
     // MARK: - Source and update

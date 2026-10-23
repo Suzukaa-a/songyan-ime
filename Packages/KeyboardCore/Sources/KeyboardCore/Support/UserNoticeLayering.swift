@@ -26,13 +26,4 @@ public enum UserNoticeLayering {
         guard installedPackageID != nil else { return nil }
         return "接下来选择要使用的键盘。"
     }
-
-    /// Success notice for starting use (applying). `nil` means no new apply fact was produced.
-    public static func appliedNotice(inputMethod: String?, layout: String?, sourceName: String?) -> String? {
-        guard let sourceName, !sourceName.isEmpty else { return nil }
-        var parts = [sourceName]
-        if let inputMethod, !inputMethod.isEmpty { parts.append(inputMethod) }
-        if let layout, !layout.isEmpty { parts.append(layout) }
-        return "\(UserTerminology.statusInUse)：\(parts.joined(separator: " · "))"
-    }
 }

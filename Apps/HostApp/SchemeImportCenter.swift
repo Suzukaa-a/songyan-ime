@@ -22,7 +22,6 @@ final class SchemeImportCenter: ObservableObject {
         let sourceSchemas: [String]
         let skippedSchemas: [SkippedEngineSchema]
         let bindings: [KeyboardResourceSet.LayoutEntry]
-        let preferredLayouts: [String: KeyboardLayoutKind]
         /// Keyboard layouts this source supports (dynamic capability: the truly available input method x 26/14/9 combinations).
         /// A capability fact only; not bound to source identity and hardcodes no schema ID.
         let supportedLayouts: [KeyboardLayoutKind]
@@ -314,21 +313,6 @@ final class SchemeImportCenter: ObservableObject {
             requiredSchemaIDs: snapshot.requiredSchemaIDs, forPackageID: packageID)
     }
 
-    /// An explicit front-end preference, separate from both schema source and input capability.
-    /// Saving a preference does not apply a package or invent a compact-key encoding.
-    func setPreferredLayout(_ layout: KeyboardLayoutKind?, packageID: String, schemaID: String) async throws {
-        guard let item = installedPackages.first(where: { $0.id == packageID }),
-            item.schemas.contains(where: { $0.id == schemaID })
-        else {
-            throw RecipeInstallError.invalidResource("未找到指定的输入方案或输入方式")
-        }
-        var values = item.preferredLayouts
-        values[schemaID] = layout
-        let url = Self.storeRoot.appendingPathComponent(item.id).appendingPathComponent("layout-preferences.json")
-        try JSONEncoder().encode(values).write(to: url, options: .atomic)
-        await refresh()
-    }
-
     func incompatibilityReason(packageID: String, schemaID: String, layout: KeyboardLayoutKind) -> String? {
         guard let item = installedPackages.first(where: { $0.id == packageID }),
             item.schemas.contains(where: { $0.id == schemaID })
@@ -338,24 +322,6 @@ final class SchemeImportCenter: ObservableObject {
             userDirectory: item.active.userDataURL, layoutEntries: item.bindings, schemas: item.schemas,
             selectedSchemaID: schemaID)
         return set.incompatibilityReason(layout: layout, schemaID: schemaID)
-    }
-
-    /// Display name of the input method (dynamic from the resource snapshot; never leaks an internal schema ID when no name is recorded).
-    static func inputMethodDisplayName(_ set: KeyboardResourceSet, schemaID: String) -> String {
-        if let descriptor = set.inputSchemeChoices.first(where: { $0.id == schemaID }) {
-            return UserTerminology.inputMethodName(descriptor)
-        }
-        return UserTerminology.inputMethodName(schemaID: schemaID, schemas: set.schemas)
-            ?? UserTerminology.inputMethod
-    }
-
-    /// Display name of the input method (from the installed roster).
-    static func inputMethodDisplayName(_ item: InstalledPackage, schemaID: String) -> String {
-        if let descriptor = item.schemas.first(where: { $0.id == schemaID }) {
-            return UserTerminology.inputMethodName(descriptor)
-        }
-        return UserTerminology.inputMethodName(schemaID: schemaID, schemas: item.schemas)
-            ?? UserTerminology.inputMethod
     }
 
     /// Input method x keyboard layout information architecture for this source (dynamic from the resource snapshot, not bound to source identity).
@@ -547,10 +513,6 @@ final class SchemeImportCenter: ObservableObject {
             else { return nil }
             return .init(layout: layout, schemaID: binding.schemaID)
         }
-        let preferencesURL = slot.appendingPathComponent("layout-preferences.json")
-        let preferences =
-            FileManager.default.fileExists(atPath: preferencesURL.path)
-            ? try JSONDecoder().decode([String: KeyboardLayoutKind].self, from: Data(contentsOf: preferencesURL)) : [:]
         let resources = KeyboardResourceSet(
             id: id, name: declaration.name, sharedDirectory: active.resourceURL,
             userDirectory: active.userDataURL, layoutEntries: bindings,
@@ -558,7 +520,6 @@ final class SchemeImportCenter: ObservableObject {
         return InstalledPackage(
             id: id, name: declaration.name, active: active, schemas: schemas,
             sourceSchemas: sourceSchemas, skippedSchemas: skippedSchemas, bindings: bindings,
-            preferredLayouts: preferences,
             supportedLayouts: supportedLayouts(resourceSet: resources),
             sourceURL: recordedSourceURL(packageID: id, storeRoot: storeRoot))
     }
@@ -637,36 +598,6 @@ final class SchemeImportCenter: ObservableObject {
             userDirectory: item.active.userDataURL, layoutEntries: item.bindings,
             prebuiltDirectory: item.active.userDataURL.appendingPathComponent("build"), schemas: item.schemas,
             selectedSchemaID: selected,
-            preferredLayout: item.preferredLayouts[selected],
             sourceRevision: item.active.installation.revision)
-    }
-
-    /// "Start using": add/update the chosen "input method x layout" as a user keyboard. If the target is a compact
-    /// layout (14 / 9 keys), it must go through the same `performAddKeyboard` transaction that first generates and validates the adapter
-    /// before publishing, never publish directly and rely on an invariant error; 26-key uses the same transaction without generation.
-    func apply(packageID: String, schemaID: String, layout: KeyboardLayoutKind? = nil) {
-        guard !busy, installedPackages.contains(where: { $0.id == packageID }) else { return }
-        error = nil
-        Task {
-            do {
-                guard !(await AppliedSelectionLoader.sharedContainerUnavailable()) else {
-                    fail(.nothingCommitted, AppliedSelectionLoader.missingGroupMessage)
-                    return
-                }
-                guard let set = try await tryResources(packageID: packageID, schemaID: schemaID) else {
-                    throw RecipeInstallError.deployment("未找到已安装的方案文件，请重新安装该输入方案。")
-                }
-                guard let targetLayout = layout ?? set.preferredLayout ?? set.availableLayouts.first else {
-                    throw RecipeInstallError.deployment("该输入方案没有可用的键盘布局。")
-                }
-                let keyboard = PublishedKeyboard(schemaID: schemaID, layout: targetLayout)
-                _ = try await performAddKeyboard(packageID: packageID, keyboard: keyboard)
-                diagnostics = []
-                userNotice = UserNoticeLayering.appliedNotice(
-                    inputMethod: Self.inputMethodDisplayName(set, schemaID: schemaID),
-                    layout: UserTerminology.layoutName(targetLayout),
-                    sourceName: set.name)
-            } catch { fail(.nothingCommitted, error) }
-        }
     }
 }

@@ -168,25 +168,4 @@ final class OnboardingRefreshTests: XCTestCase {
                 recipeEnabled: true, resourceKind: "userScheme", packageID: "pkg-a",
                 selectedSchemaID: "wb", requiredSchemaIDs: [], forPackageID: builtin))
     }
-
-    /// A detail row shows either 正在使用 or one action, never both.
-    func testInputMethodRowShowsInUseOrOneAction() {
-        let current = ActiveSchemaResolver.currentSchemaID(
-            recipeEnabled: true, resourceKind: "userScheme", packageID: ProductionInputAvailability.builtinPackageID,
-            selectedSchemaID: BuiltinTemplateSchemas.flypy, requiredSchemaIDs: [],
-            forPackageID: ProductionInputAvailability.builtinPackageID)
-        XCTAssertEqual(
-            ActiveSchemaResolver.state(
-                of: BuiltinTemplateSchemas.flypy, currentSchemaID: current,
-                revisionIsCurrent: true), .inUse)
-        XCTAssertEqual(
-            ActiveSchemaResolver.state(
-                of: BuiltinTemplateSchemas.quanpin, currentSchemaID: current,
-                revisionIsCurrent: true), .use)
-        XCTAssertEqual(
-            ActiveSchemaResolver.state(
-                of: BuiltinTemplateSchemas.flypy, currentSchemaID: current,
-                revisionIsCurrent: false), .useNewVersion)
-        XCTAssertEqual(ActiveSchemaResolver.state(of: "wb", currentSchemaID: nil, revisionIsCurrent: true), .use)
-    }
 }

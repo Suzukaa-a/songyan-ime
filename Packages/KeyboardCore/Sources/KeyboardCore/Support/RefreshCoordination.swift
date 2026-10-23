@@ -64,25 +64,6 @@ public enum ActiveSchemaResolver {
         if let selectedSchemaID { return selectedSchemaID }
         return requiredSchemaIDs.first
     }
-
-    /// What a scheme detail page shows beside one input method: either 正在使用 or a single action.
-    public enum InputMethodState: Equatable, Sendable {
-        case inUse
-        case use
-        /// In use, but from an older installed version of the scheme.
-        case useNewVersion
-    }
-
-    /// - Parameters:
-    ///   - currentSchemaID: `currentSchemaID(...)` for the page's package.
-    ///   - revisionIsCurrent: the publication carries the package's installed revision (true for the fallback, which publishes nothing).
-    public static func state(
-        of schemaID: String, currentSchemaID: String?,
-        revisionIsCurrent: Bool
-    ) -> InputMethodState {
-        guard currentSchemaID == schemaID else { return .use }
-        return revisionIsCurrent ? .inUse : .useNewVersion
-    }
 }
 
 /// Two-gate decision for landing a structured refresh result (pure value).
