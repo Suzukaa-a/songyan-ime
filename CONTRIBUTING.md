@@ -24,7 +24,7 @@ Thanks for helping. Songyan (松烟) is an iOS keyboard built on the RIME engine
 
 ## Gates
 
-Run the gate that matches your change. CI runs `make lint`, `make fast` and an unsigned Release device build on every pull request (changes that touch only docs are skipped), and all of them must pass. The Debug and simulator builds run when CI is started by hand and for every release.
+Run the gate that matches your change. CI runs `make lint`, `make fast` and an unsigned Release device build on every pull request (changes that touch only docs are skipped), and all of them must pass. The Debug device build runs when CI is started by hand and for every release.
 
 | Command | Runs | Use it when |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
 ```
 
-[release.yml](.github/workflows/release.yml) then runs the full CI, builds the app with version `0.2.0` (the build number is the commit count), and publishes a GitHub Release with an ad-hoc signed IPA and notes generated from the commits since the previous tag. A tag with a suffix such as `v0.2.0-beta.1` is published as a pre-release. The IPA is meant for installers that re-sign it under your own Apple ID, such as AltStore or Sideloadly.
+[release.yml](.github/workflows/release.yml) then runs lint, tests and the Debug device build, builds the app with version `0.2.0` (the build number is the commit count), and publishes a GitHub Release with an ad-hoc signed IPA and notes generated from the commits since the previous tag. A tag with a suffix such as `v0.2.0-beta.1` is published as a pre-release. The IPA is meant for installers that re-sign it under your own Apple ID, such as AltStore or Sideloadly.
 
 ## Security
 

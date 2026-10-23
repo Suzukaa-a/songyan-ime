@@ -1,8 +1,9 @@
 name: Release
 
 # Pushing a tag vX.Y.Z (or vX.Y.Z-suffix for a pre-release) on a commit of
-# main runs the full CI, then publishes a GitHub Release with an ad-hoc signed
-# IPA for re-signing installers (AltStore, Sideloadly).
+# main runs CI (lint, tests, Debug device build), then publishes a GitHub
+# Release with an ad-hoc signed IPA for re-signing installers (AltStore,
+# Sideloadly).
 on:
   push:
     tags:

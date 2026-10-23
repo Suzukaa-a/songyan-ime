@@ -1,8 +1,7 @@
 name: CI
 
-# Pushes and pull requests get the quick set: lint, tests and the strictest
-# single build (Release, device: warnings are errors). The four-way build
-# matrix runs on demand and for every release tag (release.yml calls this).
+# Lint and tests on every run; which device builds run depends on the trigger
+# (see the build matrix). release.yml calls this for every release tag.
 on:
   pull_request:
     paths-ignore:
@@ -97,11 +96,13 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # A push to a branch or a pull request builds Release for device only:
-      # it turns warnings into errors, so it is the strictest single build.
+      # Device only: the simulator build compiles the same sources. A push to a
+      # branch or a pull request builds Release (warnings are errors, the
+      # strictest single build); a release tag builds Debug, since release.yml
+      # builds the versioned Release itself; a manual run builds both.
       matrix:
-        configuration: ${{ fromJSON(((github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request') && '["Release"]' || '["Debug", "Release"]') }}
-        platform: ${{ fromJSON(((github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request') && '["device"]' || '["simulator", "device"]') }}
+        configuration: ${{ fromJSON(((github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request') && '["Release"]' || (github.ref_type == 'tag' && '["Debug"]' || '["Debug", "Release"]')) }}
+        platform: [device]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
