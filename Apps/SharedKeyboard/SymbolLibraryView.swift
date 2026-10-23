@@ -65,7 +65,7 @@ public struct SymbolLibraryView: View {
                 height: geometry.size.height,
                 railItemCount: railItems.count)
             VStack(spacing: 0) {
-                headerBar.frame(height: layout.titleBarHeight)
+                headerBar(layout).frame(height: layout.titleBarHeight)
                 bandSeparator(layout)
                 if model.searchKeyboardVisible {
                     queryBar.frame(height: layout.titleBarHeight)
@@ -190,7 +190,7 @@ public struct SymbolLibraryView: View {
             }
         } label: {
             Text(item.title)
-                .font(appearance.font(appearance.skin.typography.secondarySize))
+                .font(appearance.font(KeyboardToolsStyle.categoryRailTitleSize))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(
@@ -304,40 +304,43 @@ public struct SymbolLibraryView: View {
         insertionError = model.insertQuickText(text) ? nil : "未能输入文字，请返回键盘后重试。"
     }
 
-    // MARK: Header (back / title / search toggle)
+    // MARK: Header (title / search toggle / back)
 
-    private var headerBar: some View {
-        HStack(spacing: 0) {
-            Button {
-                onClose()
-            } label: {
-                Text("返回")
-            }
-            .frame(minWidth: 60, maxHeight: .infinity, alignment: .leading)
-            .buttonStyle(SymbolPanelPressStyle())
-            .accessibilityHint("关闭符号面板，恢复之前的键盘页面")
-            Spacer()
+    /// Same arrangement as the keyboard settings panel: the title centred, the way
+    /// out top-right in the 完成 style, search just left of it.
+    private func headerBar(_ layout: QuickContentLayout) -> some View {
+        ZStack {
             Text(model.searchKeyboardVisible ? "搜索" : "快捷内容")
                 .font(appearance.font(appearance.controlTextSize))
                 .foregroundStyle(Color(uiColor: appearance.text(on: "panel")))
+                .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button {
-                if model.searchKeyboardVisible { model.endSearch() } else { model.beginSearch() }
-            } label: {
-                Image(systemName: model.searchKeyboardVisible ? "xmark.circle.fill" : "magnifyingglass")
-                    .font(appearance.font(appearance.controlIconSize))
-                    .frame(width: 44)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
+            HStack(spacing: 4) {
+                Spacer(minLength: 0)
+                searchToggle
+                KeyboardToolsDismissButton(
+                    title: "返回", accessibilityHint: "关闭快捷内容，回到之前的键盘页面",
+                    minHeight: min(44, layout.titleBarHeight), action: onClose)
             }
-            .buttonStyle(SymbolPanelPressStyle())
-            .disabled(section == "clipboard")
-            .accessibilityIdentifier("quickContent.search")
-            .accessibilityLabel(model.searchKeyboardVisible ? "退出搜索" : "搜索")
-            .accessibilityHint(model.searchKeyboardVisible ? "清空查询并回到分类浏览" : "打开键盘内查询输入")
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
+    }
+
+    private var searchToggle: some View {
+        Button {
+            if model.searchKeyboardVisible { model.endSearch() } else { model.beginSearch() }
+        } label: {
+            Image(systemName: model.searchKeyboardVisible ? "xmark.circle.fill" : "magnifyingglass")
+                .font(appearance.font(appearance.controlIconSize))
+                .frame(width: 44)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SymbolPanelPressStyle())
+        .disabled(section == "clipboard")
+        .accessibilityIdentifier("quickContent.search")
+        .accessibilityLabel(model.searchKeyboardVisible ? "退出搜索" : "搜索")
+        .accessibilityHint(model.searchKeyboardVisible ? "清空查询并回到分类浏览" : "打开键盘内查询输入")
     }
 
     /// Query display row: the panel-private buffer + per-character backspace + clear (no system keyboard focus).

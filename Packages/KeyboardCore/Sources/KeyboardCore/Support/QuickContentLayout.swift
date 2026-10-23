@@ -49,9 +49,9 @@ public struct QuickContentLayout: Equatable, Sendable {
         let height = max(0, height)
         let density: Density = height >= 240 ? .regular : (height >= 176 ? .compact : .minimal)
         let title: CGFloat = density == .regular ? 44 : (density == .compact ? 40 : 36)
-        // Narrow on purpose: the choices are two or three characters, and every point the column
-        // does not take is a point the symbol grid gets.
-        let railWidth: CGFloat = 42
+        // Just wide enough for three characters (常用语, 剪贴板, 颜文字) at the category-rail
+        // size the 9-key symbol page uses; every other point goes to the symbol grid.
+        let railWidth: CGFloat = 60
         let cellHeight: CGFloat = density == .regular ? 56 : (density == .compact ? 48 : 44)
         let columnWidth: CGFloat = density == .regular ? 64 : (density == .compact ? 58 : 52)
         // Whole phrases (kaomoji and friends) sit in a fixed number of equal columns: wide enough

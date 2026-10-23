@@ -85,11 +85,11 @@ final class QuickContentLayoutTests: XCTestCase {
     }
 
     func testRailKeepsOneNarrowWidthAtEveryDensity() {
-        // The column is deliberately narrow so the grid gets the rest; it does not grow with the
-        // panel, because the choices are short words, not full sentences.
+        // The column fits three characters at the category-rail size and no more, so the grid
+        // gets the rest; it does not grow with the panel, because the choices are short words.
         for height in [CGFloat(150), 200, 240, 288, 320] {
             let layout = QuickContentLayout.resolve(height: height, railItemCount: 8)
-            XCTAssertEqual(layout.railWidth, 42, accuracy: 0.01)
+            XCTAssertEqual(layout.railWidth, 60, accuracy: 0.01)
         }
     }
 

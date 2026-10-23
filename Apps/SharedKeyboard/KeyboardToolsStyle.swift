@@ -27,6 +27,35 @@ enum KeyboardToolsStyle {
     static let sectionTopPadding: CGFloat = 14
     /// Spacing between a section header and its card.
     static let sectionHeaderBottomPadding: CGFloat = 6
+    /// Labels of a leading category column (the 9-key symbol page, the quick-content
+    /// panel): readable at a glance, and three Chinese characters still fit a 60pt column.
+    static let categoryRailTitleSize: Double = 16
+}
+
+// MARK: - Panel dismiss button
+
+/// The one way out of a keyboard panel, top-right: 「完成」 in the settings panel,
+/// 「返回」 in the quick-content panel. Drawn like the Return key, as the panel's
+/// primary action, on a 44pt hit frame.
+struct KeyboardToolsDismissButton: View {
+    let title: String
+    var accessibilityHint: String?
+    /// Lets a short title bar keep the frame inside its own height.
+    var minHeight: CGFloat = 44
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minWidth: 44, minHeight: minHeight)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(KeyboardToolsKeyButtonStyle(role: "accent"))
+        .accessibilityHint(accessibilityHint ?? "")
+    }
 }
 
 // MARK: - Section header

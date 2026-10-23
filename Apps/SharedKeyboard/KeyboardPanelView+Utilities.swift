@@ -76,18 +76,9 @@ extension KeyboardPanelView {
                     .accessibilityFocused($utilitiesTitleFocused)
                 HStack {
                     Spacer(minLength: 8)
-                    // Drawn like the Return key: the panel's one primary action.
-                    Button {
+                    KeyboardToolsDismissButton(title: "完成", accessibilityHint: "返回键盘") {
                         showsUtilitiesMenu = false
-                    } label: {
-                        Text("完成")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(KeyboardToolsKeyButtonStyle(role: "accent"))
-                    .accessibilityHint("返回键盘")
                 }
             }
             .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
