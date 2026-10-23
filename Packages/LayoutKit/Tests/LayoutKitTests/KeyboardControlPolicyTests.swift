@@ -72,9 +72,8 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
     }
 
-    /// The bottom row has no standalone symbol function key: digits/symbols always go through the 123 / #+= pages or existing tool paths.
-    /// T9 must not reuse the utility slot to open the symbol page.
-    func testControlRowHasNoDedicatedSymbolKey() {
+    /// 26/14/18 keep the system row: symbols go through 123 -> #+=, and the utility slot stays a punctuation key.
+    func testGenericControlRowHasNoDedicatedSymbolKey() {
         for phone in [false, true] {
             for english in [false, true] {
                 for page in KeyboardControlPolicy.Page.allCases {
@@ -86,11 +85,45 @@ final class KeyboardControlPolicyTests: XCTestCase {
                         phone && page == .numeric
                             ? .digit("0")
                             : .punctuation(phone ? (english ? "." : "。") : (english ? "," : "，")),
-                        "bottom-row utility is a direct punctuation key (0 on the 9-key digit page; no standalone symbol key)"
+                        "bottom-row utility is a direct punctuation key (0 on the 9-key digit page)"
                     )
+                    XCTAssertFalse(policy.slots.map(policy.key(at:)).contains(.symbolPage))
                 }
             }
         }
+    }
+
+    /// Bundled 9-key, as on Sogou / iFlytek: 符号 | 123 | 空格 | 中/英 on letters, so the symbol page is
+    /// one tap from the bottom-left corner; on 123 and 符号 that corner returns to letters.
+    func testBundledT9BottomRowLeadsWithSymbolKey() {
+        func keys(_ page: KeyboardControlPolicy.Page, globe: Bool = false) -> [KeyboardControlPolicy.Slot] {
+            let policy = KeyboardControlPolicy(
+                page: page, isEnglishMode: false, hasGlobe: globe, isPhoneLayout: true,
+                usesASCIIPunctuation: false, includesBottomEnter: false)
+            return policy.slots.map(policy.key(at:))
+        }
+        XCTAssertEqual(keys(.letters), [.symbolPage, .page, .space, .language])
+        XCTAssertEqual(keys(.numeric), [.language, .page, .space, .utility])
+        XCTAssertEqual(keys(.symbols), [.language, .page, .space])
+        XCTAssertEqual(keys(.letters, globe: true), [.symbolPage, .page, .globe, .space, .language])
+        let letters = KeyboardControlPolicy(
+            page: .letters, isEnglishMode: false, hasGlobe: false, isPhoneLayout: true,
+            usesASCIIPunctuation: false, includesBottomEnter: false)
+        XCTAssertEqual(letters.pageTitle, "123")
+        XCTAssertEqual(letters.languageTitle, "ABC")
+        let numeric = KeyboardControlPolicy(
+            page: .numeric, isEnglishMode: false, hasGlobe: false, isPhoneLayout: true,
+            usesASCIIPunctuation: false, includesBottomEnter: false)
+        XCTAssertEqual(numeric.pageTitle, KeyboardControlPolicy.symbolPageTitle)
+        XCTAssertEqual(numeric.pageTarget, .symbols)
+        XCTAssertEqual(numeric.languageTitle, "返回")
+        XCTAssertEqual(numeric.languageAction, .returnToLetters)
+        // Generic surfaces keep their titles.
+        let qwertyNumeric = KeyboardControlPolicy(
+            page: .numeric, isEnglishMode: false, hasGlobe: false, isPhoneLayout: false,
+            usesASCIIPunctuation: false)
+        XCTAssertEqual(qwertyNumeric.pageTitle, "#+=")
+        XCTAssertEqual(qwertyNumeric.languageTitle, "中文")
     }
 
     /// 9-key trailing column (system/mainstream 9-key): delete (row 0) + re-input (row 1) + return/confirm
@@ -119,8 +152,8 @@ final class KeyboardControlPolicyTests: XCTestCase {
                 XCTAssertFalse(
                     policy.slots.contains(.enter), "\(width): the 9-key bottom row must not repeat the confirm key")
                 XCTAssertEqual(
-                    policy.slots.contains(.utility), page == .numeric,
-                    "\(width): letter and symbol pages have no bottom-row punctuation; the digit page keeps 0")
+                    policy.slots.contains(.utility), page != .symbols,
+                    "\(width): letters hold 中/英 and 123 holds 0 there; the symbol page widens space")
                 let metrics = policy.metrics(width: control.width)
                 let total =
                     policy.slots.reduce(0.0) { $0 + metrics[$1] }
@@ -130,7 +163,8 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
     }
 
-    /// 9-key bottom row aligns with the column above: page key = leading rail width, language key = one digit column, space takes the remainder; digit page 0 = one column.
+    /// 9-key bottom row aligns with the columns above: first key = rail width, second = one digit column, the last
+    /// (中/英 or 0) = one digit column, space takes the remainder (two columns on the symbol page).
     func testBundledT9ControlRowAlignsWithColumns() {
         for width in [367.0, 382, 412, 430] {
             let m = PhoneKeypadMetrics.resolve(width: width, rowHeight: 54)
@@ -145,7 +179,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
                 let metrics = policy.metrics(width: control)
                 XCTAssertEqual(metrics.page, m.railWidth, accuracy: 0.0001)
                 XCTAssertEqual(metrics.language, m.digitWidth, accuracy: 0.0001)
-                let expectedSpace = page == .numeric ? m.digitWidth : m.digitWidth * 2 + m.spacing
+                let expectedSpace = page == .symbols ? m.digitWidth * 2 + m.spacing : m.digitWidth
                 XCTAssertEqual(metrics.space, expectedSpace, accuracy: 0.0001, "\(width) \(page)")
                 let total =
                     policy.slots.reduce(0.0) { $0 + metrics[$1] }
@@ -166,7 +200,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
             page: .letters, isEnglishMode: false,
             hasGlobe: false, isPhoneLayout: true, usesASCIIPunctuation: false,
             includesBottomEnter: false)
-        XCTAssertEqual(t9.slots, [.page, .language, .space])
+        XCTAssertEqual(t9.slots, [.page, .language, .space, .utility])
     }
 
     func testTinyOrInvalidPreviewWidthNeverOverflowsOrProducesNaN() {

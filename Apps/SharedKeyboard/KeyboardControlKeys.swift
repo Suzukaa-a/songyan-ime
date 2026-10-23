@@ -44,7 +44,17 @@ struct ControlRow<ModeKey: View>: View {
                 cap: KeyCap(id: "control-page", title: policy.pageTitle, action: .cycleLayout),
                 alternates: []
             ) { _ in onPage(policy.pageTarget) }
-            .accessibilityLabel(policy.pageTarget == .symbols ? "打开更多符号页" : "打开数字符号页")
+            .accessibilityLabel(
+                policy.pageTarget == .symbols
+                    ? (policy.isBundledPhonePad ? "打开符号页" : "打开更多符号页") : "打开数字符号页")
+        case .symbolPage:
+            AlternateCharacterKey(
+                cap: KeyCap(
+                    id: "control-symbol-page", title: KeyboardControlPolicy.symbolPageTitle,
+                    action: .cycleLayout),
+                alternates: []
+            ) { _ in onPage(.symbols) }
+            .accessibilityLabel("打开符号页")
         case .language:
             modeKey
         case .space:

@@ -6,6 +6,8 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public enum Page: CaseIterable, Hashable, Sendable { case letters, numeric, symbols }
     public enum Slot: CaseIterable, Hashable, Sendable {
         case page, language, globe, space, utility, enter
+        /// A key, never a position: the bundled 9-key's direct 「符号」 key.
+        case symbolPage
     }
     public enum LanguageAction: Equatable, Sendable {
         case toggleLanguage, returnToLetters
@@ -25,8 +27,9 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// in the bottom row. This is presentation only; the action remains `.enter`.
     public let includesBottomEnter: Bool
     /// The bundled phone shell's column widths. When set, the bottom keys sit under
-    /// the columns above them (page under the rail, language under 1/4/7, space
-    /// across the rest) instead of the generic budget.
+    /// the columns above them (the first position under the rail, the second
+    /// under 1/4/7, the last under 3/6/9, space across the rest) instead of the
+    /// generic budget.
     public private(set) var phoneColumns: PhoneColumns?
 
     public struct PhoneColumns: Equatable, Sendable {
@@ -60,12 +63,11 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Slot identities and count stay unchanged across all pages and languages
     /// **for one surface**. Only an actual system-keyboard availability change may
     /// add/remove globe, and only the bundled T9 (which moves Return into its own
-    /// trailing column) may drop `enter`. That column also owns 重输, and its letter
-    /// and symbol pages already type punctuation themselves, so they drop the utility
-    /// slot too; its 123 page keeps it for 0.
+    /// trailing column) may drop `enter`. That surface uses the utility position for
+    /// 中/英 on letters and 0 on 123; its symbol page drops it and widens space.
     public var slots: [Slot] {
         Slot.allCases.filter {
-            ($0 != .globe || hasGlobe) && ($0 != .enter || includesBottomEnter)
+            $0 != .symbolPage && ($0 != .globe || hasGlobe) && ($0 != .enter || includesBottomEnter)
                 && ($0 != .utility || includesUtility)
         }
     }
@@ -75,7 +77,23 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// leading position — where 「123」 was tapped to get here — and the page key
     /// moves one to the right, so the same spot leads in and back out, as on the
     /// system keyboard.
+    ///
+    /// The bundled 9-key follows the mainstream 9-key row instead
+    /// (符号 | 123 | 空格 | 中/英, Sogou and iFlytek): its letter page opens
+    /// the symbol page in one tap from the bottom-left corner, and every
+    /// other page puts 返回 in that corner, so the corner always leads into
+    /// symbols and back out.
     public func key(at slot: Slot) -> Slot {
+        if isBundledPhonePad {
+            switch (page, slot) {
+            case (.letters, .page): return .symbolPage
+            case (.letters, .language): return .page
+            case (.letters, .utility): return .language
+            case (_, .page): return .language
+            case (_, .language): return .page
+            default: return slot
+            }
+        }
         guard page != .letters else { return slot }
         switch slot {
         case .page: return .language
@@ -85,16 +103,25 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     }
 
     public var includesUtility: Bool {
-        // Only the digit pad needs it (for 0); the 9-key symbol grid holds every
-        // punctuation mark itself, so its space key takes the slot.
-        !(isPhoneLayout && !includesBottomEnter && page != .numeric)
+        // The bundled 9-key's letter page holds 中/英 there and its digit pad
+        // holds 0; its symbol grid has nothing to add, so space takes the slot.
+        !(isBundledPhonePad && page == .symbols)
     }
 
+    /// Only the bundled 9-key moves Return into its own trailing column.
+    public var isBundledPhonePad: Bool { isPhoneLayout && !includesBottomEnter }
+
     public var pageTarget: Page { page == .numeric ? .symbols : .numeric }
-    public var pageTitle: String { pageTarget == .symbols ? "#+=" : "123" }
+    public var pageTitle: String {
+        guard pageTarget == .symbols else { return "123" }
+        return isBundledPhonePad ? Self.symbolPageTitle : "#+="
+    }
+    public static let symbolPageTitle = "符号"
+
     public var languageAction: LanguageAction { page == .letters ? .toggleLanguage : .returnToLetters }
     public var languageTitle: String {
         if page == .letters { return isEnglishMode ? "中文" : "ABC" }
+        if isBundledPhonePad { return "返回" }
         return isEnglishMode ? "ABC" : "中文"
     }
     public var languageAccessibilityLabel: String {
@@ -198,6 +225,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             case .space: return space
             case .utility: return utility
             case .enter: return enter
+            case .symbolPage: return page
             }
         }
     }
