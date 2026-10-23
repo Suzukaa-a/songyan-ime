@@ -423,6 +423,7 @@ public struct KeyboardPanelHost: View {
                 candidateBandHeight: CGFloat(layoutFit.headerHeight),
                 topSlack: CGFloat(layoutFit.topSlack),
                 readingRowBandHeight: CGFloat(layoutFit.readingRowHeight),
+                topTrim: CGFloat(layoutFit.topTrim),
                 onReadingRowReport: { report in
                     latestReadingRowReport = report
                     applyReadingRowReport()

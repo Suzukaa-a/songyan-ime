@@ -182,12 +182,14 @@ public extension KeyboardPanelGeometry {
     }
 
     /// Extra height the candidate area gets beyond the configured budget (the configured budget alone leaves it too narrow),
-    /// minus the temporary `hostGapWorkaroundCut`.
-    static let candidateAreaBonus: Double = 16 - hostGapWorkaroundCut
+    /// minus the temporary `hostGapWorkaroundCut`. The candidate text sits low in the band
+    /// (`CandidateReadingRowPolicy.candidateDrop`), so the band is short below the text, not above it.
+    static let candidateAreaBonus: Double = 12 - hostGapWorkaroundCut
     /// TEMPORARY: iOS often adds a 17pt blank band above a third-party keyboard (after switching from a system
     /// keyboard or returning to the app; FB24460699 / FB25094825), which the extension cannot detect. Until Apple
-    /// fixes it, every layout's candidate area gives up 10pt so the keyboard does not look too tall with the band.
-    /// Set back to 0 once the band is gone.
+    /// fixes it, every layout's shell is 10pt shorter and `fit` takes those 10pt off the top of the topmost band
+    /// only, so the keyboard does not look too tall with the band while the candidates keep their place above
+    /// the keys. Set back to 0 once the band is gone.
     static let hostGapWorkaroundCut: Double = 10
     /// How much less candidate-area bonus a definition with a reading row (14-key) gets.
     static let readingLayoutBonusCut: Double = 4
@@ -199,10 +201,43 @@ public extension KeyboardPanelGeometry {
     /// the candidate area, or stays at the top when there is none. When height is short (iOS reused the shorter
     /// height of the previous presentation, e.g. switching from nine-key to 14-key mid-presentation) the reading
     /// row yields height first (down to `CandidateReadingRowPolicy.minimumHeight`), and key height is squeezed only if that is still not enough.
+    ///
+    /// With a candidate area, the page is laid out `hostGapWorkaroundCut` taller and the cut comes off the top of
+    /// the topmost band (`topTrim`), as long as that band keeps room for its text; otherwise (a short shell
+    /// already squeezing the reading row) the page is fitted to the shell as is.
     static func fit(
         shellHeight: Double, candidateHeight: Double, standardKeyHeight: Double,
         readingRowReserved: Bool, candidateAreaReserved: Bool,
         candidateSize: Double = 17, compactReadingRow: Bool = false
+    ) -> KeyboardPanelFit {
+        func layout(_ height: Double) -> KeyboardPanelFit {
+            untrimmedFit(
+                shellHeight: height, candidateHeight: candidateHeight, standardKeyHeight: standardKeyHeight,
+                readingRowReserved: readingRowReserved, candidateAreaReserved: candidateAreaReserved,
+                candidateSize: candidateSize, compactReadingRow: compactReadingRow)
+        }
+        let cut = hostGapWorkaroundCut
+        guard candidateAreaReserved, cut > 0 else { return layout(shellHeight) }
+        let tall = layout(shellHeight + cut)
+        if tall.readingRowHeight > 0 {
+            // The reading text sits low in its row; 4pt under the policy height still clears it.
+            let floor = CandidateReadingRowPolicy.height(reserved: true, compact: compactReadingRow) - 4
+            guard tall.readingRowHeight - cut >= floor else { return layout(shellHeight) }
+            return KeyboardPanelFit(
+                keyHeight: tall.keyHeight, headerHeight: tall.headerHeight, topSlack: tall.topSlack,
+                readingRowHeight: tall.readingRowHeight - cut, topTrim: cut)
+        }
+        let floor = CandidateBarDefinition.Collapsed.effectiveHeight(candidateHeight, candidateSize: candidateSize)
+        guard tall.headerHeight - cut >= floor else { return layout(shellHeight) }
+        return KeyboardPanelFit(
+            keyHeight: tall.keyHeight, headerHeight: tall.headerHeight - cut, topSlack: tall.topSlack,
+            readingRowHeight: 0, topTrim: cut)
+    }
+
+    private static func untrimmedFit(
+        shellHeight: Double, candidateHeight: Double, standardKeyHeight: Double,
+        readingRowReserved: Bool, candidateAreaReserved: Bool,
+        candidateSize: Double, compactReadingRow: Bool
     ) -> KeyboardPanelFit {
         let header =
             candidateAreaReserved
@@ -313,6 +348,10 @@ public struct KeyboardPanelFit: Equatable, Sendable {
     public let topSlack: Double
     /// Actual reading row height (including its share of spare height); 0 when not granted.
     public var readingRowHeight: Double = 0
+    /// How much was cut off the top of the topmost band (reading row, else candidate row) for
+    /// `hostGapWorkaroundCut`: that band lays its content out `topTrim` taller, bottom-aligned,
+    /// so only blank space above the text goes.
+    public var topTrim: Double = 0
 }
 
 /// The exact vertical layout of the panel in a given state (content coordinates, origin = panel top edge).

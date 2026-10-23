@@ -82,7 +82,7 @@ extension KeyboardPanelView {
     /// and only a custom skin covers the content area the product actually owns. The status-detail overlay appears only when explicitly opened.
     var compositionArea: some View {
         CandidateHeaderSurface(
-            height: headerHeight,
+            height: candidateRowHeight,
             backing: appearance.headerBacking
         ) {
             if controller.isEnglishMode && !controller.englishSuggestions.isEmpty && statusMessage == nil {

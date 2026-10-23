@@ -85,6 +85,9 @@ public struct KeyboardPanelView: View {
     private let candidateBandHeight: CGFloat?
     private let topSlack: CGFloat
     private let readingRowBandHeight: CGFloat?
+    /// Height cut off the top of the topmost band (`KeyboardPanelFit.topTrim`): that band
+    /// draws its content this much taller, bottom-aligned, so only blank space goes.
+    private let topTrim: CGFloat
     /// Reports eligibility facts (physical definition content) to the host, not heights.
     let onReadingRowReport: ((CandidateReadingRowReport) -> Void)?
     @State var page: KeyboardPage = .letters
@@ -151,6 +154,7 @@ public struct KeyboardPanelView: View {
         candidateBandHeight: CGFloat? = nil,
         topSlack: CGFloat = 0,
         readingRowBandHeight: CGFloat? = nil,
+        topTrim: CGFloat = 0,
         onReadingRowReport: ((CandidateReadingRowReport) -> Void)? = nil
     ) {
         self.controller = controller
@@ -158,6 +162,7 @@ public struct KeyboardPanelView: View {
         self.candidateBandHeight = candidateBandHeight
         self.topSlack = topSlack
         self.readingRowBandHeight = readingRowBandHeight
+        self.topTrim = topTrim
         self.readingRowReserved = readingRowReserved
         self.candidateAreaReserved = candidateAreaReserved
         self.onReadingRowReport = onReadingRowReport
@@ -242,7 +247,9 @@ public struct KeyboardPanelView: View {
     /// The candidate row fills the whole band: the spare height the shell gives it
     /// (`KeyboardPanelGeometry.fit`) is touch budget, and the centred text sits a
     /// little above the keys instead of on their edge.
-    var candidateRowHeight: CGFloat { headerHeight }
+    var candidateRowHeight: CGFloat { headerHeight + headerTopTrim }
+    /// `topTrim` lands on the reading row when there is one, else on the candidate row.
+    var headerTopTrim: CGFloat { layoutPlan.readingRowHeight > 0 ? 0 : topTrim }
 
     // MARK: Candidate area presentation (CandidateKit default renderer; skin injected via environment, no separate palette)
 
@@ -490,8 +497,11 @@ public struct KeyboardPanelView: View {
             // paste shows in the blank area only when strictly idle, without splitting candidate width.
             // Height belongs solely to `CandidateHeaderSurface` (`surfaceHeight == effectiveHeight`).
             // The standalone reading row is granted only for the selected definition and sits above the candidate row; phone structures use the left rail instead.
+            // The topmost band lays out `topTrim` taller and hangs off the top edge: the cut
+            // only removes blank space above its text (`KeyboardPanelFit.topTrim`).
             if plan.readingRowHeight > 0 {
-                readingRow(height: plan.readingRowHeight)
+                readingRow(height: plan.readingRowHeight + Double(topTrim))
+                    .frame(height: CGFloat(plan.readingRowHeight), alignment: .bottom)
             }
             if plan.headerHeight > 0 {
                 compositionArea
@@ -550,6 +560,7 @@ public struct KeyboardPanelView: View {
                             }
                         }
                     }
+                    .frame(height: CGFloat(plan.headerHeight), alignment: .bottom)
             }
             VStack(spacing: 4) {
                 if usesPhoneDefinition && page == .numeric {

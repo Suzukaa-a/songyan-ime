@@ -37,9 +37,11 @@ public enum CandidateReadingRowPolicy {
         min(textDrop * 2, max(0, rowHeight - minimumHeight))
     }
     /// How far word-candidate text sits below its row center when a reading row is present.
-    public static let candidateDrop: Double = 1
+    /// Half of the 4pt the candidate band gives up below the text (`candidateAreaBonus` 16 → 12),
+    /// so the space above the text stays and only the gap to the keys shrinks.
+    public static let candidateDrop: Double = 3
     /// How far word-candidate text sits below its row center when there is no reading row, closer to the key area.
-    public static let plainCandidateDrop: Double = 1
+    public static let plainCandidateDrop: Double = 3
     public static let candidateLift: Double = 0
 
     /// In landscape (compact height) the shell is shorter: the reading row and font each shrink one step to leave height for key rows.

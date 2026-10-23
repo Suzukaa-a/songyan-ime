@@ -50,7 +50,7 @@ final class KeyboardPanelHeightStateTests: XCTestCase {
             readingRowReserved: false, candidateAreaReserved: true)
         XCTAssertEqual(state.panelHeight, first.shellHeight)
         XCTAssertEqual(fit.keyHeight, 54)
-        XCTAssertEqual(fit.headerHeight, 74)
+        XCTAssertEqual(fit.headerHeight, 70)
         state.endPresentation()
         state.beginPresentation(height: next.shellHeight)
         XCTAssertEqual(state.panelHeight, next.shellHeight)

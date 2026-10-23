@@ -487,7 +487,7 @@ final class KeyboardPanelGeometryTests: XCTestCase {
         let standard = KeyboardPanelGeometry.presentationShellHeight(
             candidateHeight: candidateHeight,
             keyHeight: 54, readingRow: false)
-        XCTAssertEqual(fourteen, 306)
+        XCTAssertEqual(fourteen, 302)
         XCTAssertEqual(
             fourteen - standard, CandidateReadingRowPolicy.height - KeyboardPanelGeometry.readingLayoutBonusCut)
         let reading = CandidateReadingRowPolicy.height
@@ -495,14 +495,16 @@ final class KeyboardPanelGeometryTests: XCTestCase {
         let share = KeyboardPanelGeometry.readingRowSpareShare
         let cut = KeyboardPanelGeometry.readingLayoutBonusCut
         let squeezed = CandidateReadingRowPolicy.minimumHeight
-        // The 14-key shell's spare height (bonus minus its cut); the reading row takes up to `share` of it.
-        let readingSpare = min(share, bonus - cut)
+        // The host-gap cut is laid out and then taken off the top of the topmost band:
+        // the 14-key reading row keeps its `share` of the untrimmed spare height, minus the trim.
+        let trim = KeyboardPanelGeometry.hostGapWorkaroundCut
+        let readingSpare = share - trim
         let cases:
             [(
                 name: String, shell: Double, reading: Bool, candidateArea: Bool, key: Double, header: Double,
                 slack: Double
             )] = [
-                ("14-key shell / 14-key reading row", fourteen, true, true, 54, 40 + bonus - cut - readingSpare, 0),
+                ("14-key shell / 14-key reading row", fourteen, true, true, 54, 40 + bonus + trim - cut - share, 0),
                 ("14-key shell / 26-key", fourteen, false, true, 54, 40 + bonus - cut + reading, 0),
                 (
                     "14-key shell / 123 without candidate area", fourteen, false, false, 54, 0,
@@ -521,6 +523,9 @@ final class KeyboardPanelGeometryTests: XCTestCase {
             XCTAssertEqual(fit.keyHeight, page.key, accuracy: 0.001, "\(page.name) key height")
             XCTAssertEqual(fit.headerHeight, page.header, accuracy: 0.001, "\(page.name) candidate area")
             XCTAssertEqual(fit.topSlack, page.slack, accuracy: 0.001, "\(page.name) top slack")
+            // Only the squeezed reading row (no room above its text) and pages without a candidate area skip the trim.
+            let trimmed = page.candidateArea && !(page.reading && page.shell == standard)
+            XCTAssertEqual(fit.topTrim, trimmed ? trim : 0, "\(page.name) top trim")
             let plan = KeyboardPanelGeometry(
                 candidateHeight: candidateHeight, keyHeight: fit.keyHeight,
                 selectedMainRows: 3, readingRowReserved: page.reading,
@@ -557,7 +562,7 @@ final class KeyboardPanelGeometryTests: XCTestCase {
         let slightlyShort =
             KeyboardPanelGeometry.presentationShellHeight(
                 candidateHeight: 40, keyHeight: 54,
-                readingRow: true) - 8
+                readingRow: true) - 4
         let squeezedOnly = KeyboardPanelGeometry.fit(
             shellHeight: slightlyShort, candidateHeight: 40,
             standardKeyHeight: 54, readingRowReserved: true,
@@ -600,9 +605,8 @@ final class KeyboardPanelGeometryTests: XCTestCase {
         XCTAssertEqual(plan.panelHeight, shell, accuracy: 0.001)
         XCTAssertEqual(
             plan.readingRowHeight,
-            CandidateReadingRowPolicy.compactHeight
-                + min(
-                    KeyboardPanelGeometry.readingRowSpareShare,
-                    KeyboardPanelGeometry.candidateAreaBonus - KeyboardPanelGeometry.readingLayoutBonusCut))
+            CandidateReadingRowPolicy.compactHeight + KeyboardPanelGeometry.readingRowSpareShare
+                - KeyboardPanelGeometry.hostGapWorkaroundCut)
+        XCTAssertEqual(fit.topTrim, KeyboardPanelGeometry.hostGapWorkaroundCut)
     }
 }
