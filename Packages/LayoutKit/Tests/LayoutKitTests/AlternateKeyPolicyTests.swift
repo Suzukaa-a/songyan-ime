@@ -138,6 +138,50 @@ final class AlternateKeyPolicyTests: XCTestCase {
         XCTAssertTrue(bundled("ABC").isEmpty)
     }
 
+    /// A symbol reachable from two letters reads as a mistake on the key faces (G and M
+    /// both showed `/` on the ABC page), so every offered symbol belongs to one letter in
+    /// Chinese mode, English mode and ASCII fields alike.
+    func testNoTwoLettersOfferTheSameSymbolInAnyMode() {
+        let modes: [(AlternateKeyPolicy.Language, Bool)] = [(.chinese, false), (.chinese, true), (.english, true)]
+        for (language, ascii) in modes {
+            var owner: [String: String] = [:]
+            var hints: [String: String] = [:]
+            for letter in fullAlphabet.map(String.init) {
+                let labels = options(
+                    key: letter, secondary: bundled(letter), language: language,
+                    asciiPunctuation: ascii, alphabet: fullAlphabet
+                ).map(\.label)
+                for label in labels {
+                    if let other = owner[label] {
+                        XCTFail("\(language) ascii=\(ascii): \(label) on both \(other) and \(letter)")
+                    }
+                    owner[label] = letter
+                }
+                // The corner glyph is the first option; it must be unique too.
+                if let hint = labels.first {
+                    XCTAssertNil(hints[hint], "\(language) ascii=\(ascii): hint \(hint) repeats on \(letter)")
+                    hints[hint] = letter
+                }
+            }
+        }
+    }
+
+    /// The merged pads' own declared extras (14-key QW `1 !`, single L `，`, single M `。`)
+    /// must not repeat one another either.
+    func testMergedPadDeclaredSymbolsDoNotRepeat() {
+        for layout in [BuiltinLayouts.merged14, BuiltinLayouts.merged18] {
+            var seen: [String: String] = [:]
+            for key in layout.rows.flatMap(\.keys) where key.action.type == .code {
+                let partners = Set(key.label.lowercased().map(String.init))
+                let symbols = (key.longPress ?? []).compactMap(\.action.value).filter { !partners.contains($0) }
+                for symbol in symbols {
+                    XCTAssertNil(seen[symbol], "\(layout.id): \(symbol) on \(seen[symbol] ?? "") and \(key.label)")
+                    seen[symbol] = key.label
+                }
+            }
+        }
+    }
+
     func testExplicitDIYAccentsHaveMatchingLabelAndLiteral() {
         let lower = options(key: "a", secondary: ["á"], language: .english)
         let upper = options(key: "a", secondary: ["á"], language: .english, uppercase: true)

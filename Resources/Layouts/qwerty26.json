@@ -23,7 +23,7 @@
       {"label":"s","action":{"type":"code","value":"s"},"longPress":[{"label":"。","action":{"type":"literal","value":"。"}},{"label":".","action":{"type":"literal","value":"."}},{"label":"…","action":{"type":"literal","value":"…"}}]},
       {"label":"d","action":{"type":"code","value":"d"},"longPress":[{"label":"？","action":{"type":"literal","value":"？"}},{"label":"?","action":{"type":"literal","value":"?"}}]},
       {"label":"f","action":{"type":"code","value":"f"},"longPress":[{"label":"！","action":{"type":"literal","value":"！"}},{"label":"!","action":{"type":"literal","value":"!"}}]},
-      {"label":"g","action":{"type":"code","value":"g"},"longPress":[{"label":"、","action":{"type":"literal","value":"、"}},{"label":"/","action":{"type":"literal","value":"/"}}]},
+      {"label":"g","action":{"type":"code","value":"g"},"longPress":[{"label":"、","action":{"type":"literal","value":"、"}},{"label":"\\","action":{"type":"literal","value":"\\"}}]},
       {"label":"h","action":{"type":"code","value":"h"},"longPress":[{"label":"：","action":{"type":"literal","value":"："}},{"label":":","action":{"type":"literal","value":":"}}]},
       {"label":"j","action":{"type":"code","value":"j"},"longPress":[{"label":"；","action":{"type":"literal","value":"；"}},{"label":";","action":{"type":"literal","value":";"}}]},
       {"label":"k","action":{"type":"code","value":"k"},"longPress":[{"label":"（","action":{"type":"literal","value":"（"}},{"label":"(","action":{"type":"literal","value":"("}}]},
@@ -36,7 +36,7 @@
       {"label":"v","action":{"type":"code","value":"v"},"longPress":[{"label":"‘","action":{"type":"literal","value":"‘"}},{"label":"’","action":{"type":"literal","value":"’"}},{"label":"'","action":{"type":"literal","value":"'"}}]},
       {"label":"b","action":{"type":"code","value":"b"},"longPress":[{"label":"【","action":{"type":"literal","value":"【"}},{"label":"[","action":{"type":"literal","value":"["}},{"label":"《","action":{"type":"literal","value":"《"}},{"label":"<","action":{"type":"literal","value":"<"}}]},
       {"label":"n","action":{"type":"code","value":"n"},"longPress":[{"label":"】","action":{"type":"literal","value":"】"}},{"label":"]","action":{"type":"literal","value":"]"}},{"label":"》","action":{"type":"literal","value":"》"}},{"label":">","action":{"type":"literal","value":">"}}]},
-      {"label":"m","action":{"type":"code","value":"m"},"longPress":[{"label":"/","action":{"type":"literal","value":"/"}},{"label":"\\","action":{"type":"literal","value":"\\"}}]}
+      {"label":"m","action":{"type":"code","value":"m"},"longPress":[{"label":"/","action":{"type":"literal","value":"/"}}]}
     ]},
     {"keys": [
       {"label":"布局","action":{"type":"modeSwitch","value":"nextLayout"}},

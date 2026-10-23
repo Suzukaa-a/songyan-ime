@@ -126,14 +126,18 @@ public enum AlternateKeyPolicy {
         defaultLetters[letter.lowercased()] ?? []
     }
 
+    /// Each full-width mark is paired with the ASCII key a desktop Chinese IME types it
+    /// from, so English mode and ASCII fields (which drop the full-width form) still show a
+    /// distinct mark: 、 comes from `\`, as on Sogou and Microsoft Pinyin. No two letters
+    /// may offer the same symbol in either mode, or the ABC page shows it twice.
     private static let defaultLetters: [String: [String]] = [
         "q": ["1"], "w": ["2"], "e": ["3"], "r": ["4"], "t": ["5"],
         "y": ["6"], "u": ["7"], "i": ["8"], "o": ["9"], "p": ["0"],
         "a": ["，", ","], "s": ["。", ".", "…"], "d": ["？", "?"], "f": ["！", "!"],
-        "g": ["、", "/"], "h": ["：", ":"], "j": ["；", ";"],
+        "g": ["、", "\\"], "h": ["：", ":"], "j": ["；", ";"],
         "k": ["（", "("], "l": ["）", ")"],
         "z": ["@"], "x": ["-", "_"], "c": ["“", "”", "\""], "v": ["‘", "’", "'"],
-        "b": ["【", "[", "《", "<"], "n": ["】", "]", "》", ">"], "m": ["/", "\\"],
+        "b": ["【", "[", "《", "<"], "n": ["】", "]", "》", ">"], "m": ["/"],
     ]
 
     private static func letterOptions(_ request: Request) -> [Option] {
