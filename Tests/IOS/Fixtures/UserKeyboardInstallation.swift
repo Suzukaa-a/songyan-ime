@@ -10,6 +10,8 @@ enum KeyboardRecipeStore {
         var revision: String
         var hostInstallationGeneration: String?
         var packageID: String?
+        var selectedSchemaID: String? = nil
+        var selectedLayout: KeyboardLayoutKind? = nil
     }
 }
 struct UserKeyboardPublicationView: Sendable {
@@ -80,7 +82,9 @@ struct UserKeyboardPublicationView: Sendable {
         return "removed"
     }
     func replaceKeyboards(_ keyboards: [UserKeyboard]) async throws -> String { "saved" }
-    func replaceKeyboards(_ keyboards: [UserKeyboard], viewed: UserKeyboardPublicationView) async throws -> String {
+    func replaceKeyboards(
+        _ keyboards: [UserKeyboard], selecting: UserKeyboard? = nil, viewed: UserKeyboardPublicationView
+    ) async throws -> String {
         if Fixture.mutationFailsOnce {
             Fixture.mutationFailsOnce = false
             throw NSError(domain: "fixture", code: 3)
@@ -92,10 +96,13 @@ struct UserKeyboardPublicationView: Sendable {
             "the save receives the original captured publication")
         Fixture.writes += 1
         Fixture.view.keyboards = keyboards
+        let current = selecting ?? keyboards.first
         Fixture.view.activation = .init(
             revision: Fixture.installed.revision,
-            hostInstallationGeneration: Fixture.installed.generation, packageID: "package")
-        return "saved"
+            hostInstallationGeneration: Fixture.installed.generation, packageID: "package",
+            selectedSchemaID: current?.inputMethodID, selectedLayout: current?.layout)
+        Fixture.view.isCurrent = true
+        return selecting.map { "using \($0.id)" } ?? "saved"
     }
     // PRODUCTION_EVALUATOR
 }
@@ -295,5 +302,31 @@ struct DraftChanges {
             savedButStale.resultMessage == "saved",
             "the mutation's own completion message is preserved from the write")
         print("PASS: successful mutation with failed reload reports explicitly")
+
+        // "Use now" on a pair that is not in the roster yet adds it, makes it the
+        // keyboard in use, and the reload reports it as current.
+        Fixture.reset(
+            revision: "same", generation: "generation", installedRevision: "same", installedGeneration: "generation")
+        let nine = UserKeyboard(inputMethodID: "test", inputMethodName: "Test", layout: .phone9)
+        let using = makeCenter()
+        await using.refresh()
+        precondition(using.currentKeyboardID == nil, "a publication without a selection has no keyboard in use")
+        let used = await using.apply([Fixture.keyboard], selecting: nine)
+        precondition(used && Fixture.writes == 1)
+        precondition(Fixture.view.keyboards.map(\.id) == [Fixture.keyboard.id, nine.id], "the used pair is added")
+        precondition(using.currentKeyboardID == nine.id, "the used pair is reported as in use")
+        precondition(using.resultMessage == "using \(nine.id)")
+        print("PASS: use now adds the pair and reports it as in use")
+
+        // Another source's publication never marks a keyboard of this page as in use.
+        Fixture.reset(
+            revision: "same", generation: "generation", installedRevision: "same",
+            installedGeneration: "generation", current: false)
+        Fixture.view.activation?.selectedSchemaID = "test"
+        Fixture.view.activation?.selectedLayout = .qwerty26
+        let elsewhere = makeCenter()
+        await elsewhere.refresh()
+        precondition(elsewhere.currentKeyboardID == nil)
+        print("PASS: only the page's own source has a keyboard in use")
     }
 }

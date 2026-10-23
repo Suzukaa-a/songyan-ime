@@ -2,12 +2,14 @@ import Foundation
 
 /// User-model terminology for input configuration (the single literal source shared by Host and the keyboard extension).
 ///
-/// User model (a generic Rime front end, not designed around any particular source):
-///  - Input scheme: an installable, applicable unit of data (a source). A source can contain
+/// User model (a generic Rime front end, not designed around any particular source). The host app
+/// has two places to act: 输入方案 (what is installed) and 我的键盘 (what is on the keyboard).
+///  - Input scheme: an installable unit of data (a source). A source can contain
 ///    any number of schemes with any names; the list always comes from the resource snapshot's enabled list.
 ///  - Input method: a concrete way of typing within a scheme (a schema, e.g. full pinyin,
 ///    Xiaohe Shuangpin, 9-key, shape-code, dialect). Display names come from the resource
-///    snapshot; no schema ID is hard-coded.
+///    snapshot; no schema ID is hard-coded. It is only a group heading in 我的键盘 and a read-only
+///    list on a scheme's detail page, never a separate place to choose.
 ///  - Keyboard layout: a front-end keyboard capability (26 / 14 / 9 / custom key layout),
 ///    independent of source identity; whether an input method works with a layout is decided
 ///    only by resource capability (`availableCombinations` / `incompatibilityReason`).
@@ -44,14 +46,12 @@ public enum UserTerminology: Sendable {
 
     // MARK: - Actions
 
-    /// The only apply action on the scheme detail (install and apply are separate; applying is not renamed).
+    /// Apply action: switch to a keyboard in 我的键盘, or to a scheme without one (custom pinyin).
     public static let startUsing = "使用"
     /// Apply action when a newer version is installed.
     public static let startUsingNewVersion = "使用新版本"
     /// Add entry.
     public static let addInputScheme = "添加输入方案"
-    /// Entry for choosing both dimensions on one screen.
-    public static let chooseInputMethodAndLayout = "选择输入方式与键盘布局"
 
     // MARK: - Failure and retry (plain wording)
 
@@ -64,10 +64,10 @@ public enum UserTerminology: Sendable {
 
     // MARK: - Home summary
 
-    /// Prefix of the home scheme summary.
+    /// Prefix of the in-use summaries.
     public static let inUsePrefix = "正在使用"
 
-    /// Home scheme summary: "In use: <scheme> · <input method> · <keyboard layout>" (Chinese wording).
+    /// Scheme summary: "In use: <scheme> · <input method> · <keyboard layout>" (Chinese wording).
     ///
     /// `scheme == nil` means there is no usable product input scheme (Release does not pass built-in package off as usable).
     public static func inUseSummary(scheme: String?, inputMethod: String?, layout: String?) -> String {
@@ -76,6 +76,21 @@ public enum UserTerminology: Sendable {
         if let inputMethod, !inputMethod.isEmpty, inputMethod != scheme { parts.append(inputMethod) }
         if let layout, !layout.isEmpty { parts.append(layout) }
         return "\(inUsePrefix)：\(parts.joined(separator: " · "))"
+    }
+
+    /// Home 我的键盘 row: the keyboard in use, "In use: <input method> · <keyboard layout>".
+    /// Either part may be missing; with neither there is nothing to report.
+    public static func currentKeyboardSummary(inputMethod: String?, layout: KeyboardLayoutKind?) -> String? {
+        let parts = [inputMethod, layout.map(layoutName)].compactMap { $0 }.filter { !$0.isEmpty }
+        guard !parts.isEmpty else { return nil }
+        return "\(inUsePrefix)：\(parts.joined(separator: " · "))"
+    }
+
+    /// Home 输入方案 row: how many schemes are installed and which one the keyboard uses.
+    public static func installedSchemeSummary(count: Int, inUse: String?) -> String {
+        let installed = installedSourceSummary(count: count)
+        guard count > 0, let inUse, !inUse.isEmpty else { return installed }
+        return "\(installed)，\(inUsePrefix)「\(inUse)」"
     }
 
     /// Installed source count. The installed source count is never called a "scheme count".
@@ -132,33 +147,32 @@ public enum UserTerminology: Sendable {
     public static let addUserKeyboard = "添加键盘"
     /// Marks the current item in the switcher.
     public static let userKeyboardCurrent = "当前键盘"
-    /// Plain-language explanation when the list is empty (shared by the main app and the keyboard).
-    public static let userKeyboardEmptyHint =
-        "还没有添加键盘。在「输入方案」中选择输入方式与键盘布局即可添加。"
+    /// Plain-language explanation when the scheme offers no keyboard at all.
+    public static let userKeyboardEmptyHint = "这个输入方案没有可用的键盘。"
     /// Hint row when the in-keyboard switcher is empty (not tappable; only says where to add).
-    public static let userKeyboardSwitcherEmpty = "尚未添加键盘 · 请在松烟 App 中选择输入方案"
+    public static let userKeyboardSwitcherEmpty = "尚未添加键盘 · 请在松烟 App 的「我的键盘」中添加"
 
     /// Read-only explanation when the management transaction is not wired up (plain language).
     public static let userKeyboardReadOnlyNotice =
-        "请在「输入方案」中选择输入方式与键盘布局。"
+        "这里暂时无法修改。请在「输入方案」中打开方案，再从它的「我的键盘」添加。"
 
     // MARK: - User keyboard management page (main app)
 
     /// The keyboard is not using any input scheme (status sentence shared by home, onboarding, and the user keyboard page).
     public static let userKeyboardNoSource = "键盘还没有使用任何输入方案。"
 
-    /// How to make the keyboard start using an input scheme. Independent of source type:
-    /// schemes with "user keyboards" save there; those without (only "start using") tap "start using".
+    /// How to make the keyboard start using an input scheme. Schemes with 我的键盘 switch there;
+    /// those without (custom pinyin) have their own "start using" button.
     public static let userKeyboardHowToStart =
-        "请在「\(inputScheme)」中打开要使用的方案，在「\(userKeyboard)」里打开键盘并点「保存」；"
-        + "没有「\(userKeyboard)」的方案，点「\(startUsing)」。"
+        "请在「\(inputScheme)」中打开要用的方案，在它的「\(userKeyboard)」里轻点「\(startUsing)」；"
+        + "没有「\(userKeyboard)」的方案，直接轻点「\(startUsing)」。"
 
     /// Full explanation for the user keyboard page's "not using any input scheme" state.
     public static var userKeyboardNeedsSourceHint: String { userKeyboardNoSource + userKeyboardHowToStart }
 
-    /// Management page footnote: what the toggles mean, when they take effect, and how they relate to the in-keyboard switch list.
+    /// Management page footnote: what the toggles and "Use" do, and how they relate to the in-keyboard switch list.
     public static let userKeyboardFootnote =
-        "打开要使用的键盘并点「保存」，长按「ABC/中文」键即可切换。"
+        "勾选后点「保存」加入键盘，长按「ABC/中文」键可切换；轻点「\(startUsing)」立即换用。"
 
     /// Saving in progress.
     public static let userKeyboardSaving = "正在保存键盘…"
@@ -178,6 +192,11 @@ public enum UserTerminology: Sendable {
     public static func userKeyboardToggleLabel(inputMethod: String, layout: KeyboardLayoutKind) -> String {
         let name = inputMethod.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? layoutName(layout) : "\(name)，\(layoutName(layout))"
+    }
+
+    /// Message after "Use" switched the keyboard.
+    public static func userKeyboardNowUsing(_ title: String) -> String {
+        "已换用「\(title)」。"
     }
 
     /// Message for a successful save.
@@ -221,7 +240,7 @@ public enum UserTerminology: Sendable {
 
     /// Switch to it via the source's own "user keyboard".
     public static let tryHowToUseViaUserKeyboard =
-        "请先回到上一页，在「\(userKeyboard)」里打开要用的键盘并点「保存」"
+        "请先回到上一页，在「\(userKeyboard)」里轻点要用的键盘下方的「\(startUsing)」"
 
     /// Switch to it via "start using".
     public static let tryHowToUseViaStartUsing = "请先回到上一页点「\(startUsing)」"

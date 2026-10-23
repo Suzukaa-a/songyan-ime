@@ -424,13 +424,13 @@ final class UserKeyboardTests: XCTestCase {
         XCTAssertEqual(UserTerminology.userKeyboardSaveNeedsOne, "至少打开一个键盘才能保存。")
         XCTAssertEqual(UserTerminology.userKeyboardListUnchanged, "当前键盘列表没有改变。")
         XCTAssertTrue(UserTerminology.userKeyboardNeedsSourceHint.hasPrefix(UserTerminology.userKeyboardNoSource))
-        // Both fixed-source and imported-source keyboards are saved in their own "user keyboards"; only the "Start using" source taps it.
+        // Switching happens in the scheme's own 我的键盘; a scheme without one has its own "Use".
         XCTAssertTrue(UserTerminology.userKeyboardHowToStart.contains("「我的键盘」"))
-        XCTAssertTrue(UserTerminology.userKeyboardHowToStart.contains("「保存」"))
         XCTAssertTrue(UserTerminology.userKeyboardHowToStart.contains("「使用」"))
-        // Footnote: tap "Save", and how it relates to the in-keyboard long-press list.
+        XCTAssertFalse(UserTerminology.userKeyboardHowToStart.contains(UserTerminology.inputMethod))
+        // Footnote: "Save", "Use", and how it relates to the in-keyboard long-press list.
         let footnote = UserTerminology.userKeyboardFootnote
-        for part in ["「保存」", "长按「ABC/中文」"] {
+        for part in ["「保存」", "「使用」", "长按「ABC/中文」"] {
             XCTAssertTrue(footnote.contains(part), part)
         }
 
@@ -439,6 +439,7 @@ final class UserKeyboardTests: XCTestCase {
             UserTerminology.userKeyboardNeedsSourceHint, footnote,
             UserTerminology.userKeyboardSaving, UserTerminology.userKeyboardSaveNeedsOne,
             UserTerminology.userKeyboardSaved(count: 1), UserTerminology.userKeyboardListUnchanged,
+            UserTerminology.userKeyboardNowUsing("倉頡五代 · 9 键"),
             UserTerminology.tryUsesCurrentScheme, UserTerminology.tryHowToUseViaUserKeyboard,
             UserTerminology.tryHowToUseViaStartUsing,
             UserTerminology.trySourceContext(name: "A", inUse: true, howToUse: "x"),
@@ -454,6 +455,19 @@ final class UserKeyboardTests: XCTestCase {
         }
     }
 
+    /// Home rows: 输入方案 says what is installed, 我的键盘 says which keyboard is in use.
+    func testHomeSummariesSplitSchemesFromKeyboards() {
+        XCTAssertEqual(
+            UserTerminology.currentKeyboardSummary(inputMethod: "倉頡五代", layout: .phone9), "正在使用：倉頡五代 · 9 键")
+        XCTAssertEqual(UserTerminology.currentKeyboardSummary(inputMethod: nil, layout: .qwerty26), "正在使用：26 键")
+        XCTAssertNil(UserTerminology.currentKeyboardSummary(inputMethod: "", layout: nil))
+        XCTAssertEqual(
+            UserTerminology.installedSchemeSummary(count: 2, inUse: "通用形码包"), "已安装 2 个输入方案，正在使用「通用形码包」")
+        XCTAssertEqual(UserTerminology.installedSchemeSummary(count: 2, inUse: nil), "已安装 2 个输入方案")
+        XCTAssertFalse(
+            UserTerminology.installedSchemeSummary(count: 1, inUse: "A").contains(UserTerminology.inputMethod))
+    }
+
     func testTrySourceContextIsTruthfulAboutWhetherSourceIsInUse() {
         XCTAssertEqual(
             UserTerminology.trySourceContext(name: "通用形码包", inUse: true, howToUse: "忽略"),
@@ -463,7 +477,7 @@ final class UserKeyboardTests: XCTestCase {
                 name: "通用形码包", inUse: false,
                 howToUse: UserTerminology.tryHowToUseViaUserKeyboard),
             "键盘没有在使用「通用形码包」。要试打「通用形码包」，"
-                + "请先回到上一页，在「我的键盘」里打开要用的键盘并点「保存」。")
+                + "请先回到上一页，在「我的键盘」里轻点要用的键盘下方的「使用」。")
         XCTAssertEqual(
             UserTerminology.trySourceContext(
                 name: "自定义拼音", inUse: false,

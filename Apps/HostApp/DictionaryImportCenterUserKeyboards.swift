@@ -76,13 +76,18 @@ final class DictionaryImportCenterUserKeyboards: UserKeyboardManaging {
         return UserTerminology.userKeyboardSaved(count: published.count)
     }
 
-    func replaceKeyboards(_ keyboards: [UserKeyboard], viewed: UserKeyboardPublicationView) async throws -> String {
+    /// `selecting` also makes that keyboard the one in use.
+    func replaceKeyboards(
+        _ keyboards: [UserKeyboard], selecting: UserKeyboard? = nil, viewed: UserKeyboardPublicationView
+    ) async throws -> String {
         let context = try await currentContext()
         let requested = keyboards.map { PublishedKeyboard(schemaID: $0.inputMethodID, layout: $0.layout) }
         let published = try await center.performReplaceKeyboards(
             packageID: context.packageID, requested: requested,
+            selecting: selecting.map { PublishedKeyboard(schemaID: $0.inputMethodID, layout: $0.layout) },
             viewedActivation: viewed.activation, viewedRoster: viewed.roster,
             viewedSourceKey: viewed.sourceKey)
+        if let selecting { return UserTerminology.userKeyboardNowUsing(selecting.title) }
         return UserTerminology.userKeyboardSaved(count: published.count)
     }
 
@@ -115,7 +120,8 @@ final class DictionaryImportCenterUserKeyboards: UserKeyboardManaging {
             guard activation.kind != .userDictionary else {
                 throw UserKeyboardPublicationError.unavailable(
                     "自定义拼音没有可添加的键盘。要改用其他方案，"
-                        + "请在「\(UserTerminology.inputScheme)」中打开该方案，并在「\(UserTerminology.userKeyboard)」中选好键盘后保存。")
+                        + "请在「\(UserTerminology.inputScheme)」中打开该方案，"
+                        + "再到它的「\(UserTerminology.userKeyboard)」里轻点「\(UserTerminology.startUsing)」。")
             }
             guard let packageID = activation.packageID else { throw UserKeyboardPublicationError.sourceNotInstalled }
             return (

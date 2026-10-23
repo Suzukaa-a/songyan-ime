@@ -49,6 +49,8 @@ final class UserKeyboardCenter: ObservableObject {
     /// Same source, revision and installation generation as the keyboard publication.
     @Published private(set) var sourceIsCurrent = true
     @Published private(set) var sourceNeedsUpdate = false
+    /// The keyboard in use (`UserKeyboard.id`); nil when this source is not the one the keyboard runs.
+    @Published private(set) var currentKeyboardID: String?
     /// From the same publication read as the visible roster, never a second status read.
     private var viewedPublication: UserKeyboardPublicationView?
 
@@ -85,6 +87,7 @@ final class UserKeyboardCenter: ObservableObject {
             let addable = try await manager.addableKeyboards()
             updateLists(published: published, addable: addable)
             viewedPublication = viewed
+            currentKeyboardID = Self.currentKeyboardID(in: viewed)
             sourceIsCurrent = viewed?.isCurrent ?? true
             sourceNeedsUpdate = false
             if sourceIsCurrent, let viewed, let production = manager as? DictionaryImportCenterUserKeyboards {
@@ -145,7 +148,10 @@ final class UserKeyboardCenter: ObservableObject {
     /// Submit the complete edited roster once. No per-toggle generation, publication or reload.
     ///
     /// An empty list is not committed: after saving, the keyboard switches to this page's input scheme, and with no keyboard at all typing is impossible.
-    func apply(_ keyboards: [UserKeyboard]) async -> Bool {
+    /// `selecting` ("use now") also makes that keyboard the one in use; it is added to the roster when missing.
+    func apply(_ keyboards: [UserKeyboard], selecting: UserKeyboard? = nil) async -> Bool {
+        var keyboards = keyboards
+        if let selecting, !keyboards.contains(where: { $0.id == selecting.id }) { keyboards.append(selecting) }
         guard busyKeyboardID == nil else { return false }
         guard !keyboards.isEmpty else {
             resultMessage = nil
@@ -168,7 +174,8 @@ final class UserKeyboardCenter: ObservableObject {
                 guard let viewedPublication else {
                     throw UserKeyboardPublicationError.unavailable("键盘列表尚未读取，请重新读取后保存。")
                 }
-                resultMessage = try await production.replaceKeyboards(keyboards, viewed: viewedPublication)
+                resultMessage = try await production.replaceKeyboards(
+                    keyboards, selecting: selecting, viewed: viewedPublication)
             } else {
                 resultMessage = try await manager.replaceKeyboards(keyboards)
             }
@@ -198,6 +205,7 @@ final class UserKeyboardCenter: ObservableObject {
             publishedKeyboards = published
             updateLists(published: published, addable: try await manager.addableKeyboards())
             viewedPublication = viewed
+            currentKeyboardID = Self.currentKeyboardID(in: viewed)
             sourceIsCurrent = viewed?.isCurrent ?? true
             sourceNeedsUpdate = false
             if sourceIsCurrent, let viewed, let production = manager as? DictionaryImportCenterUserKeyboards {
@@ -221,6 +229,14 @@ final class UserKeyboardCenter: ObservableObject {
         publishedKeyboards = UserKeyboardRoster.backfillingNames(published, from: addable)
         let publishedIDs = Set(published.map(\.id))
         addableKeyboards = addable.filter { !publishedIDs.contains($0.id) }
+    }
+
+    /// Only a publication of this page's own source has a keyboard in use.
+    private static func currentKeyboardID(in viewed: UserKeyboardPublicationView?) -> String? {
+        guard let viewed, viewed.isCurrent, let activation = viewed.activation,
+            let schemaID = activation.selectedSchemaID, let layout = activation.selectedLayout
+        else { return nil }
+        return UserKeyboard(inputMethodID: schemaID, inputMethodName: "", layout: layout).id
     }
 
     func dismissMessages() {

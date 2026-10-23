@@ -199,9 +199,11 @@ extension SchemeImportCenter {
 
     /// Apply the complete edited roster with one adapter preparation and one publication. A page-bound
     /// save passes the publication it was read from (`viewedActivation`); the store refuses the save
-    /// when the publication changed since.
+    /// when the publication changed since. `selecting` makes that pair the current keyboard ("use now");
+    /// without it the current selection is kept when it survives, otherwise the first pair is used.
     func performReplaceKeyboards(
         packageID: String, requested: [PublishedKeyboard],
+        selecting: PublishedKeyboard? = nil,
         viewedActivation: KeyboardRecipeStore.Activation? = nil,
         viewedRoster: [PublishedKeyboard]? = nil,
         viewedSourceKey: String? = nil
@@ -212,26 +214,27 @@ extension SchemeImportCenter {
             let shared = try await loadSharedActivation()
             var list: [PublishedKeyboard] = []
             for keyboard in requested where !list.contains(keyboard) { list.append(keyboard) }
+            if let selecting, !list.contains(selecting) { list.append(selecting) }
             if list.isEmpty { throw Self.keepOneKeyboard }
             let installed = try await activeRecipe(packageID: packageID)
-            if Self.sameSource(shared, packageID: packageID), shared?.recipeEnabled == true,
-                shared?.revision == installed.installation.revision,
-                shared?.hostInstallationGeneration == installed.installation.generation,
-                shared?.keyboards == list
-            {
-                return list
-            }
             let selected =
                 Self.sameSource(shared, packageID: packageID)
                 ? shared?.selectedSchemaID.flatMap { schemaID in
                     shared?.selectedLayout.map { PublishedKeyboard(schemaID: schemaID, layout: $0) }
                 } : nil
+            if Self.sameSource(shared, packageID: packageID), shared?.recipeEnabled == true,
+                shared?.revision == installed.installation.revision,
+                shared?.hostInstallationGeneration == installed.installation.generation,
+                shared?.keyboards == list, selecting == nil || selecting == selected
+            {
+                return list
+            }
             let baseline: KeyboardRecipeStore.PublishBaseline =
                 (viewedRoster != nil ? viewedActivation : shared)
                 .map { .publication($0) } ?? .absent
             try await publishRoster(
                 packageID: packageID, roster: list,
-                selection: selected.flatMap { list.contains($0) ? $0 : nil } ?? list.first,
+                selection: selecting ?? selected.flatMap { list.contains($0) ? $0 : nil } ?? list.first,
                 prepare: true, added: nil, baseline: baseline)
             return list
         }

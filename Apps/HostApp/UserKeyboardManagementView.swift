@@ -2,7 +2,9 @@ import KeyboardCore
 import LayoutKit
 import SwiftUI
 
-/// The user edits the full "input method x layout" list on this page; the publish transaction runs once, only when "Save" is tapped.
+/// 我的键盘: the only place to choose what is on the keyboard. Pairs are grouped by input method; the
+/// toggles edit a draft published once by "Save", while "Use" on a card publishes the draft plus that
+/// pair and switches to it right away. The pair in use is marked 正在使用.
 struct UserKeyboardManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var center: UserKeyboardCenter
@@ -135,6 +137,12 @@ struct UserKeyboardManagementView: View {
             }
             if isSaving || center.busyKeyboardID != nil {
                 Section { ProgressView(UserTerminology.userKeyboardSaving) }
+            } else if center.resultMessage == nil,
+                let current = items.first(where: { $0.id == center.currentKeyboardID })
+            {
+                Section {
+                    LabeledContent(UserTerminology.statusInUse, value: current.keyboard.title)
+                }
             }
             if let result = center.resultMessage {
                 Section {
@@ -216,45 +224,68 @@ struct UserKeyboardManagementView: View {
             ? UserTerminology.inputMethod : name
     }
 
+    private var isBusy: Bool { isSaving || center.busyKeyboardID != nil }
+
+    /// The card body toggles the pair in the draft; the footer is either 正在使用 or a separate "Use" button.
     private func keyboardCard(_ item: Item, inputMethod: String) -> some View {
         let selected = selectedIDs.contains(item.id)
-        return Button {
-            binding(for: item.id).wrappedValue.toggle()
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                UserKeyboardMiniature(layout: item.layout)
-                    .frame(height: 86)
-                    .accessibilityHidden(true)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(UserTerminology.layoutName(item.layout))
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 4)
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+        let inUse = center.currentKeyboardID == item.id
+        let name = UserTerminology.userKeyboardToggleLabel(inputMethod: inputMethod, layout: item.layout)
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                binding(for: item.id).wrappedValue.toggle()
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    UserKeyboardMiniature(layout: item.layout)
+                        .frame(height: 86)
+                        .accessibilityHidden(true)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(UserTerminology.layoutName(item.layout))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    }
                 }
+                .contentShape(Rectangle())
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selected ? Color.accentColor.opacity(0.08) : Color(uiColor: .tertiarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 14)
+            .buttonStyle(.plain)
+            .disabled(isBusy || !center.supportsManagement)
+            .accessibilityIdentifier("userKeyboard.card." + item.id)
+            .accessibilityLabel(name)
+            .accessibilityValue(
+                selected ? UserTerminology.userKeyboardSelected : UserTerminology.userKeyboardNotSelected
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(
-                        selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: selected ? 2 : 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
+            .accessibilityHint(UserTerminology.userKeyboardDraftHint)
+            if inUse {
+                Label(UserTerminology.statusInUse, systemImage: "checkmark")
+                    .font(.footnote)
+                    .foregroundStyle(.green)
+                    .frame(minHeight: 28)
+                    .accessibilityLabel("\(name)，\(UserTerminology.statusInUse)")
+            } else {
+                Button(UserTerminology.startUsing) { use(item) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isBusy || !center.supportsManagement)
+                    .accessibilityIdentifier("userKeyboard.use." + item.id)
+                    .accessibilityLabel("\(UserTerminology.startUsing)\(name)")
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(isSaving || center.busyKeyboardID != nil || !center.supportsManagement)
-        .accessibilityIdentifier("userKeyboard.card." + item.id)
-        .accessibilityLabel(UserTerminology.userKeyboardToggleLabel(inputMethod: inputMethod, layout: item.layout))
-        .accessibilityValue(selected ? UserTerminology.userKeyboardSelected : UserTerminology.userKeyboardNotSelected)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .accessibilityHint(UserTerminology.userKeyboardDraftHint)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            selected ? Color.accentColor.opacity(0.08) : Color(uiColor: .tertiarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: selected ? 2 : 1)
+        )
     }
 
     private func binding(for id: String) -> Binding<Bool> {
@@ -286,6 +317,18 @@ struct UserKeyboardManagementView: View {
         Task { @MainActor in
             defer { isSaving = false }
             if await center.apply(roster) { resetDraft() }
+        }
+    }
+
+    /// "Use now": publishes the draft with this pair added and switches the keyboard to it.
+    @MainActor
+    private func use(_ item: Item) {
+        guard case .ready = center.phase, initialized, !isBusy, center.supportsManagement else { return }
+        let roster = items.filter { selectedIDs.contains($0.id) || $0.id == item.id }.map(\.keyboard)
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            if await center.apply(roster, selecting: item.keyboard) { resetDraft() }
         }
     }
 }

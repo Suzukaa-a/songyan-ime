@@ -21,6 +21,12 @@ final class KeyboardSelectionCenter: ObservableObject {
 
     var isBusy: Bool { applicationPhase == .applying }
 
+    /// Whose 我的键盘 a general entry opens: with nothing published the keyboard runs the built-in
+    /// scheme, so its keyboards are the ones to edit.
+    var userKeyboardSource: UserKeyboardSource {
+        usesInstalledScheme ? .active : .package(ProductionInputAvailability.builtinPackageID)
+    }
+
     /// Latest-wins gate: a late read never overwrites a newer value.
     private var gate = LatestWinsReadGate()
     private var snapshot = AppliedSelectionSnapshot.none

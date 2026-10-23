@@ -118,7 +118,7 @@ struct SettingsAndAboutView: View {
         case .keyboardAccess: OnboardingView(presentation: .pushed)
         case .advanced: AdvancedSettingsView()
         case .symbols: SymbolCatalogManagementView()
-        case .userKeyboards: UserKeyboardManagementView()
+        case .userKeyboards: UserKeyboardManagementView(source: KeyboardSelectionCenter.shared.userKeyboardSource)
         case .appearance: SkinManagementView()
         case .dictionary: DictionaryImportView()
         case .learningBackup: LearningBackupView()
