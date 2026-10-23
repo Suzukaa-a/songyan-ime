@@ -17,10 +17,9 @@ import UIKit
 ///   - Globe key: all touch events go to handleInputModeList, keeping the system tap/long-press/swipe-up behavior.
 ///
 /// Key feedback (KeyboardFeedbackService, shared with the host app):
-///   - The visible FeedbackInputView implements UIInputViewAudioFeedback, which the system uses to decide
-///     whether to play the input click.
-///   - Without Full Access, playInputClick and the haptic generator are not called (public reports say
-///     they block the main thread for a long time or fail silently in that state); typing is unaffected.
+///   - Clicks play through AVAudioPlayer, haptics through the shared generator.
+///   - Without Full Access neither is called (public reports say they block the main thread for a long
+///     time or fail silently in that state); typing is unaffected.
 ///
 /// Typing works without Full Access: the engine writes to its own container (RimePaths.interactiveUserDirectory).
 /// The system can terminate the extension at any time; engine startup (including first deployment) runs in the
@@ -52,6 +51,14 @@ class KeyboardViewController: UIInputViewController {
         return session
     }()
     static weak var activeController: KeyboardViewController?
+    /// Every controller that loaded its view, weakly: a replaced one may never become
+    /// `activeController`'s previous value (it already unbound on disappear).
+    private static let liveControllers = NSHashTable<KeyboardViewController>.weakObjects()
+    /// Set when a newer controller appears while this one is still on screen.
+    private var retiresPanelWhenHidden = false
+    /// From `viewWillAppear` to `viewDidDisappear`. A window alone is not proof: a host
+    /// can keep a dismissed controller's view attached.
+    private var isOnScreen = false
     private lazy var panelHostLifetime = KeyboardPanelHostLifetime { [weak self] in
         guard let self else { return false }
         return Self.activeController === self
@@ -188,13 +195,14 @@ class KeyboardViewController: UIInputViewController {
             // its _UIHostingView). Those SwiftUI panels kept observing the process session
             // and re-rendered on every key, so typing got slower with every presentation.
             // Detached, the hosting view and its graph go with this controller.
+            if hostingController != nil { KeyboardLiveObjects.panels.decrement() }
             hostingController?.view.removeFromSuperview()
         }
     }
 
     /// Installs a typed `inputView` during controlled view creation.
     /// `UIInputViewController.inputView` is publicly a `UIInputView?` (the system supplies an empty one); it is
-    /// replaced with a FeedbackInputView (a UIInputView subclass conforming to UIInputViewAudioFeedback), and the
+    /// replaced with a FeedbackInputView (a UIInputView subclass), and the
     /// controller's view points at the same instance:
     ///   - view and inputView are always the same instance, so system styling and sizing stay with the input view pipeline;
     ///   - the child controller (UIHostingController) and constraints are attached by viewDidLoad as usual,
@@ -293,7 +301,13 @@ class KeyboardViewController: UIInputViewController {
             // Session publishes on MainActor, including after retry/resource recovery.
             self?.updateHostTraits(on: controller)
         }
+        Self.liveControllers.add(self)
+        installPanelHost()
+    }
 
+    /// Builds the SwiftUI panel. Also called by `viewWillAppear` when UIKit shows a
+    /// controller again after `retirePanelHost()`.
+    private func installPanelHost() {
         let host = ExtensionKeyboardPanel(
             session: session, route: route, panelHostLifetime: panelHostLifetime,
             selectBuiltin: { [weak self] builtin in
@@ -330,6 +344,7 @@ class KeyboardViewController: UIInputViewController {
         view.addSubview(hosting.view)
         hosting.didMove(toParent: self)
         hostingController = hosting
+        KeyboardLiveObjects.panels.increment()
         // Bottom-anchored fixed-height hosting instead of four-edge pinning.
         // The bottom edge is stable; content keeps its exact height and vertical
         // position when the view service applies a transient oversized frame
@@ -353,11 +368,41 @@ class KeyboardViewController: UIInputViewController {
         logPanelGeometry("hostAttached")
     }
 
+    /// Releases the SwiftUI panel of a controller another one has replaced. Hosts can
+    /// keep replaced controllers alive (device: 26 live after 117 appearances in one
+    /// process); each kept panel observed the session and re-rendered on every key,
+    /// so typing took seconds and memory hit the extension limit.
+    private func retirePanelHost() {
+        guard let hosting = hostingController else { return }
+        hosting.willMove(toParent: nil)
+        hosting.view.removeFromSuperview()
+        hosting.removeFromParent()
+        hostingController = nil
+        hostingHeightConstraint = nil
+        retiresPanelWhenHidden = false
+        KeyboardLiveObjects.panels.decrement()
+    }
+
+    /// Called on the controller that is appearing: every other live controller gives
+    /// up its panel now, or once it is off screen if it is still animating out.
+    private func retireReplacedPanels() {
+        for case let other as KeyboardViewController in Self.liveControllers.allObjects where other !== self {
+            if !other.isOnScreen {
+                other.retirePanelHost()
+            } else {
+                other.retiresPanelWhenHidden = true
+            }
+        }
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         // No proxy read is safe until the host state arrives (viewDidAppear or the first
         // text/selection callback); reading earlier crashes in documentIdentifier.
         hostDocumentAttachPending = true
+        isOnScreen = true
+        retiresPanelWhenHidden = false
+        if hostingController == nil { installPanelHost() }
         adoptPresentationShell()
         #if DEBUG
             DebugProbe.reportEnvironment(role: "keyboardExtension")
@@ -419,6 +464,7 @@ class KeyboardViewController: UIInputViewController {
         let previousController = Self.activeController
         let isSameLiveHost = previousController === self
         Self.activeController = self
+        retireReplacedPanels()
         session.setHostVisibility(true)
         syncPresentationSizeClass()
         if let previousController, !isSameLiveHost {
@@ -709,6 +755,12 @@ class KeyboardViewController: UIInputViewController {
             session deactivated pid=\(KeyboardLifecycleDiagnostics.processIdentifier, privacy: .public) \
             active=\(Self.activeController === self, privacy: .public)
             """)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        isOnScreen = false
+        if retiresPanelWhenHidden, Self.activeController !== self { retirePanelHost() }
     }
 
     override func viewDidAppear(_ animated: Bool) {

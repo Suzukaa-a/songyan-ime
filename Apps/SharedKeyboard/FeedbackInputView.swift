@@ -1,32 +1,14 @@
 import CandidateKit
 import UIKit
 
-// MARK: - UIInputViewAudioFeedback wiring for the controller's typed inputView
-//
-// Public contract (Apple Text Programming Guide, "Adopting UIInputViewAudioFeedback", and the
-// UIInputViewController.inputView declaration): `UIDevice.playInputClick()` plays the system key click only when
-// the custom input view itself conforms to UIInputViewAudioFeedback, returns
-// enableInputClicksWhenVisible == true, and is visible. Custom keyboard UI belongs in the controller's
-// inputView, whose public type is `UIInputView?` (the SDK header also declares UIInputView *, with the system
-// supplying an empty UIInputView initially).
-//
-// So this view subclasses UIInputView via KeyboardPanelInputView: created in KeyboardViewController.loadView and
-// installed as both the controller's view and inputView (same instance). Replacing the system's empty UIInputView
-// with an instance of the same type keeps styling/sizing under the system input-view pipeline; the child controller
-// (UIHostingController) and all constraints hang off it as usual. Whether sound actually plays is still up to the
-// system: Settings > Sounds > Keyboard Clicks, the silent switch, and the extension's Full Access
-// (playInputClick is not called without Full Access).
-//
-// The host app's typing-test area does not use this view: faking input-view conformance with a plain view would
-// mislead the system.
+// The controller's view and inputView (same instance), created in KeyboardViewController.loadView.
+// It does not adopt UIInputViewAudioFeedback: key clicks play through AVAudioPlayer
+// (KeyboardFeedbackService), and the conformance only added one more system
+// reference to every input view UIKit replaces.
 
-/// Root container of the keyboard extension's input view: a `UIInputView` subclass carrying the public
-/// `UIInputViewAudioFeedback` conformance; installed as both
+/// Root container of the keyboard extension's input view; installed as both
 /// `KeyboardViewController`'s view and inputView (same instance).
-public final class FeedbackInputView: KeyboardPanelInputView, UIInputViewAudioFeedback {
-
-    /// The protocol's only requirement: allow the system input click while the view is visible.
-    public var enableInputClicksWhenVisible: Bool { true }
+public final class FeedbackInputView: KeyboardPanelInputView {
 
     public override init(frame: CGRect, inputViewStyle: UIInputView.Style) {
         super.init(frame: frame, inputViewStyle: inputViewStyle)

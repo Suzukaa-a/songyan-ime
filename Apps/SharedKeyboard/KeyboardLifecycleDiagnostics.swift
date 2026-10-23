@@ -210,6 +210,7 @@ public enum KeyboardStallReport {
             appeared n=\(appearances) \
             controllers=\(KeyboardLiveObjects.controllers.value) \
             inputViews=\(KeyboardLiveObjects.inputViews.value) \
+            panels=\(KeyboardLiveObjects.panels.value) \
             footprintMB=\(KeyboardLifecycleDiagnostics.footprintBytes / 1_048_576)
             """)
     }
@@ -219,6 +220,9 @@ public enum KeyboardStallReport {
 public enum KeyboardLiveObjects {
     public static let controllers = LiveObjectCounter()
     public static let inputViews = LiveObjectCounter()
+    /// SwiftUI keyboard panels attached to a controller; more than one means a replaced
+    /// controller is still rendering.
+    public static let panels = LiveObjectCounter()
 }
 
 public final class LiveObjectCounter: Sendable {
