@@ -84,7 +84,7 @@ extension KeyboardController {
         pendingCandidateRead = (generation, page)
         // EngineBackend is not Sendable; its calls are serialized on EngineOpQueue.
         nonisolated(unsafe) let engine = session.engine
-        let pageCount = Self.candidatePagesPerRead
+        let pageCount = Self.candidateBrowsePagesPerRead
         Task { @MainActor in
             // Several pages per engine hop, appended in one turn: a short row fills
             // in one update instead of growing page by page under the user's eyes.
@@ -113,6 +113,9 @@ extension KeyboardController {
     }
 
     static let candidatePagesPerRead = 3
+    /// Pages per read while the user scrolls. Off the key path, so it can be larger:
+    /// a fling outruns a small batch and stalls at the loaded end.
+    static let candidateBrowsePagesPerRead = 6
 
     /// Split one contiguous read into page-local pages; a short page is the real end.
     static func pageResults(

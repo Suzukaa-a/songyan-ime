@@ -29,12 +29,14 @@
             host.layoutSubtreeIfNeeded()
             // A real SwiftUI lifecycle, no scroll gesture and no call to a model-only helper.
             for _ in 0..<10 {
-                if reads >= 2 { break }
+                if reads >= 3 { break }
                 try? await Task.sleep(nanoseconds: 50_000_000)
             }
-            // Both the viewport's initial task and the visible footer's task must mount.
-            // The sink deliberately leaves state unchanged so each identity fires once.
-            XCTAssertEqual(reads, 2)
+            // The viewport's initial task, the prefetch row (the first row of a list
+            // shorter than the prefetch distance) and the visible footer all mount.
+            // The sink deliberately leaves state unchanged so each identity fires once;
+            // the controller drops repeats of a read already in flight.
+            XCTAssertEqual(reads, 3)
             print("EXPANDED_SHORT_VIEWPORT_INITIAL_AND_FOOTER_READS=\(reads)")
             window.contentView = nil
         }

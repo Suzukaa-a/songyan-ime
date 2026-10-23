@@ -161,24 +161,59 @@ extension CandidateSkinToken {
 private struct CandidateLoadingActions: ViewModifier {
     let context: CandidateAreaContext
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if context.hasMoreEntries {
-            content.accessibilityAction(
-                named: Text(
+        // The condition lives inside the actions, not around `content`: a branch
+        // there swaps the wrapped ScrollView for a new one when the last page
+        // arrives, dropping its momentum and scroll position.
+        content.accessibilityActions {
+            if context.hasMoreEntries {
+                Button(
                     context.visibleEntries == nil && context.browser.needsEarlier
-                        ? "加载更早候选" : "加载更多候选")
-            ) {
-                context.actions.perform(.loadMore)
+                        ? "加载更早候选" : "加载更多候选"
+                ) {
+                    context.actions.perform(.loadMore)
+                }
             }
-        } else {
-            content
+        }
+    }
+}
+
+/// Reads the next pages while the user is still `prefetchDistance` entries away
+/// from the loaded end, so a fling finds them in place instead of stopping at the
+/// end and watching them arrive. The tail sentinel stays for short lists.
+@available(macOS 14.0, iOS 17.0, *)
+private struct CandidatePrefetch: ViewModifier {
+    let context: CandidateAreaContext
+    let isTrigger: Bool
+    let kind: CandidateSentinelIdentity.Kind
+
+    func body(content: Content) -> some View {
+        content.task(
+            id: isTrigger
+                ? CandidateSentinelIdentity(
+                    generation: context.browser.generation, frontier: context.entryFrontier, kind: kind)
+                : nil
+        ) {
+            // A failed page waits for an explicit retry, as at the tail.
+            guard isTrigger, !Task.isCancelled,
+                context.visibleEntries != nil || !context.browser.hasIncompletePage
+            else { return }
+            context.actions.perform(.loadMore)
         }
     }
 }
 
 @available(macOS 14.0, iOS 17.0, *)
 extension CandidateAreaContext {
+    /// About two expanded screens or four collapsed ones of most schemes.
+    static let prefetchDistance = 30
+
+    /// Position in `displayEntries` whose cell or row starts the next read; nil when nothing is left.
+    func prefetchIndex(entryCount: Int) -> Int? {
+        guard hasMoreEntries, entryCount > 0 else { return nil }
+        return max(0, entryCount - Self.prefetchDistance)
+    }
+
     var hasMoreEntries: Bool { visibleHasMore ?? browser.hasMore }
     var entryFrontier: Int? { visibleFrontier ?? browser.nextPageToLoad }
     /// Accumulated candidates for continuous display: used when the host has fed `browser` (cross-page), otherwise falls back to the single-page snapshot.
@@ -388,9 +423,11 @@ struct CollapsedCandidateRow: View {
     }
 
     var body: some View {
+        let prefetch = context.prefetchIndex(entryCount: entries.count)
         LazyHStack(spacing: spacing) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 cell(entry, width: cellWidths.indices.contains(index) ? cellWidths[index] : 44)
+                    .modifier(CandidatePrefetch(context: context, isTrigger: index == prefetch, kind: .collapsedTail))
             }
             tailSentinel
         }
@@ -688,12 +725,26 @@ struct ExpandedCandidateRows: View {
 
     @ViewBuilder
     private func fixedContent(rowHeight: CGFloat) -> some View {
+        let rows = fixedRows
+        let prefetch = prefetchRow(rowCounts: rows.map(\.count))
         LazyVStack(spacing: bar.expandedRowSpacing) {
-            ForEach(Array(fixedRows.enumerated()), id: \.offset) { _, row in
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 fixedRow(row, rowHeight: rowHeight)
+                    .modifier(CandidatePrefetch(context: context, isTrigger: index == prefetch, kind: .expandedTail))
             }
             tailSentinel
         }
+    }
+
+    /// The row holding the entry that starts the next read.
+    private func prefetchRow(rowCounts: [Int]) -> Int? {
+        guard let target = context.prefetchIndex(entryCount: entries.count) else { return nil }
+        var seen = 0
+        for (index, count) in rowCounts.enumerated() {
+            seen += count
+            if target < seen { return index }
+        }
+        return nil
     }
 
     @ViewBuilder
@@ -725,9 +776,11 @@ struct ExpandedCandidateRows: View {
             typography: context.typography,
             cellPaddingX: bar.collapsed.cellPaddingX,
             availableWidth: availableWidth)
+        let prefetch = prefetchRow(rowCounts: rows.map(\.entries.count))
         LazyVStack(spacing: bar.expandedRowSpacing) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 adaptiveRow(row, rowHeight: rowHeight)
+                    .modifier(CandidatePrefetch(context: context, isTrigger: index == prefetch, kind: .expandedTail))
             }
             tailSentinel
         }
