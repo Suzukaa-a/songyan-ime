@@ -202,15 +202,20 @@ public struct KeyboardPanelView: View {
                     // the keyboard host and the last entries (e.g. the 9-key layout) become unreachable.
                     // Pinning keeps the menu a real scrollable surface inside the real panel,
                     // and deliberately adds no extra fixed bottom bar.
+                    // Each carries the key area's invisible hit surface: iOS drops touches on
+                    // fully transparent pixels of a keyboard extension, the panel beneath is at
+                    // opacity 0, so on device a drag starting between cells never reached the scroll view.
                     if showsSymbolLibrary {
                         // A new controller identity (session reconnect) rebuilds the model wholesale, so no stale onInsert callback survives.
                         SymbolLibraryPanel(controller: controller) { showsSymbolLibrary = false }
                             .id(ObjectIdentifier(controller))
                             .frame(width: geometry.size.width, height: geometry.size.height)
+                            .background(Color.black.opacity(0.001))
                             .clipped()
                     } else if showsUtilitiesMenu {
                         utilitiesPanel
                             .frame(width: geometry.size.width, height: geometry.size.height)
+                            .background(Color.black.opacity(0.001))
                             .clipped()
                     }
                 }
