@@ -76,14 +76,13 @@ extension KeyboardPanelView {
                     .accessibilityFocused($utilitiesTitleFocused)
                 HStack {
                     Spacer(minLength: 8)
-                    KeyboardToolsDismissButton(title: "完成", accessibilityHint: "返回键盘") {
+                    KeyboardToolsDismissButton(title: "完成", accessibilityHint: "返回键盘", minHeight: 40) {
                         showsUtilitiesMenu = false
                     }
                 }
             }
             .padding(.horizontal, KeyboardToolsStyle.contentHorizontalInset)
-            .padding(.vertical, 4)
-            .frame(minHeight: 48)
+            .frame(minHeight: 40)
         }
     }
 
@@ -112,7 +111,11 @@ extension KeyboardPanelView {
     /// `additionalTools` (see `KeyboardPanelHost`), grouped apart from the insert actions.
     @ViewBuilder
     private var utilitiesSection: some View {
-        KeyboardToolsSection(title: "插入") {
+        // Directly under the title bar unless a status card sits between them.
+        KeyboardToolsSection(
+            title: "插入",
+            topPadding: statusMessage != nil && onStatusDetails != nil ? KeyboardToolsStyle.sectionTopPadding : 4
+        ) {
             KeyboardToolsRow(
                 icon: "square.grid.3x3",
                 title: "快捷内容",

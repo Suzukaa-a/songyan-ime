@@ -802,6 +802,8 @@ struct OneHandModeRow: View {
                         Text(title)
                             .font(.subheadline.weight(mode == choice ? .semibold : .regular))
                             .lineLimit(1)
+                            // Two characters always fit: never let the row squeeze them to "…".
+                            .fixedSize()
                             .padding(.horizontal, 12)
                             .frame(minWidth: 44, minHeight: KeyboardToolsStyle.rowMinHeight)
                             .contentShape(Rectangle())
