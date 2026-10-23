@@ -15,7 +15,6 @@
         SH2610160000000000000004 /* ShuangpinHintManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SH2610160000000000000002; };
         QP2600000000000000000002 /* QuickPasteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = QP2600000000000000000001; };
         QP2600000000000000000003 /* QuickPasteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = QP2600000000000000000001; };
-        PA2600000000000000000002 /* PasswordAutoFillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PA2600000000000000000001; };
         QS2600000000000000000002 /* T9QuickSymbolManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = QS2600000000000000000001; };
         F10000000000000000000001 = {isa = PBXBuildFile; fileRef = F10000000000000000000101; };
 		G20100000000000000000001 = {isa = PBXBuildFile; fileRef = G20100000000000000000003; };
@@ -243,7 +242,6 @@
         SH2610160000000000000002 /* ShuangpinHintManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShuangpinHintManagementView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000072 /* Identity.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Identity.xcconfig; sourceTree = "<group>"; };
         QP2600000000000000000001 /* QuickPasteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPasteView.swift; sourceTree = "<group>"; };
-        PA2600000000000000000001 /* PasswordAutoFillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordAutoFillView.swift; sourceTree = "<group>"; };
         QS2600000000000000000001 /* T9QuickSymbolManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T9QuickSymbolManagementView.swift; sourceTree = "<group>"; };
         F10000000000000000000101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCandidateActions.swift; sourceTree = "<group>"; };
         AB0000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceManager.swift; sourceTree = "<group>"; };
@@ -467,7 +465,6 @@
 				A0000000000000000000000060 /* LayoutManager.swift */,
 				A0000000000000000000000061 /* LayoutManagementView.swift */,
 				G20000000000000000000000002 /* InputOptionsView.swift */,
-				PA2600000000000000000001 /* PasswordAutoFillView.swift */,
 				QS2600000000000000000001 /* T9QuickSymbolManagementView.swift */,
 				G20300000000000000000002 /* SymbolCatalogManagementView.swift */,
                 SH2610160000000000000001 /* ShuangpinHintManager.swift */,
@@ -783,7 +780,6 @@
                 FB0000000000000000000001 /* FeedbackInputView.swift in Sources */,
 				G20100000000000000000001 /* QuickInsertState.swift in Sources */,
 				G20100000000000000000004 /* QuickInsertView.swift in Sources */,
-                PA2600000000000000000002 /* PasswordAutoFillView.swift in Sources */,
                 QP2600000000000000000002 /* QuickPasteView.swift in Sources */,
                 QS2600000000000000000002 /* T9QuickSymbolManagementView.swift in Sources */,
 				G20200000000000000000001 /* SymbolLibraryView.swift in Sources */,

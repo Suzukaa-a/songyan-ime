@@ -70,11 +70,6 @@ struct MainTabView: View {
                         )
                     }
                     NavigationLink {
-                        PasswordAutoFillView()
-                    } label: {
-                        HomeRow(title: "密码自动填充", subtitle: "系统设置与临时填写", systemImage: "key")
-                    }
-                    NavigationLink {
                         SymbolCatalogManagementView()
                     } label: {
                         HomeRow(title: "符号库", subtitle: "标点、特殊符号与颜文字", systemImage: "number")
