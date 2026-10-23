@@ -386,7 +386,7 @@ class KeyboardViewController: UIInputViewController {
     /// Called on the controller that is appearing: every other live controller gives
     /// up its panel now, or once it is off screen if it is still animating out.
     private func retireReplacedPanels() {
-        for case let other as KeyboardViewController in Self.liveControllers.allObjects where other !== self {
+        for other in Self.liveControllers.allObjects where other !== self {
             if !other.isOnScreen {
                 other.retirePanelHost()
             } else {
