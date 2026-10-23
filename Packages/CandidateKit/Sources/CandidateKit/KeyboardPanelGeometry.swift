@@ -190,6 +190,13 @@ public extension KeyboardPanelGeometry {
     /// either gap moves every layout together.
     static let candidateBottomSpace: Double = 3
     static let candidateTopSpace: Double = 9
+    /// How far above the keys every layout centres its candidate text: half the candidate row plus
+    /// `candidateBottomSpace`. The ABC suggestion row uses it too, so a taller band (the selected
+    /// layout's reading row, which ABC does not show) does not lift its words.
+    static func candidateTextCentreAboveKeys(candidateHeight: Double, candidateSize: Double) -> Double {
+        CandidateBarDefinition.Collapsed.effectiveHeight(candidateHeight, candidateSize: candidateSize) / 2
+            + candidateBottomSpace
+    }
     /// Extra height the candidate area gets beyond the configured budget: both shared gaps,
     /// minus the temporary `hostGapWorkaroundCut`.
     static let candidateAreaBonus: Double = candidateTopSpace + candidateBottomSpace - hostGapWorkaroundCut

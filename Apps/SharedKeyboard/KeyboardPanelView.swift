@@ -253,6 +253,17 @@ public struct KeyboardPanelView: View {
     /// (`KeyboardPanelGeometry.fit`) is touch budget, and the centred text sits a
     /// little above the keys instead of on their edge.
     var candidateRowHeight: CGFloat { headerHeight + headerTopTrim }
+    /// The ABC suggestion row, seated at the bottom of the candidate band so its words sit where
+    /// the Chinese candidates do.
+    var englishSuggestionRowHeight: CGFloat {
+        min(
+            candidateRowHeight,
+            CGFloat(
+                2
+                    * KeyboardPanelGeometry.candidateTextCentreAboveKeys(
+                        candidateHeight: candidateBarDefinition.collapsed.height,
+                        candidateSize: appearance.skin.typography.candidateSize)))
+    }
     /// `topTrim` lands on the reading row when there is one, else on the candidate row.
     var headerTopTrim: CGFloat { layoutPlan.readingRowHeight > 0 ? 0 : topTrim }
 

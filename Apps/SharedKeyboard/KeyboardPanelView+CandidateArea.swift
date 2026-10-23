@@ -124,7 +124,9 @@ extension KeyboardPanelView {
                 if index > 0 {
                     Rectangle()
                         .fill(Color(uiColor: appearance.text(on: "panel", secondary: true)).opacity(0.3))
-                        .frame(width: 0.5, height: candidateRowHeight * 0.5)
+                        .frame(width: 0.5, height: englishSuggestionRowHeight * 0.5)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, englishSuggestionRowHeight * 0.25)
                         .accessibilityHidden(true)
                 }
                 Button {
@@ -135,7 +137,10 @@ extension KeyboardPanelView {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .padding(.horizontal, 6)
-                        .frame(maxWidth: .infinity, minHeight: candidateRowHeight, maxHeight: candidateRowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: englishSuggestionRowHeight)
+                        // The whole band stays tappable above the seated row.
+                        .frame(maxHeight: candidateRowHeight, alignment: .bottom)
                         .contentShape(Rectangle())
                         .transaction { $0.animation = nil }
                 }
