@@ -34,22 +34,25 @@ enum SymbolPageTable {
         return (literals("phone", priority) + rest).filter { seen.insert($0.title).inserted }
     }
 
+    /// The system keyboards' 123 pages, with no mark on two keys: the English
+    /// one (`$`, and five wide keys on the third row) and Simplified Pinyin's
+    /// (full-width colon/semicolon/brackets, Chinese quotes, and a half-width
+    /// "." for decimals, URLs and version numbers). The bottom row's
+    /// punctuation slot adds the one common mark these rows lack (see
+    /// `KeyboardControlPolicy.utility`).
     static func numericRows(ascii: Bool) -> [KeyboardRow] {
         [
             KeyboardRow(id: "num-1", caps: literals("n1", "1234567890")),
-            // The Chinese punctuation page matches the system pinyin keyboard: full-width colon/semicolon/brackets and Chinese quotes.
             KeyboardRow(
                 id: "num-2",
                 caps: literals(
                     "n2",
                     ascii
-                        ? "-/:;()¥&@\"".map(String.init)
+                        ? "-/:;()$&@\"".map(String.init)
                         : ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"])),
-            // The system Simplified Pinyin 123 page also has a half-width "." on its third row (decimal point, URLs, version numbers);
-            // the ellipsis moves to the #+= page, still one tap away.
             KeyboardRow(
                 id: "num-3",
-                caps: literals("n3", ascii ? [".", ",", "?", "!", "'", "\""] : ["，", "。", "？", "！", "、", "."])),
+                caps: literals("n3", ascii ? [".", ",", "?", "!", "'"] : ["。", "，", "、", "？", "！", "."])),
         ]
     }
 

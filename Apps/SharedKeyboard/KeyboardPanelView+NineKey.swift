@@ -324,11 +324,8 @@ extension KeyboardPanelView {
                         expandedCandidates
                     } else {
                         ForEach(Array(phoneSymbolMainRows.enumerated()), id: \.offset) { _, caps in
-                            WeightedKeyRow(
-                                caps: caps, alternates: alternates,
-                                showsAlternateHint: false
-                            ) { handleKey($0.action) }
-                            .frame(height: CGFloat(metrics.rowHeight))
+                            WeightedKeyRow(caps: caps, alternates: alternates) { handleKey($0.action) }
+                                .frame(height: CGFloat(metrics.rowHeight))
                         }
                     }
                 }
@@ -370,10 +367,9 @@ extension KeyboardPanelView {
                                 let spacing = CGFloat(metrics.spacing)
                                 let cell = (geometry.size.width - spacing * CGFloat(columns - 1)) / CGFloat(columns)
                                 HStack(spacing: 0) {
-                                    WeightedKeyRow(
-                                        caps: caps, alternates: alternates, showsKeyPreview: true,
-                                        showsAlternateHint: false
-                                    ) { cap in
+                                    // No long press here: every form a key could offer has a
+                                    // cell of its own in some category.
+                                    WeightedKeyRow(caps: caps, showsKeyPreview: true) { cap in
                                         if handleKey(cap.action), case .literal(let text) = cap.action {
                                             pendingSymbolUses.append(text)
                                             if !symbolPageLocked {

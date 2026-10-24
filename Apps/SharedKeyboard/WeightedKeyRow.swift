@@ -83,7 +83,6 @@ struct WeightedKeyRow: View {
     var alternates: (KeyCap) -> [KeyCap] = { _ in [] }
     var isEnabled: (KeyCap) -> Bool = { _ in true }
     var showsKeyPreview = false
-    var showsAlternateHint = true
     var visualRole: String? = nil
     let onTap: (KeyCap) -> Void
 
@@ -97,7 +96,6 @@ struct WeightedKeyRow: View {
                     AlternateCharacterKey(
                         cap: cap, alternates: alternates(cap),
                         showsKeyPreview: showsKeyPreview,
-                        showsAlternateHint: showsAlternateHint,
                         visualRole: visualRole, onSelect: onTap
                     )
                     .disabled(!isEnabled(cap))

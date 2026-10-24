@@ -8,7 +8,7 @@ import Foundation
 /// The policy handles field width and English shift, and emits either a verbatim
 /// literal or a valid schema-backed code. Merged 14-key partners remain codes only
 /// when the live speller alphabet includes them; unknown capabilities fail closed.
-/// Numeric/symbol pages retain their punctuation and operator variant families.
+/// Numeric/symbol pages use curated per-key lists for each punctuation width.
 public enum AlternateKeyPolicy {
 
     /// The engine mode the long press will dispatch into.
@@ -200,98 +200,62 @@ public enum AlternateKeyPolicy {
 
     // MARK: Numeric / symbol pages
 
+    /// The 123 page draws each key's first option as its corner hint, so the
+    /// lists are curated per key and per punctuation width rather than derived
+    /// from shared families: a list stays within its key's meaning and never
+    /// offers a mark that is already a key of the same 123 page. An ASCII field
+    /// still filters whatever a list holds.
     private static func symbolOptions(_ request: Request) -> [Option] {
         let label = request.keyLabel
-        var variants: [String]
-        if label.count == 1, let scalar = label.first, let superscripts = superscripts[scalar] {
-            variants = superscripts
-        } else if let family = symbolFamilies[label] {
-            variants = family.filter { $0 != label }
-        } else {
-            variants = []
+        let table = request.usesASCIIPunctuation ? asciiSymbolAlternates : chineseSymbolAlternates
+        var variants = deduplicated(
+            (table[label] ?? sharedSymbolAlternates[label] ?? []).filter { $0 != label })
+        if request.usesASCIIPunctuation {
+            variants = orderedByFieldWidth(variants, asciiFirst: true)
         }
-        variants = orderedByFieldWidth(
-            deduplicated(variants),
-            asciiFirst: request.usesASCIIPunctuation)
         return variants.map { Option(label: $0, payload: .literal($0)) }
     }
 
-    /// System-style digit long-press: superscripts and common fractions.
-    private static let superscripts: [Character: [String]] = [
-        "1": ["¹", "½", "⅓"],
-        "2": ["²", "⅔"],
-        "3": ["³", "¾"],
-        "4": ["⁴"],
-        "5": ["⁵"],
-        "6": ["⁶"],
-        "7": ["⁷"],
-        "8": ["⁸"],
-        "9": ["⁹"],
-        "0": ["⁰"],
+    /// Full-width punctuation: digits offer the Chinese numerals the system
+    /// pinyin keyboard does (一, the financial 壹, ①); marks offer their
+    /// half-width form first, then related Chinese forms.
+    private static let chineseSymbolAlternates: [String: [String]] = [
+        "1": ["一", "壹", "①"], "2": ["二", "贰", "②"], "3": ["三", "叁", "③"],
+        "4": ["四", "肆", "④"], "5": ["五", "伍", "⑤"], "6": ["六", "陆", "⑥"],
+        "7": ["七", "柒", "⑦"], "8": ["八", "捌", "⑧"], "9": ["九", "玖", "⑨"],
+        "0": ["零", "〇", "°"],
+        "-": ["～", "—", "_"],
+        "/": ["\\", "|", "÷"],
+        "：": [":"], "；": [";"],
+        "（": ["(", "【", "[", "{"], "）": [")", "】", "]", "}"],
+        "¥": ["$", "€", "£", "￥"],
+        "“": ["「", "『", "\"", "‘"], "”": ["」", "』", "\"", "’"],
+        "，": [","], "、": ["·"], "？": ["?"], "！": ["!"],
     ]
 
-    /// One family per punctuation/operator concept. The key's own label is
-    /// filtered out of its family, so the options are the *other* forms. Every form
-    /// stays in the table (a CJK field shows them); `orderedByFieldWidth` removes
-    /// the non-ASCII ones (except the allowed currency/math symbols) in an ASCII
-    /// field.
-    private static let symbolFamilies: [String: [String]] = {
-        let families: [[String]] = [
-            [".", "。", "…"],
-            [",", "，", "、"],
-            ["?", "？", "¿"],
-            ["!", "！", "¡"],
-            [":", "：", "；", ";"],
-            [";", "；", "：", ":"],
-            ["(", "（", "[", "【"],
-            [")", "）", "]", "】"],
-            ["[", "【", "{"],
-            ["]", "】", "}"],
-            ["{", "【", "["],
-            ["}", "】", "]"],
-            ["\"", "“", "”", "「", "」"],
-            ["'", "‘", "’"],
-            ["-", "—", "——", "–", "·"],
-            ["/", "\\", "|"],
-            ["\\", "/", "|"],
-            ["|", "¦", "\\"],
-            ["@", "©", "®", "™"],
-            ["&", "§"],
-            ["¥", "￥", "$", "€", "£"],
-            ["￥", "¥", "$", "€", "£"],
-            ["$", "¥", "￥", "€", "£"],
-            ["€", "¥", "￥", "$", "£"],
-            ["£", "¥", "￥", "$", "€"],
-            ["*", "×", "°"],
-            ["×", "*"],
-            ["÷", "/"],
-            ["+", "±"],
-            ["=", "≈", "≠"],
-            ["#", "№"],
-            ["%", "‰"],
-            ["^", "ˆ"],
-            ["_", "—"],
-            ["~", "˜"],
-            ["<", "〈", "‹", "≤"],
-            [">", "〉", "›", "≥"],
-            ["《", "〈", "<"],
-            ["》", "〉", ">"],
-            ["·", "•", "…"],
-            ["°", "×"],
-            ["…", "."],
-            ["「", "」", "『", "』"],
-            ["」", "「", "『", "』"],
-            ["『", "』", "「", "」"],
-            ["』", "『", "「", "」"],
-        ]
-        var index: [String: [String]] = [:]
-        for family in families {
-            for member in family where index[member] == nil {
-                index[member] = family
-            }
-        }
-        return index
-    }()
+    /// Half-width punctuation (English mode and ASCII fields): only what an
+    /// ASCII field accepts, so the hint shown is always typeable.
+    private static let asciiSymbolAlternates: [String: [String]] = [
+        "0": ["°"],
+        "-": ["_"],
+        "/": ["\\", "|"],
+        "(": ["[", "{", "<"], ")": ["]", "}", ">"],
+        "$": ["¥", "€", "£"],
+        "'": ["`"],
+    ]
+
+    /// Operators and the other forms a symbol key outside the 123 rows may
+    /// carry, the same in either width.
+    private static let sharedSymbolAlternates: [String: [String]] = [
+        "*": ["×", "°"], "×": ["*", "°"], "÷": ["/"],
+        "+": ["±"], "=": ["≈", "≠"], "#": ["№"], "%": ["‰"],
+        "<": ["≤", "‹", "〈"], ">": ["≥", "›", "〉"],
+        "·": ["•"], "•": ["·"],
+        "¥": ["$", "€", "£", "￥"], "￥": ["¥", "$", "€", "£"],
+        "€": ["$", "¥", "£"], "£": ["$", "¥", "€"],
+        "「": ["『"], "」": ["』"], "《": ["〈"], "》": ["〉"],
+        "【": ["〖", "["], "】": ["〗", "]"],
+    ]
 
     // MARK: Full/half-width field policy
 

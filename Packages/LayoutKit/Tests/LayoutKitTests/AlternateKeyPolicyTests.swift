@@ -255,10 +255,36 @@ final class AlternateKeyPolicyTests: XCTestCase {
 
     // MARK: Numeric / symbol pages
 
-    func testNumericPageDigitsUseTheSystemStyleSet() {
+    func testNumericPageDigitsOfferChineseNumeralsInFullWidthOnly() {
         let one = options(key: "1", page: .numeric, language: .chinese)
-        XCTAssertEqual(one.map(\.label), ["¹", "½", "⅓"])
+        XCTAssertEqual(one.map(\.label), ["一", "壹", "①"])
         XCTAssertTrue(one.allSatisfy { $0.payload == .literal($0.label) })
+        XCTAssertEqual(options(key: "0", page: .numeric, language: .chinese).map(\.label), ["零", "〇", "°"])
+        // Half-width: Chinese numerals would pass the ASCII field's letter rule, so
+        // that table never holds them; only the degree sign remains on 0.
+        XCTAssertTrue(options(key: "1", page: .numeric, language: .english, asciiPunctuation: true).isEmpty)
+        XCTAssertEqual(
+            options(key: "0", page: .numeric, language: .english, asciiPunctuation: true).map(\.label), ["°"])
+    }
+
+    /// Every 123-page key's first option is its corner hint, so no list may
+    /// offer a mark the same page already shows as a key.
+    func testNumericPageListsNeverOfferAVisibleKey() {
+        let pages: [(ascii: Bool, keys: [String])] = [
+            (
+                false,
+                "1234567890".map(String.init) + ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"]
+                    + ["。", "，", "、", "？", "！", "."]
+            ),
+            (true, "1234567890-/:;()$&@\".,?!'".map(String.init)),
+        ]
+        for page in pages {
+            let visible = Set(page.keys)
+            for key in page.keys {
+                let labels = options(key: key, page: .numeric, asciiPunctuation: page.ascii).map(\.label)
+                XCTAssertTrue(visible.isDisjoint(with: labels), "\(key) offers a visible key: \(labels)")
+            }
+        }
     }
 
     func testNumericPagePunctuationVariantDoesNotRepeatTheKey() {
@@ -310,13 +336,13 @@ final class AlternateKeyPolicyTests: XCTestCase {
         }
     }
 
-    func testASCIIFieldRemovesFullwidthPunctuationInsteadOfOrderingIt() {
-        // A URL/email/number field must receive `.`, not `。`.
-        let period = options(key: "。", page: .numeric, language: .chinese, asciiPunctuation: true)
-        XCTAssertEqual(period.map(\.label), ["."], "the ellipsis is not ASCII punctuation")
-        XCTAssertFalse(period.contains { $0.label == "。" })
-        let comma = options(key: "，", page: .numeric, language: .chinese, asciiPunctuation: true)
-        XCTAssertEqual(comma.map(\.label), [","], "、 is dropped in an ASCII field")
+    func testASCIIFieldOffersNoFullwidthPunctuation() {
+        // A URL/email/number field must never receive `。` or `、`.
+        for key in ["。", "，", "、", "“", "（", "-", "/", "¥", "￥", "1"] {
+            let labels = options(key: key, page: .numeric, language: .chinese, asciiPunctuation: true).map(\.label)
+            XCTAssertTrue(labels.allSatisfy(AlternateKeyPolicy.isAllowedInASCIIField), "\(key): \(labels)")
+            XCTAssertFalse(labels.contains { AlternateKeyPolicy.isFullwidthOrCJKPunctuation($0) }, key)
+        }
     }
 
     /// `… — – “ ” ¿ ¡ · • 〈 〉` are non-ASCII but outside U+3000/FE30/FF00; the
@@ -372,11 +398,11 @@ final class AlternateKeyPolicyTests: XCTestCase {
         XCTAssertTrue(upper.contains { $0.label == "É" })
     }
 
-    func testCJKFieldKeepsFullwidthFirstAndHalfwidthAsSecondary() {
-        let comma = options(key: "，", page: .numeric, language: .chinese, asciiPunctuation: false)
-        XCTAssertEqual(comma.map(\.label), ["、", ","])
-        XCTAssertEqual(comma.first?.label, "、")
-        XCTAssertEqual(comma.last?.label, ",")
+    func testFullwidthMarksOfferTheirHalfwidthFormFirst() {
+        XCTAssertEqual(options(key: "，", page: .numeric).map(\.label), [","])
+        XCTAssertEqual(options(key: "：", page: .numeric).map(\.label), [":"])
+        XCTAssertEqual(options(key: "（", page: .numeric).map(\.label), ["(", "【", "[", "{"])
+        XCTAssertEqual(options(key: "“", page: .numeric).first?.label, "「")
     }
 
     func testCurrencyAndMathFormsAreNotWidthVariantsAndSurviveASCII() {
@@ -385,7 +411,7 @@ final class AlternateKeyPolicyTests: XCTestCase {
         let fullwidthYen = options(key: "￥", page: .numeric, language: .chinese, asciiPunctuation: true)
         XCTAssertEqual(fullwidthYen.map(\.label), ["¥", "$", "€", "£"], "¥ itself is allow-listed")
         let times = options(key: "×", page: .symbols, language: .chinese, asciiPunctuation: true)
-        XCTAssertEqual(times.map(\.label), ["*", "°"], "× shares the * family: * and ° are kept")
+        XCTAssertEqual(times.map(\.label), ["*", "°"], "× offers * and °, both allowed")
         let divide = options(key: "÷", page: .symbols, language: .chinese, asciiPunctuation: true)
         XCTAssertEqual(divide.map(\.label), ["/"])
         let plusMinus = options(key: "+", page: .symbols, language: .chinese, asciiPunctuation: true)
@@ -417,17 +443,6 @@ final class AlternateKeyPolicyTests: XCTestCase {
         XCTAssertEqual(
             Set(AlternateKeyPolicy.orderedByFieldWidth(mixed, asciiFirst: false)),
             Set(mixed), "a CJK field keeps every form")
-    }
-
-    func testASCIIFieldOrdersASCIIFirst() {
-        let result = options(key: "，", page: .numeric, language: .chinese, asciiPunctuation: true)
-        XCTAssertEqual(result.first?.label, ",")
-    }
-
-    func testCJKFieldOrdersFullWidthFirst() {
-        let result = options(key: "，", page: .numeric, language: .chinese, asciiPunctuation: false)
-        XCTAssertEqual(result.first?.label, "、")
-        XCTAssertEqual(result.last?.label, ",")
     }
 
     func testASCIIWidthHelper() {

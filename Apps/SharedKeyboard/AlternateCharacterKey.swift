@@ -18,7 +18,6 @@ struct AlternateCharacterKey: UIViewRepresentable {
     var phoneSideKey = false
     var requiresExplicitAlternateSelection = false
     var showsKeyPreview = false
-    var showsAlternateHint = true
     var visualRole: String? = nil
     /// Explicit title size (points) for keys whose label is content rather than a
     /// keycap glyph, e.g. the 9-key rail's readings. nil = the role's key size.
@@ -52,7 +51,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
             cap: cap, alternates: alternates, longPressDelay: longPressDelay, layoutPicker: layoutPicker,
             phoneKey: phoneKey, phoneSideKey: phoneSideKey,
             requiresExplicitAlternateSelection: requiresExplicitAlternateSelection,
-            showsKeyPreview: showsKeyPreview, showsAlternateHint: showsAlternateHint,
+            showsKeyPreview: showsKeyPreview,
             visualRole: visualRole, titleSize: titleSize, letterGroup: letterGroup,
             groupHints: groupHints, letterSwipe: letterSwipe,
             swipeUp: swipeUp, syllableHintBelow: syllableHintBelow,
@@ -70,7 +69,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
             cap: cap, alternates: alternates, longPressDelay: longPressDelay, layoutPicker: layoutPicker,
             phoneKey: phoneKey, phoneSideKey: phoneSideKey,
             requiresExplicitAlternateSelection: requiresExplicitAlternateSelection,
-            showsKeyPreview: showsKeyPreview, showsAlternateHint: showsAlternateHint,
+            showsKeyPreview: showsKeyPreview,
             visualRole: visualRole, titleSize: titleSize, letterGroup: letterGroup,
             groupHints: groupHints, letterSwipe: letterSwipe,
             swipeUp: swipeUp, syllableHintBelow: syllableHintBelow,
@@ -202,7 +201,6 @@ struct AlternateCharacterKey: UIViewRepresentable {
             let phoneSideKey: Bool
             let requiresExplicitAlternateSelection: Bool
             let showsKeyPreview: Bool
-            let showsAlternateHint: Bool
             let visualRole: String?
             let titleSize: Double?
             let letterGroup: [String]
@@ -245,7 +243,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
             cap: KeyCap, alternates: [KeyCap], longPressDelay: TimeInterval,
             layoutPicker: Bool, phoneKey: Bool, phoneSideKey: Bool,
             requiresExplicitAlternateSelection: Bool,
-            showsKeyPreview: Bool, showsAlternateHint: Bool,
+            showsKeyPreview: Bool,
             visualRole: String?, titleSize: Double? = nil,
             letterGroup: [String] = [], groupHints: [String?] = [],
             letterSwipe: [KeyCap] = [], swipeUp: KeyCap? = nil,
@@ -259,7 +257,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
                 cap: cap, alternates: alternates, longPressDelay: longPressDelay,
                 layoutPicker: layoutPicker, phoneKey: phoneKey, phoneSideKey: phoneSideKey,
                 requiresExplicitAlternateSelection: requiresExplicitAlternateSelection,
-                showsKeyPreview: showsKeyPreview, showsAlternateHint: showsAlternateHint,
+                showsKeyPreview: showsKeyPreview,
                 visualRole: visualRole, titleSize: titleSize, letterGroup: letterGroup,
                 groupHints: groupHints, letterSwipe: letterSwipe,
                 swipeUp: swipeUp, syllableHintBelow: syllableHintBelow,
@@ -325,12 +323,6 @@ struct AlternateCharacterKey: UIViewRepresentable {
                 if subtitle.text != nil { hintKind = .syllableHint }
                 alternateHint.text = subtitle.text ?? alternateHint.text
                 subtitle.text = nil
-            }
-            // Dense numeric/symbol rows retain every long-press action but do
-            // not paint ten tiny corner hints over the main glyphs.
-            // Phone digits and the language key's menu indicator remain visible.
-            if !showsAlternateHint, !phoneKey, !layoutPicker {
-                alternateHint.text = nil
             }
             accessibilityLabel = cap.title
             accessibilityValue = cap.subtitle

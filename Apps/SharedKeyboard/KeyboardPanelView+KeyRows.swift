@@ -30,9 +30,10 @@ extension KeyboardPanelView {
             // The shared 26/14 page keeps exactly the same symbols and geometry.
             // Every literal symbol is a character key and keeps the character
             // surface, like the letters it replaces; only real controls (Delete,
-            // the page key, CN/EN, Return) carry the control/accent tone. Dense
-            // rows stay calm through the absent corner hints, not by disguising
-            // characters as controls. These caps are as narrow as 26-key letters,
+            // the page key, CN/EN, Return) carry the control/accent tone. A key
+            // with a long-press list shows its first entry in the corner, as the
+            // letters do; the lists are kept short so the rows stay calm. These
+            // caps are as narrow as 26-key letters,
             // so they reuse the same panel-local key preview: the finger-covered
             // glyph is confirmed above the key while its hit rectangle, action
             // and slide-off cancel stay exactly those of the key itself. The full
@@ -43,8 +44,7 @@ extension KeyboardPanelView {
                     GeometryReader { geometry in
                         HStack(spacing: 4) {
                             WeightedKeyRow(
-                                caps: row.caps, alternates: alternates,
-                                showsKeyPreview: true, showsAlternateHint: false
+                                caps: row.caps, alternates: alternates, showsKeyPreview: true
                             ) {
                                 handleKey($0.action)
                             }
@@ -56,8 +56,7 @@ extension KeyboardPanelView {
                     .frame(height: keyHeight)
                 } else {
                     WeightedKeyRow(
-                        caps: row.caps, alternates: alternates,
-                        showsKeyPreview: true, showsAlternateHint: false
+                        caps: row.caps, alternates: alternates, showsKeyPreview: true
                     ) {
                         handleKey($0.action)
                     }

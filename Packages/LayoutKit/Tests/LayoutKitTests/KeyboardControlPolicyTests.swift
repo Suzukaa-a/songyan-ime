@@ -49,7 +49,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
                                 XCTAssertEqual(policy.languageAction, .toggleLanguage)
                                 XCTAssertEqual(policy.languageTitle, english ? "中文" : "ABC")
                             }
-                            if english, !(phone && page == .numeric) {
+                            if english, page != .numeric {
                                 XCTAssertEqual(policy.utility, .punctuation(phone ? "." : ","))
                             }
                         }
@@ -82,11 +82,12 @@ final class KeyboardControlPolicyTests: XCTestCase {
                     let policy = KeyboardControlPolicy(
                         page: page, isEnglishMode: english,
                         hasGlobe: true, isPhoneLayout: phone, usesASCIIPunctuation: false)
+                    let expected: KeyboardControlPolicy.Utility =
+                        page == .numeric
+                        ? (phone ? .digit("0") : .punctuation(english ? "#" : "……"))
+                        : .punctuation(phone ? (english ? "." : "。") : (english ? "," : "，"))
                     XCTAssertEqual(
-                        policy.utility,
-                        phone && page == .numeric
-                            ? .digit("0")
-                            : .punctuation(phone ? (english ? "." : "。") : (english ? "," : "，")),
+                        policy.utility, expected,
                         "bottom-row utility is a direct punctuation key (0 on the 9-key digit page)"
                     )
                     XCTAssertFalse(policy.slots.map(policy.key(at:)).contains(.symbolPage))
@@ -387,6 +388,23 @@ final class KeyboardControlPolicyTests: XCTestCase {
             isPhoneLayout: true, usesASCIIPunctuation: false,
             includesBottomEnter: false)
         XCTAssertEqual(numeric.utility, .digit("0"))
+        XCTAssertTrue(numeric.utilityAlternates.isEmpty)
+    }
+
+    /// The 26/14/18 123 rows already hold comma and period, so the slot below them
+    /// carries a mark those rows lack, and its long-press list repeats none of them.
+    func testNumericPageUtilityAddsAMarkTheRowsLack() {
+        for english in [false, true] {
+            let policy = KeyboardControlPolicy(
+                page: .numeric, isEnglishMode: english, hasGlobe: true,
+                isPhoneLayout: false, usesASCIIPunctuation: english)
+            XCTAssertEqual(policy.utility, .punctuation(english ? "#" : "……"))
+            XCTAssertEqual(policy.utilityAlternates, english ? ["%", "*", "+", "="] : ["——", "…"])
+        }
+        let letters = KeyboardControlPolicy(
+            page: .letters, isEnglishMode: false, hasGlobe: true,
+            isPhoneLayout: false, usesASCIIPunctuation: false)
+        XCTAssertEqual(letters.utilityAlternates, ["。", "？", "！", "、", "…"])
     }
 
     /// Builtin 9-key 2-9 long-press must work and use the layout's declared digit.

@@ -84,12 +84,10 @@ struct ControlRow<ModeKey: View>: View {
             case .punctuation(let text):
                 AlternateCharacterKey(
                     cap: KeyCap(id: "control-period", title: text, action: .literal(text)),
-                    alternates: ((text == "." || text == ",")
-                        ? [text == "," ? "." : ",", "?", "!", "'", "\""]
-                        : [text == "，" ? "。" : "，", "？", "！", "、", "…"]).enumerated().map {
-                            KeyCap(
-                                id: "control-punctuation-\($0.offset)", title: $0.element, action: .literal($0.element))
-                        }
+                    alternates: policy.utilityAlternates.enumerated().map {
+                        KeyCap(
+                            id: "control-punctuation-\($0.offset)", title: $0.element, action: .literal($0.element))
+                    }
                 ) { onKey($0.action) }
                 .accessibilityLabel("\(text)，长按选择标点")
             case .digit(let digit):

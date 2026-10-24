@@ -126,7 +126,22 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         // This keeps the number of control slots (and hit geometry) stable.
         if isPhoneLayout && page == .numeric { return .digit("0") }
         let ascii = isEnglishMode || usesASCIIPunctuation
+        // The 123 rows already hold comma and period, so the slot carries the
+        // one common mark those rows lack instead of repeating them.
+        if page == .numeric { return .punctuation(ascii ? "#" : "……") }
         return .punctuation(isPhoneLayout ? (ascii ? "." : "。") : (ascii ? "," : "，"))
+    }
+
+    /// The punctuation slot's long-press list, its first entry being the corner
+    /// hint. On the 123 page it holds only marks the rows above lack.
+    public var utilityAlternates: [String] {
+        guard case .punctuation(let text) = utility else { return [] }
+        switch text {
+        case "……": return ["——", "…"]
+        case "#": return ["%", "*", "+", "="]
+        case ".", ",": return [text == "," ? "." : ",", "?", "!", "'", "\""]
+        default: return [text == "，" ? "。" : "，", "？", "！", "、", "…"]
+        }
     }
 
     /// One budget for every builtin page. Fractions apply to *content* width after gaps.
