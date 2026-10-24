@@ -31,7 +31,14 @@ extension KeyboardPanelView {
     /// imported phone keypad's (which keeps its declared rails), draw the fixed
     /// ⌫ / 重输 / ⏎ column and the phone bottom row (first key under the rail, wide space).
     var usesFixedEditingRail: Bool {
-        isBuiltinPhonePad || (page == .symbols && !usesPhoneDefinition)
+        isBuiltinPhonePad || (showsCategorySymbolPage && !usesPhoneDefinition)
+    }
+
+    /// #+= opens the categorised grid on a phone keypad (its 123 page is a digit
+    /// pad, with no rows for a second page to share) or when the user chose it;
+    /// otherwise it is the row-shaped page that shares the 123 page's geometry.
+    var showsCategorySymbolPage: Bool {
+        page == .symbols && (usesPhoneDefinition || prefersCategorySymbolPage)
     }
 
     func controlRow(columns: KeyboardControlPolicy.PhoneColumns?) -> some View {
@@ -163,7 +170,7 @@ extension KeyboardPanelView {
         // English QWERTY letter page keeps its direct comma and bottom Return
         // even when the selected Chinese definition happens to be a phone pad.
         let phoneShellVisible =
-            usesStandardT9 || (usesPhoneDefinition && page != .letters) || page == .symbols
+            usesStandardT9 || (usesPhoneDefinition && page != .letters) || showsCategorySymbolPage
         let trailingHasReturn =
             !usesFixedEditingRail && phoneShellVisible
             && t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter }
@@ -172,6 +179,7 @@ extension KeyboardPanelView {
             hasGlobe: systemKeyboardSwitch != nil,
             isPhoneLayout: phoneShellVisible,
             usesASCIIPunctuation: controller.usesASCIIPunctuation,
-            includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn))
+            includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn),
+            usesCategorySymbolPage: usesPhoneDefinition || prefersCategorySymbolPage)
     }
 }

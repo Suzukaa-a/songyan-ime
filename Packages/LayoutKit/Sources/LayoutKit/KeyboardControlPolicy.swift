@@ -27,6 +27,9 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Bundled T9 moves Return into its large trailing rail. Other surfaces keep it
     /// in the bottom row. This is presentation only; the action remains `.enter`.
     public let includesBottomEnter: Bool
+    /// The #+= page is the categorised grid (with 锁定) rather than rows of keys
+    /// shaped like the 123 page's.
+    public let usesCategorySymbolPage: Bool
     /// The bundled phone shell's column widths. When set, the first bottom key sits
     /// under the rail and the rest share the grid's width with a wide space bar
     /// (see `Metrics.init(width:columns:includesUtility:)`) instead of the generic
@@ -51,7 +54,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public init(
         page: Page, isEnglishMode: Bool, hasGlobe: Bool,
         isPhoneLayout: Bool, usesASCIIPunctuation: Bool,
-        includesBottomEnter: Bool = true
+        includesBottomEnter: Bool = true, usesCategorySymbolPage: Bool = true
     ) {
         self.page = page
         self.isEnglishMode = isEnglishMode
@@ -59,6 +62,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         self.isPhoneLayout = isPhoneLayout
         self.usesASCIIPunctuation = usesASCIIPunctuation
         self.includesBottomEnter = includesBottomEnter
+        self.usesCategorySymbolPage = usesCategorySymbolPage
     }
 
     /// Slot identities and count stay unchanged across all pages and languages
@@ -84,11 +88,12 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// so the symbol page is one tap away without moving the familiar keys; a long
     /// press on 符号 types 0, which the letter page has no other key for.
     ///
-    /// Every symbol page carries 锁定 in the utility position: its grid already
-    /// types every mark, and the lock decides whether the page stays open after
-    /// a symbol (Sogou and iFlytek return to letters unless locked).
+    /// The categorised symbol page carries 锁定 in the utility position: its grid
+    /// already types every mark, and the lock decides whether the page stays open
+    /// after a symbol (Sogou and iFlytek return to letters unless locked). The
+    /// row-shaped #+= page keeps a punctuation key there, like 123.
     public func key(at slot: Slot) -> Slot {
-        if page == .symbols && slot == .utility { return .symbolLock }
+        if page == .symbols && usesCategorySymbolPage && slot == .utility { return .symbolLock }
         if isBundledPhonePad && page == .letters && slot == .utility { return .symbolPage }
         guard page != .letters else { return slot }
         switch slot {
@@ -126,19 +131,21 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         // This keeps the number of control slots (and hit geometry) stable.
         if isPhoneLayout && page == .numeric { return .digit("0") }
         let ascii = isEnglishMode || usesASCIIPunctuation
-        // The 123 rows already hold comma and period, so the slot carries the
-        // one common mark those rows lack instead of repeating them.
+        // The 123 and row-shaped #+= pages already hold comma and period, so the
+        // slot carries a common mark their rows lack instead of repeating them.
         if page == .numeric { return .punctuation(ascii ? "#" : "……") }
+        if page == .symbols && !usesCategorySymbolPage { return .punctuation(ascii ? "@" : "……") }
         return .punctuation(isPhoneLayout ? (ascii ? "." : "。") : (ascii ? "," : "，"))
     }
 
     /// The punctuation slot's long-press list, its first entry being the corner
-    /// hint. On the 123 page it holds only marks the rows above lack.
+    /// hint. On the 123 and #+= pages it holds only marks the rows above lack.
     public var utilityAlternates: [String] {
         guard case .punctuation(let text) = utility else { return [] }
         switch text {
-        case "……": return ["——", "…"]
+        case "……": return page == .numeric ? ["——", "…"] : ["…"]
         case "#": return ["%", "*", "+", "="]
+        case "@": return []
         case ".", ",": return [text == "," ? "." : ",", "?", "!", "'", "\""]
         default: return [text == "，" ? "。" : "，", "？", "！", "、", "…"]
         }

@@ -52,7 +52,7 @@ enum SymbolPageTable {
                         : ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"])),
             KeyboardRow(
                 id: "num-3",
-                caps: literals("n3", ascii ? [".", ",", "?", "!", "'"] : ["。", "，", "、", "？", "！", "."])),
+                caps: literals("n3", sentenceMarks(ascii: ascii))),
         ]
     }
 
@@ -105,7 +105,7 @@ enum SymbolPageTable {
     static let phoneEnglishSymbols = [
         ",", ".", "?", "!", ":", ";", "'", "\"", "(", ")", "[", "]",
         "{", "}", "<", ">", "@", "#", "$", "%", "&", "*", "-", "_",
-        "+", "=", "/", "\\", "|", "~", "^", "`", "–", "¥", "€", "£",
+        "+", "=", "/", "\\", "|", "~", "^", "`", "–", "¥", "€", "£", "•",
     ]
 
     /// Pairs side by side, two pairs per row.
@@ -142,12 +142,12 @@ enum SymbolPageTable {
         return [common] + recent + widths + themed
     }
 
-    /// The rows the 26/14/18-key #+= page used to show. #+= now opens the
-    /// categorised page; these stay as the set its built-in tabs must cover.
+    /// The row-shaped #+= page of the 26/14/18-key layouts, the default: the
+    /// system keyboards' second page, sharing the 123 page's geometry and its
+    /// sentence-mark row, so only the top two rows change between the pages.
+    /// The categorised page must still cover every mark here.
     static func symbolRows(ascii: Bool) -> [KeyboardRow] {
         [
-            // Chinese symbol page: title marks, square brackets, em dash and & are directly visible (as on the system Chinese keyboard);
-            // the euro and pound signs remain available on long press of the yen / dollar keys.
             KeyboardRow(
                 id: "sym-1",
                 caps: literals(
@@ -160,12 +160,14 @@ enum SymbolPageTable {
                 caps: literals(
                     "s2",
                     ascii
-                        ? "_\\|~<>€£¥·".map(String.init)
-                        : ["_", "—", "\\", "|", "~", "《", "》", "&", "$", "·"])),
-            KeyboardRow(
-                id: "sym-3",
-                caps: literals("s3", ascii ? [".", ",", "?", "!", "@", "/"] : ["，", "。", "？", "！", "「", "」", "…"])),
+                        ? "_\\|~<>€£¥•".map(String.init)
+                        : ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"])),
+            KeyboardRow(id: "sym-3", caps: literals("s3", sentenceMarks(ascii: ascii))),
         ]
+    }
+
+    private static func sentenceMarks(ascii: Bool) -> [String] {
+        ascii ? [".", ",", "?", "!", "'"] : ["。", "，", "、", "？", "！", "."]
     }
 
     /// The id is the row prefix + the character itself: stable and repeatably renderable (SwiftUI identity does not change per access).

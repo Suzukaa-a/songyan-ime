@@ -57,14 +57,24 @@ for ascii in [false, true] {
         : ["1234567890".map(String.init), ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"],
            ["。", "，", "、", "？", "！", "."]]
     precondition(numeric.map { literalValues($0.caps) } == expectedNumeric, "123 rows (ascii=\(ascii))")
-    precondition(Set(numericValues).count == numericValues.count, "the 123 page shows each mark once (ascii=\(ascii))")
-    // The bottom row's punctuation slot sits on the same page: it must add a mark, not repeat one.
-    let bottom = KeyboardControlPolicy(page: .numeric, isEnglishMode: ascii, hasGlobe: true,
-                                       isPhoneLayout: false, usesASCIIPunctuation: ascii)
-    guard case .punctuation(let slot) = bottom.utility else { fatalError("the 123 bottom slot is punctuation") }
-    precondition(!numericValues.contains(slot), "the bottom slot \(slot) repeats a 123 key (ascii=\(ascii))")
-    precondition(Set(bottom.utilityAlternates).isDisjoint(with: numericValues + [slot]),
-                 "the bottom slot's long press repeats a 123 key (ascii=\(ascii))")
+    // The row-shaped #+= page (the default) is the system keyboards' second page and keeps the sentence row.
+    let expectedSymbols: [[String]] = ascii
+        ? ["[]{}#%^*+=".map(String.init), "_\\|~<>€£¥•".map(String.init), expectedNumeric[2]]
+        : [["【", "】", "{", "}", "#", "%", "^", "*", "+", "="], ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"],
+           expectedNumeric[2]]
+    precondition(symbols.map { literalValues($0.caps) } == expectedSymbols, "#+= rows (ascii=\(ascii))")
+    for (page, rows) in [(KeyboardControlPolicy.Page.numeric, numeric), (.symbols, symbols)] {
+        let values = literalValues(rows.flatMap(\.caps))
+        precondition(Set(values).count == values.count, "\(page) shows each mark once (ascii=\(ascii))")
+        // The bottom row's punctuation slot sits on the same page: it must add a mark, not repeat one.
+        let bottom = KeyboardControlPolicy(page: page, isEnglishMode: ascii, hasGlobe: true,
+                                           isPhoneLayout: false, usesASCIIPunctuation: ascii,
+                                           usesCategorySymbolPage: false)
+        guard case .punctuation(let slot) = bottom.utility else { fatalError("\(page) bottom slot is punctuation") }
+        precondition(!values.contains(slot), "the \(page) bottom slot \(slot) repeats a key (ascii=\(ascii))")
+        precondition(Set(bottom.utilityAlternates).isDisjoint(with: values + [slot]),
+                     "the \(page) bottom slot's long press repeats a key (ascii=\(ascii))")
+    }
 
     let rail = SymbolPageTable.phoneNumericRail(ascii: ascii)
     let railValues = literalValues(rail)

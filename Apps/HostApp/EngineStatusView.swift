@@ -89,7 +89,7 @@ struct SettingsAndAboutView: View {
         }
         var keywords: String {
             switch self {
-            case .inputOptions: return "输入选项 声音 触感 纠错 联想 九键 拼写 高度 紧凑 宽松 双拼 提示 单手 模糊音 弱 适中 强"
+            case .inputOptions: return "输入选项 声音 触感 纠错 联想 九键 拼写 高度 紧凑 宽松 双拼 提示 单手 模糊音 弱 适中 强 符号页 分类符号"
             case .grammarModel: return "语法模型 模型"
             case .quickContent: return "常用语 剪贴板 历史 快捷短语"
             case .keyboardAccess: return "键盘 完全访问 权限 添加 引导"

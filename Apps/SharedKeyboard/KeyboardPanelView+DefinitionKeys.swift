@@ -442,7 +442,8 @@ extension KeyboardPanelView {
             language: controller.isEnglishMode ? .english : .chinese,
             isUppercase: controller.shiftState.isActive,
             usesASCIIPunctuation: controller.usesASCIIPunctuation,
-            schemaAlphabet: controller.activeSchemaAlphabet)
+            schemaAlphabet: controller.activeSchemaAlphabet,
+            visibleKeys: page == .letters ? [] : Set(symbolRows.flatMap { $0.caps.map(\.title) }))
         return AlternateKeyPolicy.options(for: request).enumerated().map { index, option in
             let action: KeyAction =
                 switch option.payload {

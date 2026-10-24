@@ -69,6 +69,9 @@ public enum AlternateKeyPolicy {
         public let usesASCIIPunctuation: Bool
         /// The active schema's `speller/alphabet` (any case). Empty = unknown.
         public let schemaAlphabet: String
+        /// Labels already shown as keys of the same page. A symbol page never
+        /// offers them, so a corner hint never repeats a visible key.
+        public let visibleKeys: Set<String>
 
         public init(
             keyLabel: String,
@@ -78,7 +81,8 @@ public enum AlternateKeyPolicy {
             language: Language,
             isUppercase: Bool = false,
             usesASCIIPunctuation: Bool = false,
-            schemaAlphabet: String = ""
+            schemaAlphabet: String = "",
+            visibleKeys: Set<String> = []
         ) {
             self.keyLabel = keyLabel
             self.mergedGroup = mergedGroup
@@ -88,6 +92,7 @@ public enum AlternateKeyPolicy {
             self.isUppercase = isUppercase
             self.usesASCIIPunctuation = usesASCIIPunctuation
             self.schemaAlphabet = schemaAlphabet
+            self.visibleKeys = visibleKeys
         }
     }
 
@@ -209,7 +214,9 @@ public enum AlternateKeyPolicy {
         let label = request.keyLabel
         let table = request.usesASCIIPunctuation ? asciiSymbolAlternates : chineseSymbolAlternates
         var variants = deduplicated(
-            (table[label] ?? sharedSymbolAlternates[label] ?? []).filter { $0 != label })
+            (table[label] ?? sharedSymbolAlternates[label] ?? []).filter {
+                $0 != label && !request.visibleKeys.contains($0)
+            })
         if request.usesASCIIPunctuation {
             variants = orderedByFieldWidth(variants, asciiFirst: true)
         }
@@ -251,7 +258,7 @@ public enum AlternateKeyPolicy {
         "+": ["±"], "=": ["≈", "≠"], "#": ["№"], "%": ["‰"],
         "<": ["≤", "‹", "〈"], ">": ["≥", "›", "〉"],
         "·": ["•"], "•": ["·"],
-        "¥": ["$", "€", "£", "￥"], "￥": ["¥", "$", "€", "£"],
+        "¥": ["$", "€", "£", "￥"], "￥": ["¥", "$", "€", "£"], "$": ["€", "£", "¥"],
         "€": ["$", "¥", "£"], "£": ["$", "¥", "€"],
         "「": ["『"], "」": ["』"], "《": ["〈"], "》": ["〉"],
         "【": ["〖", "["], "】": ["〗", "]"],

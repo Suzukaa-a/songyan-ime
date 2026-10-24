@@ -129,7 +129,8 @@ extension KeyboardPanelView {
             layoutHintToken: layoutHintToken,
             hasKeyAlternates: keyAlternates != nil,
             hasSystemKeyboardSwitch: systemKeyboardSwitch != nil,
-            allowsCursorMovement: allowsCursorMovement)
+            allowsCursorMovement: allowsCursorMovement,
+            prefersCategorySymbolPage: prefersCategorySymbolPage)
     }
 
     var usesConfiguredLayout: Bool { page == .letters && !controller.isEnglishMode }
@@ -172,9 +173,11 @@ extension KeyboardPanelView {
             readingKeys: CompactSpellingLayout.readingKeyMap(for: activeDefinition))
     }
 
-    /// The 123 rows; #+= opens the categorised symbol page instead of rows.
+    /// The 123 rows, or the row-shaped #+= page's (the categorised page has no rows).
     var symbolRows: [KeyboardRow] {
-        SymbolPageTable.numericRows(ascii: controller.usesASCIIPunctuation)
+        page == .symbols
+            ? SymbolPageTable.symbolRows(ascii: controller.usesASCIIPunctuation)
+            : SymbolPageTable.numericRows(ascii: controller.usesASCIIPunctuation)
     }
 
     /// Only the untouched bundled 26-key definitions receive the standard system-key shell.

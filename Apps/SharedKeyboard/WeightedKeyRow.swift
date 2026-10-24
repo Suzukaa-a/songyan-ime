@@ -63,6 +63,7 @@ struct KeyAreaRenderToken: Equatable {
     let hasKeyAlternates: Bool
     let hasSystemKeyboardSwitch: Bool
     let allowsCursorMovement: Bool
+    let prefersCategorySymbolPage: Bool
 }
 
 /// `.equatable()` gate: while the token is unchanged SwiftUI skips recomputing `content`, and subviews'

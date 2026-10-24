@@ -407,6 +407,25 @@ final class KeyboardControlPolicyTests: XCTestCase {
         XCTAssertEqual(letters.utilityAlternates, ["。", "？", "！", "、", "…"])
     }
 
+    /// The row-shaped #+= page (the default) has no 锁定: its slot is a punctuation
+    /// key like 123's, carrying a mark its own rows lack.
+    func testRowShapedSymbolPageKeepsAPunctuationSlot() {
+        for english in [false, true] {
+            let policy = KeyboardControlPolicy(
+                page: .symbols, isEnglishMode: english, hasGlobe: true,
+                isPhoneLayout: false, usesASCIIPunctuation: english, usesCategorySymbolPage: false)
+            XCTAssertEqual(policy.key(at: .utility), .utility)
+            XCTAssertEqual(policy.utility, .punctuation(english ? "@" : "……"))
+            XCTAssertEqual(policy.utilityAlternates, english ? [] : ["…"])
+            XCTAssertEqual(Array(policy.slots.map(policy.key(at:)).prefix(2)), [.language, .page])
+            XCTAssertEqual(policy.pageTitle, "123")
+        }
+        let grid = KeyboardControlPolicy(
+            page: .symbols, isEnglishMode: false, hasGlobe: true,
+            isPhoneLayout: true, usesASCIIPunctuation: false, includesBottomEnter: false)
+        XCTAssertEqual(grid.key(at: .utility), .symbolLock)
+    }
+
     /// Builtin 9-key 2-9 long-press must work and use the layout's declared digit.
     ///
     /// Uses the real API (not just static LayoutKey assertions): first proves the generic policy returns empty for a

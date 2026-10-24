@@ -95,6 +95,9 @@ public struct KeyboardPanelView: View {
     @State var phoneSymbolCategoryID = SymbolPageTable.commonCategoryID
     /// 锁定 on the symbol page: stay there after a symbol. Session-only, never stored.
     @State var symbolPageLocked = false
+    /// The user's choice of the categorised #+= page (`KeyboardSymbolPagePreferences`),
+    /// re-read on each presentation.
+    @State var prefersCategorySymbolPage = false
     /// Whether a symbol has been entered on the current number/symbol page (used to return to letters after space); reset on every page change.
     @State private var typedOnSymbolPage = false
     @StateObject var quickSymbols = T9QuickSymbolModel()
@@ -581,7 +584,7 @@ public struct KeyboardPanelView: View {
             VStack(spacing: 4) {
                 if usesPhoneDefinition && page == .numeric {
                     phoneSymbolKeypad
-                } else if page == .symbols {
+                } else if showsCategorySymbolPage {
                     phoneCategorySymbolKeypad
                 } else if usesStandardT9 {
                     standardT9Keypad
@@ -671,6 +674,10 @@ public struct KeyboardPanelView: View {
         }
         .onChange(of: controller.keyboardType) { syncHostPage() }
         .onAppear { syncHostPage() }
+        .onAppear { prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage }
+        .onChange(of: hostBindingTick) {
+            prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage
+        }
         .onChange(of: quickPasteIdleInput) { _, input in
             if !input.allowsPaste { quickPasteError = nil }
         }

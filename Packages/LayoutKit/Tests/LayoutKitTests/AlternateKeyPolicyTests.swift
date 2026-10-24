@@ -287,6 +287,21 @@ final class AlternateKeyPolicyTests: XCTestCase {
         }
     }
 
+    /// A page passes its keys so no list, and so no corner hint, repeats one: 、 offers
+    /// · on 123 but nothing on the #+= page, where · is a key.
+    func testSymbolPageNeverOffersAKeyItShows() {
+        let onNumeric = AlternateKeyPolicy.options(for: .init(keyLabel: "、", page: .numeric, language: .chinese))
+        XCTAssertEqual(onNumeric.map(\.label), ["·"])
+        let onSymbols = AlternateKeyPolicy.options(
+            for: .init(keyLabel: "、", page: .symbols, language: .chinese, visibleKeys: ["、", "·", "——"]))
+        XCTAssertTrue(onSymbols.isEmpty)
+        let yen = AlternateKeyPolicy.options(
+            for: .init(
+                keyLabel: "¥", page: .symbols, language: .english, usesASCIIPunctuation: true,
+                visibleKeys: ["€", "£", "¥"]))
+        XCTAssertEqual(yen.map(\.label), ["$"])
+    }
+
     func testNumericPagePunctuationVariantDoesNotRepeatTheKey() {
         let dash = options(key: "-", page: .numeric, language: .chinese)
         XCTAssertFalse(dash.contains { $0.label == "-" }, "the key's own label is not an alternate")

@@ -27,6 +27,18 @@ public enum KeyboardOneHandPreferences {
     }
 }
 
+/// Which #+= page the 26/14/18-key layouts open. Off (the default) keeps the
+/// system keyboards' row-shaped page; on opens the categorised grid. The 9-key
+/// always uses the grid, since its 123 page is a digit pad with no rows to share.
+/// The keyboard re-reads it on each presentation.
+public enum KeyboardSymbolPagePreferences {
+    public static let categoryPageKey = "keyboard.categorySymbolPage.v1"
+    public static var defaults: UserDefaults { KeyboardRecipeStore.sharedDefaults() ?? .standard }
+    public static var usesCategoryPage: Bool {
+        (SharedPreferences.object(forKey: categoryPageKey, in: defaults) as? Bool) ?? false
+    }
+}
+
 extension Notification.Name {
     /// The single appearance-change notification: skin, candidate-area layout and display mode share one
     /// appearance identity, so there is one change channel.
