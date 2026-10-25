@@ -290,7 +290,7 @@ struct CursorSpaceKey: UIViewRepresentable {
 
     static func dismantleUIView(_ button: SpaceButton, coordinator: ()) { button.cancelPress() }
 
-    final class SpaceButton: SkinnedButton {
+    final class SpaceButton: SkinnedButton, KeyboardRolloverPress {
         var hostLifetime: KeyboardPanelHostLifetime? {
             didSet {
                 guard oldValue !== hostLifetime else { return }
@@ -407,6 +407,7 @@ struct CursorSpaceKey: UIViewRepresentable {
             originX = latestX
             pressStartedAt = ProcessInfo.processInfo.systemUptime
             refreshAppearance()
+            AlternateCharacterKey.CharacterButton.pendingTap = self
             if moveCursor != nil {
                 let timer = Timer(timeInterval: Self.cursorHoldDelay, repeats: false) { [weak self] _ in
                     MainActor.assumeIsolated {
@@ -421,7 +422,18 @@ struct CursorSpaceKey: UIViewRepresentable {
             return true
         }
 
+        /// The next key landed while the space bar is still a plain tap: type the space
+        /// now so it stays ahead of that key. The release then types nothing.
+        func commitRolloverPress() {
+            guard isHighlighted, !isDragging else { return }
+            cancelPress()
+            onTap?()
+        }
+
         private func startCursorMode() {
+            if AlternateCharacterKey.CharacterButton.pendingTap === self {
+                AlternateCharacterKey.CharacterButton.pendingTap = nil
+            }
             hintTimer?.invalidate()
             hintTimer = nil
             isDragging = true
@@ -461,6 +473,9 @@ struct CursorSpaceKey: UIViewRepresentable {
         override func cancelTracking(with event: UIEvent?) { cancelPress() }
 
         @objc func cancelPress() {
+            if AlternateCharacterKey.CharacterButton.pendingTap === self {
+                AlternateCharacterKey.CharacterButton.pendingTap = nil
+            }
             hintTimer?.invalidate()
             hintTimer = nil
             isDragging = false

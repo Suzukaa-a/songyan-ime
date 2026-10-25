@@ -41,6 +41,7 @@ struct MarkedComposition: Equatable {
 enum Evidence { case documentContextEcho }
 enum Presentation { case idle, inline(evidence: Evidence), awaitingHost, keyboard(reason: String) }
 final class Backend { var hostInputIsReady = true }
+enum KeyboardLifecycleDiagnostics { static func emit(_ event: String, _ fields: [String: String] = [:]) {} }
 final class QuickInsert {
     var commits: [String] = []
     func recordCommitted(_ text: String) { commits.append(text) }

@@ -278,6 +278,14 @@ extension KeyboardViewController {
         // Accept only an observed full echo in the same document; do not discard it as an external edit.
         if observeMarkedEcho() || observeCancelledMarkedEcho() { return }
         guard expectedContext != proxyContext else { return }
+        // A late echo of one of our own earlier marks also lands here and wipes the
+        // composition; the line tells that apart from a real outside edit in device logs.
+        KeyboardLifecycleDiagnostics.emit(
+            "compositionClearedByOutsideEdit",
+            [
+                "marked": pendingMarked == nil ? "0" : "1",
+                "echoed": lastEchoedMarked != nil && lastEchoedMarked == pendingMarked ? "1" : "0",
+            ])
         // External selection/focus move: never mutate the new target or delete host text.
         // Both a marked and a keyboard-only composition belong to the old insertion point.
         markedDocument = nil

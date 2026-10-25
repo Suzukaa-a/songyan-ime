@@ -534,6 +534,10 @@ class KeyboardViewController: UIInputViewController {
             _ = self.observeMarkedEcho()
             _ = self.observeCancelledMarkedEcho()
             guard self.expectedContext == self.proxyContext else {
+                // The engine already committed: this text is dropped. Logged so a host whose
+                // context lags our own writes can be told apart from a real outside edit.
+                KeyboardLifecycleDiagnostics.emit(
+                    "commitRefused", ["marked": self.pendingMarked == nil ? "0" : "1"])
                 self.checkDocumentOwnership()
                 return false
             }
