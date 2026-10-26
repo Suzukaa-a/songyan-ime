@@ -110,23 +110,19 @@ public enum KeyboardPagePresets {
         numericChinese, numericEnglish, englishQwerty,
     ]
 
-    /// IDs owned by code. Every upgrade merges these presets into a stored catalog, so catalog
-    /// totals must not charge pages for them and a save may omit the unchanged ones.
-    public static let codeOwnedIDs = Set(all.map(\.id))
-
     public static func preset(id: String) -> KeyboardPageDefinition? {
         all.first { $0.id == id }
     }
 
-    /// A stored page with a preset ID may be a user-modified preset; only an unchanged one may be
-    /// dropped from the wire form.
+    /// A stored page with a preset ID may be a user-modified preset; only an unchanged one is left
+    /// out of the saved catalog and of the catalog totals, because loading restores it from code.
     public static func isUnmodifiedPreset(_ page: KeyboardPageDefinition) -> Bool {
         preset(id: page.id) == page
     }
 
-    /// Adds the built-in pages a catalog saved before they existed is missing. A stored page with
-    /// the same ID stays untouched (it may be the user's edited preset); missing ones append in
-    /// `all` order, so an upgraded catalog can still reference a page shipped later.
+    /// Adds the built-in pages a stored catalog does not carry: saves leave unchanged ones out, and
+    /// a release may add one. A stored page with the same ID stays untouched (it may be the user's
+    /// edited preset); missing ones append in `all` order.
     public static func mergingInto(_ pages: [KeyboardPageDefinition]) -> [KeyboardPageDefinition] {
         var merged = pages
         var known = Set(pages.map(\.id))

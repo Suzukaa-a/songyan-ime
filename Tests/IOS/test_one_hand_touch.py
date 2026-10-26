@@ -37,13 +37,16 @@ def production_sources():
     host = (ROOT / "Apps/SharedKeyboard/KeyboardPanelHost.swift").read_text()
     feedback = (ROOT / "Apps/SharedKeyboard/FeedbackInputView.swift").read_text()
     policy = (ROOT / "Packages/CandidateKit/Sources/CandidateKit/OneHandLayoutPolicy.swift").read_text()
+    split = (ROOT / "Packages/LayoutKit/Sources/LayoutKit/LayoutSplitConfiguration.swift").read_text()
+    # The policy's phone-width bound lives in LayoutKit, which the probe does not link.
+    surface = section(split, "public enum KeyboardSurfaceWidth {", "/// A saved split")
 
     routed = section(appearance, "protocol KeyboardKeyHitTarget", "class SkinnedButton")
     # The restore control is the last declaration of KeyboardPanelHost.swift.
     gutter = host[host.index("final class OneHandGutterControl: UIControl {"):]
     router = strip_imports(feedback)
 
-    return strip_imports(routed), gutter, router, strip_imports(policy)
+    return strip_imports(routed), gutter, router, surface + strip_imports(policy)
 
 
 def assemble():

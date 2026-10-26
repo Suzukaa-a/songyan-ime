@@ -66,7 +66,7 @@ final class KeyboardControlPolicyTests: XCTestCase {
     }
 
     /// Every page puts the globe first. The left switch after it is 123 on letters, a literal
-    /// return on the row pages, and the language/return key on the categorised grid. Slot widths
+    /// return on the row pages, and the language/return key on the categorized grid. Slot widths
     /// stay position-based; the semantic slot never adds or removes a physical key.
     func testNonLetterPagesLeadWithTheirSwitchKey() {
         let expectations: [KeyboardControlPolicy.Page: [KeyboardControlPolicy.Slot]] = [

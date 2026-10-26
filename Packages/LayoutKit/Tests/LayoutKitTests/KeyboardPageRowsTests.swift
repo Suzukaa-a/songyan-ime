@@ -32,8 +32,8 @@ final class KeyboardPageRowsTests: XCTestCase {
     /// row: 9*keyWidth + 8 gaps + one gap + keyWidth == 10*keyWidth + 9 gaps.
     func testThirdRowPlusDeleteFillsTheTenColumnWidth() {
         for width in [280.0, 320, 382, 422, 768, 1024] {
-            for split in [nil, LayoutSplitConfiguration(rowBreaks: [5, 4, 3], gapFraction: 0.24)] {
-                let geometry = StandardKeyRowGeometry(width: width, split: split)
+            for split in [nil, LayoutSplitConfiguration(activation: .always, rowBreaks: [5, 4, 3], gapFraction: 0.24)] {
+                let geometry = StandardKeyRowGeometry(width: width, split: split?.resolved(forWidth: width))
                 let contentWidth = width - geometry.gap
                 let letterRow = geometry.keyWidth * 10 + spacing * 9
                 let thirdRow = geometry.keyWidth * 9 + spacing * 8
@@ -94,10 +94,10 @@ final class KeyboardPageRowsTests: XCTestCase {
             page: .numeric, isEnglishMode: false, hasGlobe: true,
             isPhoneLayout: true, usesASCIIPunctuation: false, includesBottomEnter: false)
         XCTAssertEqual(digitPage.utility, .digit("0"))
-        let categorised = KeyboardControlPolicy(
+        let categorized = KeyboardControlPolicy(
             page: .symbols, isEnglishMode: false, hasGlobe: true,
             isPhoneLayout: true, usesASCIIPunctuation: false, includesBottomEnter: false)
-        XCTAssertEqual(categorised.key(at: .utility), .symbolLock)
+        XCTAssertEqual(categorized.key(at: .utility), .symbolLock)
     }
 
     /// The utility key on the row pages must not repeat a mark its own rows type.

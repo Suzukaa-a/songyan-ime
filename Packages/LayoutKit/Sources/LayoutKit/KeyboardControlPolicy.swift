@@ -3,7 +3,8 @@ import Foundation
 /// Builtin presentation policy. DIY rows/actions are deliberately outside this policy.
 /// Page changes never own or mutate the engine's remembered Chinese/English mode.
 public struct KeyboardControlPolicy: Equatable, Sendable {
-    public enum Page: CaseIterable, Hashable, Sendable { case letters, numeric, symbols }
+    /// The page a control row sits on is the same set a `.pageSwitch` key can open.
+    public typealias Page = LayoutAction.PageTarget
     public enum Slot: CaseIterable, Hashable, Sendable {
         case page, language, globe, space, utility, enter
         /// Keys, never positions: the bundled 9-key's direct 「符号」 key, and the
@@ -34,7 +35,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Bundled T9 moves Return into its large trailing rail. Other surfaces keep it
     /// in the bottom row. This is presentation only; the action remains `.enter`.
     public let includesBottomEnter: Bool
-    /// The #+= page is the categorised grid (with 锁定) rather than rows of keys
+    /// The #+= page is the categorized grid (with 锁定) rather than rows of keys
     /// shaped like the 123 page's.
     public let usesCategorySymbolPage: Bool
     /// The bundled phone shell's column widths. When set, the first bottom key sits
@@ -76,7 +77,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// **for one surface**. Only an actual system-keyboard availability change may
     /// add/remove globe, and only the bundled T9 (which moves Return into its own
     /// trailing column) may drop `enter`. The utility position opens symbols on
-    /// letter pages, types 0 on the phone digit pad and locks the categorised symbol page.
+    /// letter pages, types 0 on the phone digit pad and locks the categorized symbol page.
     ///
     /// The globe is the leftmost, lowest-frequency control; every other slot keeps its
     /// relative order after it. A surface without a system-keyboard switch has no globe
@@ -93,12 +94,11 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// leading position it has on every page.
     ///
     /// Every letter page — the bundled 9-key included — reaches the symbol page
-    /// from the utility slot, where 26/14/18 used to keep 「，」/「。」, so the page
-    /// is one tap away on every layout. Numeric and symbol pages keep their own
-    /// utility actions (punctuation, 0 on the 9-key digit page, 锁定 on a
-    /// categorised symbol page).
+    /// from the utility slot, so the page is one tap away on every layout. Numeric
+    /// and symbol pages keep their own utility actions (punctuation, 0 on the 9-key
+    /// digit page, 锁定 on a categorized symbol page).
     ///
-    /// The categorised symbol page carries 锁定 in the utility position: its grid
+    /// The categorized symbol page carries 锁定 in the utility position: its grid
     /// already types every mark, and the lock decides whether the page stays open
     /// after a symbol (Sogou and iFlytek return to letters unless locked). The
     /// row-shaped #+= page keeps a punctuation key there, like 123.
@@ -117,7 +117,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             }
         case .symbols:
             if usesCategorySymbolPage {
-                // Categorised grid: the page position returns (keeping the language), the
+                // Categorized grid: the page position returns (keeping the language), the
                 // language position opens 123, and the utility position is the lock.
                 switch slot {
                 case .page: return .language
@@ -134,7 +134,7 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         }
     }
 
-    /// The phone-pad row: the bundled 9-key, and every layout's categorised symbol
+    /// The phone-pad row: the bundled 9-key, and every layout's categorized symbol
     /// page, move Return into their own trailing column.
     public var isBundledPhonePad: Bool { isPhoneLayout && !includesBottomEnter }
 
@@ -146,12 +146,12 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public static let symbolPageTitle = "符号"
 
     /// The page-following default: letters toggle the input language; 123 (the 9-key digit pad
-    /// included) and the row-shaped #+= page switch the symbol language in place; the categorised
+    /// included) and the row-shaped #+= page switch the symbol language in place; the categorized
     /// symbol grid returns to the main letter keyboard.
     public var languageAction: LanguageAction { languageAction(for: nil) }
 
     /// What the language key does. Nil follows the page; an authored behavior overrides the page
-    /// rule, including the categorised page's return default.
+    /// rule, including the categorized page's return default.
     public func languageAction(for behavior: LayoutAction.LanguageSwitchBehavior?) -> LanguageAction {
         switch behavior {
         case .symbols: return .toggleSymbols

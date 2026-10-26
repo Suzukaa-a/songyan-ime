@@ -383,7 +383,7 @@ public struct KeyboardPanelHost: View {
         let plan = KeyboardOneHandLayoutPolicy.plan(
             mode: oneHandMode,
             panelWidth: Double(panelSize.width),
-            isPhonePortrait: oneHandAvailable)
+            isAvailable: oneHandAvailable)
         return FixedPhaseHeight(height: layoutShellHeight) {
             KeyboardPanelView(
                 controller: controller, onSelectLayout: session.selectLayout,

@@ -102,7 +102,7 @@ public struct KeyboardPanelView: View {
     @State var phoneSymbolCategoryID = SymbolPageTable.commonCategoryID
     /// 锁定 on the symbol page: stay there after a symbol. Session-only, never stored.
     @State var symbolPageLocked = false
-    /// The user's choice of the categorised #+= page (`KeyboardSymbolPagePreferences`),
+    /// The user's choice of the categorized #+= page (`KeyboardSymbolPagePreferences`),
     /// re-read on each presentation.
     @State var prefersCategorySymbolPage = false
     /// Whether a symbol has been entered on the current number/symbol page (used to return to letters after space); reset on every page change.
@@ -137,13 +137,11 @@ public struct KeyboardPanelView: View {
     var heldReadingRowContent: CandidateReadingRowContent? { choiceHold.row }
 
     @State var definitionMemo = DefinitionResolutionMemo()
+    @State var pageMemo = PageResolutionMemo()
     /// The real key-area width, recorded by the root GeometryReader before the panel body builds.
     @State var widthBox = KeyboardPanelWidthBox()
     /// Per-physical wide-screen dock, read at presentation/layout changes (never per key).
     @State private var contentDock: KeyboardContentDock
-    /// Stable owner for the wide content-frame registration; a replaced panel must not
-    /// clear a newer region.
-    @State private var wideContentFrameOwner = WideContentFrameOwner()
 
     /// Observation coordinator for definition changes (pure value): distinguishes "the panel's own explicit selection/reconciliation" from
     /// "external registry content replacement". The explicit path registers the expected (from, to) before acting; the observation callback
@@ -203,14 +201,16 @@ public struct KeyboardPanelView: View {
         self.openHostApp = openHostApp
         self.dismissKeyboard = dismissKeyboard
         self.candidateBarDefinition = candidateBarDefinition
-        _contentDock = State(
-            initialValue: KeyboardContentDockPreferences.dock(for: controller.layout))
+        // The host rebuilds this value on every pass; only the first one seeds the state. The
+        // cache reads the shared defaults once per layout and process, so the first frame is
+        // already docked without a read per host pass.
+        _contentDock = State(initialValue: ContentDockCache.dock(for: controller.layout))
     }
 
     public var body: some View {
         GeometryReader { geometry in
             let rawWidth = geometry.size.width
-            let isWideSurface = rawWidth > KeyboardWideContentPolicy.minimumActivePanelWidth
+            let isWideSurface = rawWidth > KeyboardSurfaceWidth.phoneMaximum
             let widePlan = KeyboardWideContentPolicy.plan(
                 panelWidth: Double(rawWidth),
                 maximumContentWidth: wideMaximumContentWidth(rawWidth: Double(rawWidth)),
@@ -227,11 +227,10 @@ public struct KeyboardPanelView: View {
                 needsHeaderlessToolRail ? min(baseContentWidth, availableWidth) : baseContentWidth
             let contentIsDocked = widePlan.active || needsHeaderlessToolRail
             let wideSignature = WideContentSignature(
-                rawWidth: Double(rawWidth), contentWidth: CGFloat(contentWidth),
                 isWideSurface: isWideSurface, active: contentIsDocked,
                 headerlessToolRail: needsHeaderlessToolRail, dock: contentDock)
             let _ = widthBox.record(contentWidth: contentWidth - 8, mainSplitWidth: rawWidth - 8)
-            let panel = panelBody(isWide: isWideSurface)
+            panelBody(isWide: isWideSurface)
                 .frame(width: contentWidth, alignment: .topLeading)
                 .disabled(showsUtilitiesMenu || showsSymbolLibrary)
                 .accessibilityHidden(showsUtilitiesMenu || showsSymbolLibrary)
@@ -275,33 +274,20 @@ public struct KeyboardPanelView: View {
                 .background(appearance.panelBackground.ignoresSafeArea(edges: .bottom))
                 // The blank side margins of a docked keyboard are not part of the key
                 // surface: touches there must not route to an edge key.
-                .background {
-                    GeometryReader { proxy in
-                        Color.clear
-                            .onAppear {
-                                registerWideContentFrame(
-                                    proxy.frame(in: .global), active: contentIsDocked)
-                            }
-                            .onChange(of: proxy.frame(in: .global)) { _, frame in
-                                registerWideContentFrame(frame, active: contentIsDocked)
-                            }
-                    }
-                }
+                .background { WideContentFrameReporter(active: contentIsDocked) }
                 .onChange(of: wideSignature) { _, _ in
-                    // A real frame/position change moves every key under any retained touch.
+                    // Docking moves every key under any retained touch; a plain width change
+                    // only needs the route cleared, which the host does on every resize.
                     keyAreaGeneration &+= 1
                     choiceHold.rail = nil
                     choiceHold.row = nil
                     KeyboardRoutedTouch.clear()
                 }
-            if needsHeaderlessToolRail {
-                panel
-                    .frame(width: availableWidth, alignment: wideDockAlignment)
-                    .frame(width: rawWidth, alignment: .topLeading)
-                    .overlay(alignment: .trailing) { headerlessWideToolRail }
-            } else {
-                panel.frame(width: rawWidth, alignment: wideDockAlignment)
-            }
+                .frame(width: availableWidth, alignment: wideDockAlignment)
+                .frame(width: rawWidth, alignment: .topLeading)
+                .overlay(alignment: .trailing) {
+                    if needsHeaderlessToolRail { headerlessWideToolRail }
+                }
         }
     }
 
@@ -310,7 +296,7 @@ public struct KeyboardPanelView: View {
     /// when it really splits at the pre-rail width, keep the full surface instead of
     /// silently cancelling the opt-in. Page splits never change this host-level width.
     private func wideMaximumContentWidth(rawWidth: Double) -> Double? {
-        guard rawWidth > KeyboardWideContentPolicy.minimumActivePanelWidth else { return nil }
+        guard rawWidth > KeyboardSurfaceWidth.phoneMaximum else { return nil }
         if let split = activeDefinition?.split, split.isActive(width: rawWidth - 8) { return nil }
         switch controller.layout {
         case .phone9: return KeyboardWideContentPolicy.phoneNineMaximumContentWidth
@@ -327,13 +313,6 @@ public struct KeyboardPanelView: View {
         }
     }
 
-    /// Headerless pages have no band to host the dismiss entry. The fallback is a real
-    /// 44pt strip outside the key content, so it never covers the first key row or changes
-    /// the footer; those rare pages lose the same width from their usable key area.
-    /// Geometry reports a real frame in screen coordinates; FeedbackInputView compares a
-    /// converted window point against it before it routes a blank-edge touch to a key.
-    /// The lifecycle teardown is a named method so the long panel-body modifier chain does
-    /// not carry this closure through type checking; behavior is unchanged.
     private func finishPanelLifecycle() {
         if let panelHostLifetime {
             panelHostLifetime.cancelSharedSelection { controller.cancelRailSelection() }
@@ -341,16 +320,12 @@ public struct KeyboardPanelView: View {
             // App-owned panels do not share an extension process session.
             controller.cancelRailSelection()
         }
-        KeyboardRoutedTouch.registerWideContentFrame(
-            owner: wideContentFrameOwner, frame: nil)
         feedback.end(token: feedbackLifecycleToken)
     }
 
-    private func registerWideContentFrame(_ frame: CGRect, active: Bool) {
-        KeyboardRoutedTouch.registerWideContentFrame(
-            owner: wideContentFrameOwner, frame: active ? frame : nil)
-    }
-
+    /// Headerless pages have no band to host the dismiss entry. The fallback is a real
+    /// 44pt strip outside the key content, so it never covers the first key row or changes
+    /// the footer; those rare pages lose the same width from their usable key area.
     private var headerlessWideToolRail: some View {
         VStack(spacing: 0) {
             if let dismissKeyboard {
@@ -371,8 +346,8 @@ public struct KeyboardPanelView: View {
     }
 
     /// With a separate reading row above, the word row's content sits a little
-    /// above centre so the two text lines read as one group instead of being split
-    /// by both rows' centring margins (hit areas stay full height).
+    /// above center so the two text lines read as one group instead of being split
+    /// by both rows' centering margins (hit areas stay full height).
     var candidateContentLift: Double {
         layoutPlan.readingRowHeight > 0 ? CandidateReadingRowPolicy.candidateLift : 0
     }
@@ -387,7 +362,7 @@ public struct KeyboardPanelView: View {
         panelGeometry.headerHeight
     }
     /// The candidate row fills the whole band: the spare height the shell gives it
-    /// (`KeyboardPanelGeometry.fit`) is touch budget, and the centred text sits a
+    /// (`KeyboardPanelGeometry.fit`) is touch budget, and the centered text sits a
     /// little above the keys instead of on their edge.
     var candidateRowHeight: CGFloat { headerHeight + headerTopTrim }
     /// The ABC suggestion row, seated at the bottom of the candidate band so its words sit where
@@ -740,8 +715,7 @@ public struct KeyboardPanelView: View {
                     // Authored page: rows, rails and footer all come from data, drawn by the same
                     // shell the preview uses. The gate takes the live return/clear-input state.
                     KeyAreaRenderGate(
-                        token: keyAreaRenderToken(
-                            phone: nil, readsComposition: Self.pageReadsComposition(pageDefinition))
+                        token: keyAreaRenderToken(phone: nil, readsComposition: pageDefinitionReadsComposition)
                     ) {
                         authoredChromePage(pageDefinition)
                     }
@@ -819,8 +793,7 @@ public struct KeyboardPanelView: View {
     }
 
     /// The named modifier group keeps the SwiftUI type-checker from re-solving the
-    /// whole panel surface and every lifecycle modifier as one expression. Behavior and
-    /// modifier order are unchanged.
+    /// whole panel surface and every lifecycle modifier as one expression.
     private func panelBody(isWide: Bool) -> some View {
         panelLifecycleModifiers(panelSurface(isWide: isWide))
     }
@@ -851,10 +824,10 @@ public struct KeyboardPanelView: View {
             .onChange(of: controller.layout) {
                 showsAllCandidates = false
                 clearSymbolMarksOverride()
-                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+                refreshContentDock()
             }
             .onReceive(NotificationCenter.default.publisher(for: .keyboardContentDockChanged)) { _ in
-                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+                refreshContentDock()
             }
     }
 
@@ -895,13 +868,11 @@ public struct KeyboardPanelView: View {
             }
             .onChange(of: controller.keyboardType) { syncHostPage() }
             .onAppear { syncHostPage() }
-            .onAppear {
-                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
-            }
+            .onAppear { refreshContentDock() }
             .onAppear { prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage }
             .onChange(of: hostBindingTick) {
                 prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage
-                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+                refreshContentDock()
                 clearSymbolMarksOverride()
             }
             .onChange(of: quickPasteIdleInput) { _, input in
@@ -932,6 +903,13 @@ public struct KeyboardPanelView: View {
             }
     }
 
+    /// Presentation, layout and dock-change hooks only; never per key.
+    private func refreshContentDock() {
+        let dock = KeyboardContentDockPreferences.dock(for: controller.layout)
+        ContentDockCache.docks[controller.layout] = dock
+        if contentDock != dock { contentDock = dock }
+    }
+
     private func observeFeedbackLifecycle<Content: View>(_ content: Content) -> some View {
         content
             .onAppear {
@@ -948,20 +926,61 @@ public struct KeyboardPanelView: View {
 
 }
 
-/// A real-frame change (width cap, dock, rotation) must cancel keys and recorded routes
-/// even before the next touch; the signature stays Equatable so only a real move triggers it.
+/// Docking or undocking moves every key, so it cancels keys and recorded routes even before
+/// the next touch. Width is deliberately absent: a live resize (Stage Manager) must not
+/// recreate every key view per frame.
 private struct WideContentSignature: Equatable {
-    let rawWidth: Double
-    let contentWidth: CGFloat
     let isWideSurface: Bool
     let active: Bool
     let headerlessToolRail: Bool
     let dock: KeyboardContentDock
 }
 
-/// Stable identity for the wide content-frame registration. SwiftUI recreates the panel
-/// value, but a replaced panel must not clear the region registered by a newer one.
-private final class WideContentFrameOwner {}
+/// The dock each layout last resolved to in this process. A new panel value seeds its state
+/// from here; `refreshContentDock` keeps it current.
+@MainActor
+private enum ContentDockCache {
+    static var docks: [KeyboardLayoutKind: KeyboardContentDock] = [:]
+
+    static func dock(for layout: KeyboardLayoutKind) -> KeyboardContentDock {
+        if let dock = docks[layout] { return dock }
+        let dock = KeyboardContentDockPreferences.dock(for: layout)
+        docks[layout] = dock
+        return dock
+    }
+}
+
+/// Registers the docked content's live frame with `KeyboardRoutedTouch`, so a touch in the
+/// blank margins is not routed to the nearest key. The frame is read at hit-test time, in
+/// window coordinates, from this view; a removed or replaced reporter takes its region with it.
+private struct WideContentFrameReporter: UIViewRepresentable {
+    let active: Bool
+
+    func makeUIView(context: Context) -> ReporterView {
+        let view = ReporterView()
+        view.isUserInteractionEnabled = false
+        view.isAccessibilityElement = false
+        view.active = active
+        return view
+    }
+
+    func updateUIView(_ view: ReporterView, context: Context) { view.active = active }
+
+    static func dismantleUIView(_ view: ReporterView, coordinator: ()) { view.active = false }
+
+    final class ReporterView: UIView {
+        var active = false { didSet { if active != oldValue { register() } } }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            register()
+        }
+
+        private func register() {
+            KeyboardRoutedTouch.registerWideContent(self, active: active && window != nil)
+        }
+    }
+}
 
 /// Non-observed width snapshot for split activation. The whole keyboard width decides a split
 /// once; reading it through a reference keeps that value out of SwiftUI's invalidation set, while

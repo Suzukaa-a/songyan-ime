@@ -208,19 +208,8 @@ struct KeyboardAuthoredPageKey: View {
 
     private var accessibilityLabel: String {
         guard key.titleMode == .automatic else { return key.label }
-        switch key.action.type {
-        case .pageSwitch:
-            if key.action.pageSwitchTarget == .letters { return "返回主键盘" }
-            let title = state.title(for: key)
-            return "打开\(title)页"
-        case .languageSwitch:
-            return state.controlPolicy.languageAccessibilityLabel(
-                for: key.action.languageSwitchBehavior)
-        case .symbolLock: return "锁定符号页"
-        case .clearInput: return "重输"
-        case .shift: return "上档键"
-        default: return state.title(for: key)
-        }
+        return KeyboardPageControlFace.accessibilityLabel(for: key, policy: state.controlPolicy)
+            ?? state.title(for: key)
     }
 
     private var accessibilityHint: String {
@@ -228,7 +217,7 @@ struct KeyboardAuthoredPageKey: View {
         switch key.action.type {
         case .clearInput: return state.isComposing ? "清空当前输入" : "当前没有待确认的输入"
         case .symbolLock: return state.symbolLocked ? "输入符号后留在符号页" : "输入一个符号后回到字母页"
-        case .shift: return state.isEnglishMode ? "轻点切换一次大写，连续点按两次锁定大写" : "当前为中文输入；使用语言键切换到英文后可用"
+        case .shift: return state.isEnglishMode ? "轻点切换一次大写，连续点按两次锁定大写" : "切换到英文输入后可用。"
         default: return ""
         }
     }
@@ -263,7 +252,7 @@ struct KeyboardAuthoredPageKey: View {
     private func faceAction(_ action: LayoutAction, alternate: Bool) -> KeyAction {
         if state.kind == .english, let letter = action.singleASCIILetter {
             // The engine owns shift/case: a plain tap sends the lowercase code, an explicit
-            // long-press variant stays verbatim, as on the legacy English page.
+            // long-press variant stays verbatim, as on the built-in English page.
             return alternate ? .letterVariant(letter) : .code(letter.lowercased())
         }
         switch action.type {
@@ -287,13 +276,13 @@ struct KeyboardAuthoredPageKey: View {
 
 /// The authored rows of a page. Geometry comes from the one LayoutKit builder, so the live keyboard
 /// and the preview cannot drift: standard alphabet rows keep the 26-key columns, anything else uses
-/// the declared relative weights, and no Shift/Delete is ever synthesised here.
+/// the declared relative weights, and no Shift/Delete is ever synthesized here.
 struct KeyboardAuthoredPageRows: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     /// The page with keys the system cannot use already removed; source indices map a visible key
     /// back to its authored position so selection and action routing stay on the stored address.
     let page: KeyboardPageDefinition
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     let metrics: KeyboardAuthoredPageMetrics
     let sourceIndices: [[Int]]
     let state: KeyboardPageAuthoredState
@@ -388,7 +377,7 @@ struct KeyboardAuthoredPageFooter: View {
     let page: KeyboardPageDefinition
     let keys: [LayoutKey]
     let sourceIndices: [Int]
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     let rootWidth: CGFloat
     let state: KeyboardPageAuthoredState
     let actions: KeyboardPageAuthoredActions
@@ -397,7 +386,7 @@ struct KeyboardAuthoredPageFooter: View {
     var editorSelection = false
 
     private var minimumWidth: Double { KeyboardAuthoredPageMetrics.minimumKeyHeight }
-    /// Categorised pages keep browser rows as backup data; the presentation decides the shape.
+    /// Categorized pages keep browser rows as backup data; the presentation decides the shape.
     private var isCategoryPage: Bool { page.symbolPresentation == .categorized }
     private var isKeypadPage: Bool { page.isKeypad }
 
@@ -458,16 +447,16 @@ struct KeyboardAuthoredPageFooter: View {
 
     /// Generic authored widths only: floor each key to a usable touch width; when a real weight
     /// makes any key narrower than that, the caller scrolls the floored row. The built-in budget
-    /// keeps its legacy scaling rules.
+    /// keeps the built-in control row's scaling rules.
     private func minimumScrollWidths(_ geometry: KeyboardPageFooterGeometry) -> [Double]? {
         guard !geometry.usesControlRowBudget, !keys.isEmpty else { return nil }
         guard geometry.keyWidths.contains(where: { $0 < minimumWidth }) else { return nil }
         return geometry.keyWidths.map { max(minimumWidth, $0) }
     }
 
-    @ViewBuilder private func splitRow(width: Double, split: LayoutSplitConfiguration) -> some View {
+    @ViewBuilder private func splitRow(width: Double, split: ActiveLayoutSplit) -> some View {
         let boundary =
-            split.breakIndex(row: page.rows.count, keyCount: keys.count, width: Double(rootWidth))
+            split.breakIndex(row: page.rows.count, keyCount: keys.count)
             ?? keys.count
         let left = keys.indices.filter { $0 < boundary }
         let right = keys.indices.filter { $0 >= boundary }
@@ -478,59 +467,38 @@ struct KeyboardAuthoredPageFooter: View {
         }
     }
 
-    /// Exactly one author space: it becomes the two native cursor spaces (one per half). If the row
-    /// cannot hold both, it scrolls horizontally instead of falling back to a single space.
+    /// Exactly one author space: it becomes the two native cursor spaces (one per half) of the
+    /// shared split row. If the row cannot hold both, it scrolls instead of dropping one.
     @ViewBuilder private func dualSpaceRow(
-        width: Double, split: LayoutSplitConfiguration, left: [Int], right: [Int], space: Int
+        width: Double, split: ActiveLayoutSplit, left: [Int], right: [Int], space: Int
     ) -> some View {
         let footer = footerGeometry(width)
-        // The built-in split row pins its controls to the 320pt budget and lets the two spaces
-        // share the remainder; the structural default keeps that, authored data uses its weights.
+        // The structural default keeps the built-in split row's control budget; authored data
+        // uses its own weights.
         let controlWidths =
-            footer.usesControlRowBudget ? footerGeometry(320).keyWidths : footer.keyWidths
-        let leftWidths = left.filter { $0 != space }.map { max(minimumWidth, controlWidths[$0]) }
-        let rightWidths = right.filter { $0 != space }.map { max(minimumWidth, controlWidths[$0]) }
-        // Space prefers three letter widths, exactly the legacy split row.
-        let letterWidth = StandardKeyRowGeometry(width: width, split: split).keyWidth
-        let preferredSpace = letterWidth * 3 * keys[space].widthWeight / 4
-        let requestedGap = split.gap(width: Double(rootWidth), keyCount: keys.count + 1)
-        if let geometry = SplitSpaceRowGeometry(
-            width: width, requestedGap: requestedGap, leftKeyWidths: leftWidths,
-            rightKeyWidths: rightWidths, spacing: footer.spacing,
-            minimumSpaceWidth: minimumWidth,
-            preferredSpaceWidth: max(minimumWidth, preferredSpace))
-        {
-            HStack(spacing: 0) {
-                HStack(spacing: geometry.spacing) {
-                    ForEach(Array(left.filter { $0 != space }.enumerated()), id: \.offset) { position, index in
-                        keyView(index: index, keyValue: keys[index])
-                            .frame(width: CGFloat(leftWidths[position]), height: keyHeight)
-                    }
-                    keyView(index: space, keyValue: keys[space])
-                        .id("authored-footer-left-space")
-                        .frame(width: CGFloat(geometry.leftSpaceWidth), height: keyHeight)
-                }
-                .frame(width: CGFloat(geometry.leftWidth))
-                KeyboardSplitGap().frame(width: CGFloat(geometry.gap + geometry.spacing), height: keyHeight)
-                HStack(spacing: geometry.spacing) {
-                    keyView(index: space, keyValue: keys[space])
-                        .id("authored-footer-right-space")
-                        .frame(width: CGFloat(geometry.rightSpaceWidth), height: keyHeight)
-                    ForEach(Array(right.filter { $0 != space }.enumerated()), id: \.offset) { position, index in
-                        keyView(index: index, keyValue: keys[index])
-                            .frame(width: CGFloat(rightWidths[position]), height: keyHeight)
-                    }
-                }
-                .frame(width: CGFloat(geometry.rightWidth))
-            }
-        } else {
-            scrollableDualSpaceRow(
-                split: split, left: left, right: right, space: space, widths: footer.keyWidths)
-        }
+            footer.usesControlRowBudget
+            ? footerGeometry(SplitSpaceRowBudget.controlRowWidth).keyWidths : footer.keyWidths
+        let leftKeys = left.filter { $0 != space }
+        let rightKeys = right.filter { $0 != space }
+        SplitSpaceKeyboardRow(
+            leftKeys: leftKeys, rightKeys: rightKeys,
+            leftWidths: leftKeys.map { max(minimumWidth, controlWidths[$0]) },
+            rightWidths: rightKeys.map { max(minimumWidth, controlWidths[$0]) }, split: split,
+            // Space prefers three letter widths, like the built-in split row.
+            spaceWidthMultiplier: 3 * keys[space].widthWeight / 4,
+            requestedGap: split.gap(width: Double(rootWidth), keyCount: keys.count + 1),
+            spacing: footer.spacing,
+            key: { index in keyView(index: index, keyValue: keys[index]) },
+            space: { keyView(index: space, keyValue: keys[space]) },
+            fallback: {
+                scrollableDualSpaceRow(
+                    split: split, left: left, right: right, space: space, widths: footer.keyWidths)
+            },
+            narrowUsesFallback: true)
     }
 
     @ViewBuilder private func scrollableDualSpaceRow(
-        split: LayoutSplitConfiguration, left: [Int], right: [Int], space: Int, widths: [Double]
+        split: ActiveLayoutSplit, left: [Int], right: [Int], space: Int, widths: [Double]
     ) -> some View {
         let spacing = CGFloat(KeyboardAuthoredPageMetrics.spacing)
         let gap = max(CGFloat(split.gap(width: Double(rootWidth), keyCount: keys.count + 1)), spacing)
@@ -559,7 +527,7 @@ struct KeyboardAuthoredPageFooter: View {
 
     /// The author declared no space or several: render exactly that data, only adding the split gutter.
     @ViewBuilder private func authoredSpaceRow(
-        width: Double, split: LayoutSplitConfiguration, left: [Int], right: [Int]
+        width: Double, split: ActiveLayoutSplit, left: [Int], right: [Int]
     ) -> some View {
         let gap = split.gap(width: Double(rootWidth), keyCount: keys.count)
         let footer = footerGeometry(max(0, width - gap))
@@ -601,8 +569,8 @@ struct KeyboardAuthoredPageFooter: View {
 struct KeyboardAuthoredPageView<CategoryMain: View, CategoryLeading: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let page: KeyboardPageDefinition
-    /// The stored split (or inherited one). Activation is resolved against the real key-area width.
-    let split: LayoutSplitConfiguration?
+    /// The split the caller resolved once against the whole keyboard width.
+    let split: ActiveLayoutSplit?
     let state: KeyboardPageAuthoredState
     let actions: KeyboardPageAuthoredActions
     var selectedPath: KeyboardPageKeyPath? = nil
@@ -614,148 +582,111 @@ struct KeyboardAuthoredPageView<CategoryMain: View, CategoryLeading: View>: View
     @ViewBuilder var categoryLeading: (KeyboardAuthoredPageMetrics) -> CategoryLeading
 
     private var spacing: CGFloat { CGFloat(KeyboardAuthoredPageMetrics.spacing) }
-    /// A categorised page keeps its browser rows as backup data, so this is decided by the
-    /// presentation, never by rows.isEmpty.
-    private var isCategoryPage: Bool { page.symbolPresentation == .categorized }
-
-    /// The authored data minus keys the system cannot use. With no input-mode switch the globe key
-    /// is removed and the remaining keys take its width; it is never left as a dead key.
-    private var renderedPage: KeyboardPageDefinition {
-        guard !state.hasGlobe, let chrome = page.chrome else { return page }
-        var copy = page
-        copy.rows = page.rows.map { LayoutRow(keys: $0.keys.filter { $0.action.type != .globe }) }
-        var rendered = chrome
-        rendered.bottom = chrome.bottom.filter { $0.action.type != .globe }
-        rendered.leading = chrome.leading.filter { $0.action.type != .globe }
-        rendered.trailing = chrome.trailing.filter { $0.action.type != .globe }
-        copy.chrome = rendered
-        return copy
-    }
-
-    /// Visible index -> authored index. Routing always uses the authored address.
-    private func visibleSourceIndices(_ keys: [LayoutKey]) -> [Int] {
-        guard !state.hasGlobe else { return Array(keys.indices) }
-        return keys.indices.filter { keys[$0].action.type != .globe }
-    }
-
-    private var rowSourceIndices: [[Int]] { page.rows.map { visibleSourceIndices($0.keys) } }
-    private var leadingSourceIndices: [Int] { visibleSourceIndices(page.chrome?.leading ?? []) }
-    private var trailingSourceIndices: [Int] { visibleSourceIndices(page.chrome?.trailing ?? []) }
-    private var bottomSourceIndices: [Int] { visibleSourceIndices(page.chrome?.bottom ?? []) }
-
-    private var renderedChrome: KeyboardPageChrome? { renderedPage.chrome }
-    /// The fixed viewport: the phone/built-in pages budget three rows, and an authored page with
-    /// more rows scrolls inside that same viewport instead of growing past the keyboard.
-    private var rowsViewportCount: Int {
-        isCategoryPage ? 3 : min(3, max(0, renderedPage.rows.count))
-    }
-    private var rowCount: Int { isCategoryPage ? 3 : max(0, renderedPage.rows.count) }
-    private var hasLeadingRegion: Bool {
-        isCategoryPage || !(renderedChrome?.leading.isEmpty ?? true)
-    }
-    private var hasTrailingRegion: Bool { !(renderedChrome?.trailing.isEmpty ?? true) }
-    private var hasBottomRegion: Bool { !(renderedChrome?.bottom.isEmpty ?? true) }
 
     var body: some View {
+        // Derived once per body: every region below reads the same filtered page and table.
+        let rendered = KeyboardAuthoredRenderedPage(page: page, hasGlobe: state.hasGlobe)
         GeometryReader { proxy in
             let rootWidth = Double(proxy.size.width)
-            // The whole keyboard width decides the split, and a centred phone shell keeps its
-            // built-in unit width; an active split expands it across the surface like the 9-key shell.
-            let effectiveSplit = split?.resolvedForRender(rootWidth: rootWidth)
-            let layoutWidth = contentLayoutWidth(rootWidth: rootWidth, split: effectiveSplit)
+            // A centered phone shell keeps its built-in unit width; an active split expands it
+            // across the surface like the 9-key shell.
+            let layoutWidth = contentLayoutWidth(rootWidth: rootWidth, split: split, rendered: rendered)
             let metrics = KeyboardAuthoredPageMetrics(
-                rootWidth: layoutWidth, keyHeight: Double(keyHeight), rowCount: rowsViewportCount,
-                hasLeading: hasLeadingRegion, hasTrailing: hasTrailingRegion, hasBottom: hasBottomRegion,
-                hasTrailingSpansBottom: renderedChrome?.trailingSpansBottom == true,
-                leadingWidth: renderedChrome?.leadingWidth, trailingWidth: renderedChrome?.trailingWidth)
-            let actionTable = KeyboardPageAuthoredActionTable(page: page)
+                rootWidth: layoutWidth, keyHeight: Double(keyHeight), rowCount: rendered.rowsViewportCount,
+                hasLeading: rendered.hasLeadingRegion, hasTrailing: rendered.hasTrailingRegion,
+                hasBottom: rendered.hasBottomRegion,
+                hasTrailingSpansBottom: rendered.chrome?.trailingSpansBottom == true,
+                leadingWidth: rendered.chrome?.leadingWidth, trailingWidth: rendered.chrome?.trailingWidth)
             Group {
                 if metrics.trailingRailHeight > metrics.rowsHeight {
-                    spansBottomLayout(metrics: metrics, split: effectiveSplit, actionTable: actionTable)
+                    spansBottomLayout(metrics: metrics, split: split, rendered: rendered)
                 } else {
-                    containedLayout(metrics: metrics, split: effectiveSplit, actionTable: actionTable)
+                    containedLayout(metrics: metrics, split: split, rendered: rendered)
                 }
             }
             .frame(width: CGFloat(metrics.rootWidth), height: CGFloat(metrics.totalHeight), alignment: .topLeading)
             .frame(width: proxy.size.width, alignment: .center)
         }
-        .frame(height: estimatedHeight)
+        .frame(height: estimatedHeight(rendered))
     }
 
     /// A keypad/category page keeps the built-in phone shell's 436pt unit and centres it on a wide
     /// surface; normally a row page simply fills the width. An active split expands the unit.
-    private func contentLayoutWidth(rootWidth: Double, split: LayoutSplitConfiguration?) -> Double {
-        guard split == nil, page.isKeypad || isCategoryPage, rootWidth > PhoneKeypadMetrics.maximumShellWidth
+    private func contentLayoutWidth(
+        rootWidth: Double, split: ActiveLayoutSplit?, rendered: KeyboardAuthoredRenderedPage
+    ) -> Double {
+        guard split == nil, page.isKeypad || rendered.isCategoryPage,
+            rootWidth > PhoneKeypadMetrics.maximumShellWidth
         else { return rootWidth }
         return PhoneKeypadMetrics.maximumShellWidth
     }
 
     /// Height before the real width is known: the panel and the preview reserve it up front.
-    private var estimatedHeight: CGFloat {
-        let rows = CGFloat(rowsViewportCount) * (keyHeight + spacing) - spacing
-        return rows + (hasBottomRegion ? spacing + keyHeight : 0)
+    private func estimatedHeight(_ rendered: KeyboardAuthoredRenderedPage) -> CGFloat {
+        let rows = CGFloat(rendered.rowsViewportCount) * (keyHeight + spacing) - spacing
+        return rows + (rendered.hasBottomRegion ? spacing + keyHeight : 0)
     }
 
     @ViewBuilder private func spansBottomLayout(
-        metrics: KeyboardAuthoredPageMetrics, split: LayoutSplitConfiguration?,
-        actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, split: ActiveLayoutSplit?,
+        rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         HStack(alignment: .top, spacing: spacing) {
             VStack(spacing: metrics.bottomHeight > 0 ? spacing : 0) {
                 HStack(alignment: .top, spacing: spacing) {
-                    leadingColumn(metrics: metrics, actionTable: actionTable)
-                    mainArea(metrics: metrics, split: split, actionTable: actionTable)
+                    leadingColumn(metrics: metrics, rendered: rendered)
+                    mainArea(metrics: metrics, split: split, rendered: rendered)
                 }
                 .frame(height: CGFloat(metrics.rowsHeight))
                 if metrics.bottomHeight > 0 {
-                    footer(metrics: metrics, split: split, actionTable: actionTable)
+                    footer(metrics: metrics, split: split, rendered: rendered)
                 }
             }
-            trailingRail(metrics: metrics, actionTable: actionTable)
+            trailingRail(metrics: metrics, rendered: rendered)
         }
     }
 
     @ViewBuilder private func containedLayout(
-        metrics: KeyboardAuthoredPageMetrics, split: LayoutSplitConfiguration?,
-        actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, split: ActiveLayoutSplit?,
+        rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         VStack(spacing: metrics.bottomHeight > 0 ? spacing : 0) {
             HStack(alignment: .top, spacing: spacing) {
-                leadingColumn(metrics: metrics, actionTable: actionTable)
-                mainArea(metrics: metrics, split: split, actionTable: actionTable)
-                trailingRail(metrics: metrics, actionTable: actionTable)
+                leadingColumn(metrics: metrics, rendered: rendered)
+                mainArea(metrics: metrics, split: split, rendered: rendered)
+                trailingRail(metrics: metrics, rendered: rendered)
             }
             .frame(height: CGFloat(metrics.rowsHeight))
             if metrics.bottomHeight > 0 {
-                footer(metrics: metrics, split: split, actionTable: actionTable)
+                footer(metrics: metrics, split: split, rendered: rendered)
             }
         }
     }
 
     @ViewBuilder private func footer(
-        metrics: KeyboardAuthoredPageMetrics, split: LayoutSplitConfiguration?,
-        actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, split: ActiveLayoutSplit?,
+        rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         KeyboardAuthoredPageFooter(
-            page: page, keys: renderedChrome?.bottom ?? [], sourceIndices: bottomSourceIndices,
+            page: page, keys: rendered.chrome?.bottom ?? [], sourceIndices: rendered.bottomSourceIndices,
             split: split, rootWidth: CGFloat(metrics.rootWidth), state: state, actions: actions,
-            actionTable: actionTable, selectedPath: selectedPath, editorSelection: editorSelection
+            actionTable: rendered.actionTable, selectedPath: selectedPath, editorSelection: editorSelection
         )
         .frame(width: CGFloat(metrics.bottomWidth), height: CGFloat(metrics.bottomHeight))
     }
 
     @ViewBuilder private func leadingColumn(
-        metrics: KeyboardAuthoredPageMetrics, actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         if metrics.leadingWidth > 0 {
             Group {
-                if isCategoryPage {
+                if rendered.isCategoryPage {
                     categoryLeading(metrics)
                 } else {
                     KeyboardAuthoredPageRail(
-                        keys: renderedChrome?.leading ?? [], sourceIndices: leadingSourceIndices,
+                        keys: rendered.chrome?.leading ?? [], sourceIndices: rendered.leadingSourceIndices,
                         region: .leading, height: CGFloat(metrics.leadingRailHeight), state: state,
-                        actions: actions, actionTable: actionTable, selectedPath: selectedPath,
+                        actions: actions, actionTable: rendered.actionTable, selectedPath: selectedPath,
                         editorSelection: editorSelection)
                 }
             }
@@ -764,13 +695,13 @@ struct KeyboardAuthoredPageView<CategoryMain: View, CategoryLeading: View>: View
     }
 
     @ViewBuilder private func trailingRail(
-        metrics: KeyboardAuthoredPageMetrics, actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         if metrics.trailingWidth > 0 {
             KeyboardAuthoredPageRail(
-                keys: renderedChrome?.trailing ?? [], sourceIndices: trailingSourceIndices,
+                keys: rendered.chrome?.trailing ?? [], sourceIndices: rendered.trailingSourceIndices,
                 region: .trailing, height: CGFloat(metrics.trailingRailHeight), state: state,
-                actions: actions, actionTable: actionTable, selectedPath: selectedPath,
+                actions: actions, actionTable: rendered.actionTable, selectedPath: selectedPath,
                 editorSelection: editorSelection
             )
             .frame(width: CGFloat(metrics.trailingWidth), height: CGFloat(metrics.trailingRailHeight), alignment: .top)
@@ -778,22 +709,22 @@ struct KeyboardAuthoredPageView<CategoryMain: View, CategoryLeading: View>: View
     }
 
     @ViewBuilder private func mainArea(
-        metrics: KeyboardAuthoredPageMetrics, split: LayoutSplitConfiguration?,
-        actionTable: KeyboardPageAuthoredActionTable
+        metrics: KeyboardAuthoredPageMetrics, split: ActiveLayoutSplit?,
+        rendered: KeyboardAuthoredRenderedPage
     ) -> some View {
         if let expandedCandidates {
             expandedCandidates
                 .frame(width: CGFloat(metrics.mainWidth), height: CGFloat(metrics.rowsHeight), alignment: .top)
-        } else if isCategoryPage {
+        } else if rendered.isCategoryPage {
             categoryMain(metrics)
                 .frame(width: CGFloat(metrics.mainWidth), height: CGFloat(metrics.rowsHeight), alignment: .top)
         } else {
             let rows = KeyboardAuthoredPageRows(
-                page: renderedPage, split: split, metrics: metrics, sourceIndices: rowSourceIndices,
-                state: state, actions: actions, actionTable: actionTable, selectedPath: selectedPath,
+                page: rendered.page, split: split, metrics: metrics, sourceIndices: rendered.rowSourceIndices,
+                state: state, actions: actions, actionTable: rendered.actionTable, selectedPath: selectedPath,
                 editorSelection: editorSelection)
             Group {
-                if renderedPage.rows.count > rowsViewportCount {
+                if rendered.page.rows.count > rendered.rowsViewportCount {
                     // More authored rows than the fixed three-row viewport: only the rows scroll,
                     // the rails and the footer keep their place.
                     ScrollView(.vertical, showsIndicators: false) { rows }
@@ -808,8 +739,58 @@ struct KeyboardAuthoredPageView<CategoryMain: View, CategoryLeading: View>: View
     }
 }
 
+/// The authored data minus keys the system cannot use, with every fact the shell derives from it.
+/// With no input-mode switch the globe key is removed and the remaining keys take its width; it is
+/// never left as a dead key. Routing always uses the authored address (`*SourceIndices`).
+struct KeyboardAuthoredRenderedPage {
+    let page: KeyboardPageDefinition
+    let rowSourceIndices: [[Int]]
+    let leadingSourceIndices: [Int]
+    let trailingSourceIndices: [Int]
+    let bottomSourceIndices: [Int]
+    /// Built from the stored page so cap ids keep their authored addresses.
+    let actionTable: KeyboardPageAuthoredActionTable
+    /// A categorized page keeps its browser rows as backup data, so this is decided by the
+    /// presentation, never by rows.isEmpty.
+    let isCategoryPage: Bool
+
+    init(page source: KeyboardPageDefinition, hasGlobe: Bool) {
+        func visible(_ keys: [LayoutKey]) -> [Int] {
+            hasGlobe ? Array(keys.indices) : keys.indices.filter { keys[$0].action.type != .globe }
+        }
+        rowSourceIndices = source.rows.map { visible($0.keys) }
+        leadingSourceIndices = visible(source.chrome?.leading ?? [])
+        trailingSourceIndices = visible(source.chrome?.trailing ?? [])
+        bottomSourceIndices = visible(source.chrome?.bottom ?? [])
+        actionTable = KeyboardPageAuthoredActionTable(page: source)
+        isCategoryPage = source.symbolPresentation == .categorized
+        guard !hasGlobe else {
+            page = source
+            return
+        }
+        // Rows are filtered like their source indices, so the two can never disagree.
+        var copy = source
+        copy.rows = source.rows.map { LayoutRow(keys: $0.keys.filter { $0.action.type != .globe }) }
+        if var chrome = source.chrome {
+            chrome.bottom = chrome.bottom.filter { $0.action.type != .globe }
+            chrome.leading = chrome.leading.filter { $0.action.type != .globe }
+            chrome.trailing = chrome.trailing.filter { $0.action.type != .globe }
+            copy.chrome = chrome
+        }
+        page = copy
+    }
+
+    var chrome: KeyboardPageChrome? { page.chrome }
+    /// The fixed viewport: the phone/built-in pages budget three rows, and an authored page with
+    /// more rows scrolls inside that same viewport instead of growing past the keyboard.
+    var rowsViewportCount: Int { isCategoryPage ? 3 : min(3, max(0, page.rows.count)) }
+    var hasLeadingRegion: Bool { isCategoryPage || !(chrome?.leading.isEmpty ?? true) }
+    var hasTrailingRegion: Bool { !(chrome?.trailing.isEmpty ?? true) }
+    var hasBottomRegion: Bool { !(chrome?.bottom.isEmpty ?? true) }
+}
+
 /// Category navigation is metadata, never authored chrome. This one view backs the built-in phone
-/// symbol page, a copied categorised page's authored shell and the preview, so the rail never drifts.
+/// symbol page, a copied categorized page's authored shell and the preview, so the rail never drifts.
 struct KeyboardAuthoredCategoryRail: View {
     @Environment(\.keyboardAppearance) private var appearance
     let categories: [SymbolPageTable.PhoneSymbolCategory]

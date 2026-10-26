@@ -76,7 +76,7 @@ public struct KeyboardPageResolutionInput: Equatable, Sendable {
 /// Resolves the page a pairing selects into what the key area (or a preview) draws.
 public enum KeyboardPageResolver {
     /// The single resolution rule. `page` is nil when the pairing has no page for this kind; such a
-    /// pairing keeps the built-in page, exactly as it did before pairings existed.
+    /// pairing keeps the built-in page.
     public static func resolve(
         page: KeyboardPageDefinition?, kind: KeyboardPageKind, input: KeyboardPageResolutionInput
     ) -> KeyboardPageResolution {
@@ -120,12 +120,12 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     /// Set on the 123 page that follows the live keyboard (see `KeyboardNumericPresentation`).
     public var numericPresentation: KeyboardNumericPresentation?
     public var categories: [KeyboardPageCategory]?
-    /// Authored function area. Nil keeps the exact legacy synthesis; non-nil is drawn as data and
-    /// nothing is ever synthesized for it.
+    /// Authored function area. Nil draws the native controls around the rows (built-in pages);
+    /// non-nil is drawn as data and nothing is ever synthesized for it.
     public var chrome: KeyboardPageChrome?
     /// The symbol branch this page opens in when the panel has no explicit override. Nil follows
     /// the live keyboard; authored pages keep nil unless the copy/materialization chose a branch,
-    /// so an old page is never guessed into one.
+    /// so a page is never guessed into one.
     public var defaultSymbolMarks: KeyboardNumericMarks?
 
     public var usesSymbolBrowser: Bool { symbolPresentation == .automatic || symbolPresentation == .categorized }
@@ -164,58 +164,54 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
         LayoutDefinition(id: id, name: name, input: .init(builtinLayout: .qwerty26), rows: rows, split: split)
     }
 
-    public func validate() throws {
+    public func validate() throws { _ = try validatedUsage() }
+
+    /// Validates the page once and returns what it spends, so the catalog check never walks the
+    /// page a second time.
+    func validatedUsage() throws -> LayoutResourceBudget.Usage {
         guard numericPresentation == nil || kind == .numeric else {
             throw LayoutError.invalid("只有 123 页可以选择「自动」或「数字盘」，请重新选择页面。")
-        }
-        if numericPresentation == .automatic {
-            guard rows.isEmpty, categories == nil, symbolPresentation == nil, chrome == nil else {
-                throw LayoutError.invalid("「自动 123」不能带按键或分类，请复制一份再编辑。")
-            }
-            try Self.validateIdentity(id: id, name: name)
-            try split?.validate(rowKeyCounts: [])
-            try LayoutResourceBudget.validate(self)
-            return
         }
         guard kind == .symbols || (symbolPresentation == nil && categories == nil) else {
             throw LayoutError.invalid("分类浏览只适用于符号页，请重新选择页面。")
         }
-        if let chrome { try chrome.validate() }
-        if symbolPresentation == .categorized {
+        try Self.validateIdentity(id: id, name: name)
+        // Bound the work first: every later check walks keys the budget has already counted.
+        let usage = try LayoutResourceBudget.usage(self)
+        if numericPresentation == .automatic {
+            guard rows.isEmpty, categories == nil, symbolPresentation == nil, chrome == nil else {
+                throw LayoutError.invalid("「自动 123」不能带按键或分类，请复制一份再编辑。")
+            }
+        } else if symbolPresentation == .categorized {
             if let chrome, !chrome.leading.isEmpty {
                 throw LayoutError.invalid("分类符号页的左侧栏由分类决定，不能再放按键。")
             }
-            try LayoutResourceBudget.validate(self)
-            // Existing catalogs only had the non-empty check, so length stays unvalidated here to
-            // keep an old catalog readable.
-            guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            else { throw LayoutError.invalid("请填写页面名称。") }
             if let categories {
                 guard !categories.isEmpty else { throw LayoutError.invalid("请至少保留一个分类。") }
                 guard Set(categories.map(\.id)).count == categories.count else {
-                    throw LayoutError.invalid("分类标识重复，请重新复制分类。")
+                    throw LayoutError.invalid("有两个分类重复了，请删掉其中一个。")
                 }
                 for category in categories { try category.validate() }
             }
-            try split?.validate(rowKeyCounts: splitRowKeyCounts)
-            return
+        } else {
+            guard categories == nil else {
+                throw LayoutError.invalid("只有分类符号页可以放分类，请删掉分类，或者改用分类符号页。")
+            }
+            if chrome == nil {
+                // Native controls are drawn around these rows; authored pages (chrome != nil) may
+                // keep a deliberately empty key area instead.
+                guard numericPresentation == nil else {
+                    throw LayoutError.invalid("这个数字盘页面没有按键，请复制「数字盘 123」后再编辑。")
+                }
+                guard !rows.isEmpty, rows.allSatisfy({ !$0.keys.isEmpty }) else {
+                    throw LayoutError.invalid("请至少保留一行，每行至少保留一个按键。")
+                }
+            }
         }
-        guard categories == nil else { throw LayoutError.invalid("请为分类选择分类符号页。") }
-        if chrome != nil {
-            // Authored pages keep deliberate structural emptiness: an empty key area, footer or
-            // rail is a user decision, not a state to repair.
-            try Self.validateIdentity(id: id, name: name)
-            try split?.validate(rowKeyCounts: splitRowKeyCounts)
-            try LayoutResourceBudget.validate(self)
-            for key in rows.flatMap(\.keys) { try Self.validateKey(key) }
-            return
-        }
-        guard numericPresentation == nil else {
-            throw LayoutError.invalid("数字盘页面缺少按键数据，请复制预设后重新保存。")
-        }
-        try layoutDefinition.validate()
         for key in rows.flatMap(\.keys) { try Self.validateKey(key) }
+        try chrome?.validate()
+        try split?.validate(rowKeyCounts: splitRowKeyCounts)
+        return usage
     }
 
     private static func validateIdentity(id: String, name: String) throws {
@@ -232,7 +228,7 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             throw LayoutError.invalid("请填写按键标题，并把宽度设为大于 0 的数字。")
         }
         guard key.action.type != .code, (key.longPress ?? []).allSatisfy({ $0.action.type != .code }) else {
-            throw LayoutError.invalid("页面按键请选择「输入文字」。")
+            throw LayoutError.invalid("页面上的按键请选择「输入文字」。")
         }
         try key.action.validate()
         for option in key.longPress ?? [] {
@@ -241,8 +237,8 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
         }
     }
 
-    /// Split row counts including the footer row. The footer cut lives at `rows.count`, so a
-    /// materialized page can keep the legacy footer split without a bogus row.
+    /// Split row counts including the footer row. The footer cut lives at `rows.count`, so an
+    /// authored footer keeps its own cut after the key rows.
     private var splitRowKeyCounts: [Int] {
         var counts = rows.map { $0.keys.count }
         if let bottom = chrome?.bottom, !bottom.isEmpty { counts.append(bottom.count) }
@@ -251,7 +247,7 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
 
     // MARK: - Materialized drafts and copies
 
-    /// The editable form of this page: legacy synthesis becomes real data. It is idempotent: an
+    /// The editable form of this page: the native controls become real data. It is idempotent: an
     /// already authored page (chrome != nil) is returned untouched, so opening the editor twice can
     /// never duplicate Shift/Delete/footer/rails or resurrect a key the user deleted.
     ///
@@ -275,9 +271,9 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
                     (numericMarks == .ascii ? KeyboardPagePresets.numericEnglish : KeyboardPagePresets.numericChinese)
                     .rows
                 page.numericPresentation = nil
-                // The legacy row page got its tenth-column Delete from the renderer; materialized
+                // The native row page gets its tenth-column Delete from the renderer; materialized
                 // data carries it explicitly so an authored page still has a Delete key.
-                page.rows = Self.rowsInsertingLegacyControls(rows: page.rows, kind: .numeric, split: &page.split)
+                page.rows = Self.rowsInsertingNativeControls(rows: page.rows, kind: .numeric, split: &page.split)
                 page.chrome = Self.rowsChrome(kind: .numeric)
                 page.defaultSymbolMarks = numericMarks
             }
@@ -300,23 +296,21 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
                         ? KeyboardPagePresets.symbolsEnglish.rows : KeyboardPagePresets.symbolsChinese.rows
                 }
                 page.categories = nil
-                page.rows = Self.rowsInsertingLegacyControls(rows: page.rows, kind: .symbols, split: &page.split)
+                page.rows = Self.rowsInsertingNativeControls(rows: page.rows, kind: .symbols, split: &page.split)
                 page.chrome = Self.rowsChrome(kind: .symbols)
                 page.defaultSymbolMarks = numericMarks
             } else if symbolPresentation == .categorized || categories != nil {
                 page.symbolPresentation = .categorized
-                // Legacy browser rows stay readable and editable; materialising must not delete
-                // stored content, even though the category grid is what renders.
                 page.chrome = Self.categoryChrome
             } else {
-                page.rows = Self.rowsInsertingLegacyControls(rows: page.rows, kind: page.kind, split: &page.split)
+                page.rows = Self.rowsInsertingNativeControls(rows: page.rows, kind: page.kind, split: &page.split)
                 page.chrome = Self.rowsChrome(kind: page.kind)
             }
         }
         return page
     }
 
-    /// A copy is editable authored content, so an automatic page materialises into the built-in
+    /// A copy is editable authored content, so an automatic page materializes into the built-in
     /// rows it stands for instead of keeping the automatic flag, and the result gets a new id.
     public func copy(
         name: String? = nil,
@@ -330,9 +324,10 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     }
 
     private static let shiftKey = LayoutKey(
-        label: "⇧", width: 1.5, action: .init(.shift), titleMode: .automatic)
+        label: "⇧", width: KeyboardPageDefaultShape.alphabetSideWidth, action: .init(.shift), titleMode: .automatic)
     private static let deleteKey = LayoutKey(
-        label: "⌫", width: 1.5, action: .init(.backspace), titleMode: .automatic)
+        label: "⌫", width: KeyboardPageDefaultShape.alphabetSideWidth, action: .init(.backspace),
+        titleMode: .automatic)
     private static let plainDeleteKey = LayoutKey(
         label: "⌫", action: .init(.backspace), titleMode: .automatic)
 
@@ -347,7 +342,9 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
         functionKey("返回", .languageSwitch(.letters))
     }
     private static var globeKey: LayoutKey { functionKey("🌐", .init(.globe)) }
-    private static var spaceKey: LayoutKey { functionKey("空格", .init(.space), width: 4) }
+    private static var spaceKey: LayoutKey {
+        functionKey("空格", .init(.space), width: KeyboardPageDefaultShape.footerSpaceWidth)
+    }
     private static var enterKey: LayoutKey { functionKey("⏎", .init(.enter)) }
     private static var symbolLockKey: LayoutKey { functionKey("锁定", .init(.symbolLock)) }
 
@@ -384,9 +381,9 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     }
 
     /// Default slots stay physically stable — globe first, the switches at the positions the
-    /// control row already budgets — so materialising a page never re-tunes the bottom row.
-    /// Authored chrome is data and is never rebuilt here; only a nil chrome (legacy synthesis or a
-    /// new preset) is materialised by this factory.
+    /// control row already budgets — so materializing a page never re-tunes the bottom row.
+    /// Authored chrome is data and is never rebuilt here; only a nil chrome (native controls) is
+    /// materialized by this factory.
     private static func rowsChrome(kind: KeyboardPageKind) -> KeyboardPageChrome {
         switch kind {
         case .english:
@@ -418,7 +415,7 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     private static var categoryChrome: KeyboardPageChrome {
         KeyboardPageChrome(
             bottom: [
-                // The categorised default return keeps the native language/tools menu.
+                // The categorized default return keeps the native language/tools menu.
                 globeKey, returnToLettersLanguageKey, pageSwitchKey(.numeric), spaceKey, symbolLockKey,
             ],
             trailing: [
@@ -443,7 +440,9 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             bottom: [
                 // globe, 返回, 中英, space, 0; Delete/重输/Return stay in the trailing rail.
                 globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey,
-                LayoutKey(label: "0", action: .init(.literal, value: "0")),
+                LayoutKey(
+                    label: KeyboardPageDefaultShape.keypadZero,
+                    action: .init(.literal, value: KeyboardPageDefaultShape.keypadZero)),
             ],
             leading: keypadLeadingKeys(marks: marks),
             trailing: [
@@ -453,10 +452,10 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             trailingSpansBottom: true)
     }
 
-    /// Legacy rendering synthesized Shift/Delete around the last row. Materializing writes them as
+    /// Native rendering synthesizes Shift/Delete around the last row. Materializing writes them as
     /// keys instead; a stored split cut on the Shift row moves by one because Shift is inserted
     /// before the characters, while an appended Delete never moves a cut.
-    private static func rowsInsertingLegacyControls(
+    private static func rowsInsertingNativeControls(
         rows: [LayoutRow], kind: KeyboardPageKind, split: inout LayoutSplitConfiguration?
     ) -> [LayoutRow] {
         guard !rows.isEmpty else { return rows }
@@ -485,5 +484,46 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             split = updated
         }
         return result
+    }
+}
+
+/// The shapes materialization writes and the geometry recognizes. Recognition reads only these
+/// structural facts (never an ID or label), so a default copy keeps the native widths while any
+/// structural edit falls back to the authored weights.
+enum KeyboardPageDefaultShape {
+    static let footerSpaceWidth = 4.0
+    static let alphabetSideWidth = 1.5
+    static let keypadZero = "0"
+
+    /// One letter per equal-width column. Any single letter qualifies; a control, a phrase or a
+    /// changed weight does not.
+    static func isLetterKey(_ key: LayoutKey) -> Bool {
+        guard key.widthWeight == 1, key.action.type == .literal, let value = key.action.value,
+            value.count == 1
+        else { return false }
+        return value.first?.isLetter == true
+    }
+
+    /// Native ABC rows: 10 / 9 / 7 letters; the renderer adds Shift and Delete.
+    static func isNativeAlphabet(_ page: KeyboardPageDefinition) -> Bool {
+        page.kind == .english && page.rows.map(\.keys.count) == [10, 9, 7]
+            && page.rows.allSatisfy { $0.keys.allSatisfy(isLetterKey) }
+    }
+
+    /// Native 123 / symbol rows: 10 / 10 / 9 equal literals; the renderer adds Delete.
+    static func isNativeTenColumns(_ page: KeyboardPageDefinition) -> Bool {
+        page.kind != .english && page.rows.map(\.keys.count) == [10, 10, 9]
+            && page.rows.allSatisfy { $0.keys.allSatisfy { $0.widthWeight == 1 && $0.action.type == .literal } }
+    }
+
+    /// Authored ABC rows: 10 / 9 / Shift + 7 letters + Delete, with the default side weights.
+    static func isAuthoredAlphabet(_ page: KeyboardPageDefinition) -> Bool {
+        guard page.rows.map(\.keys.count) == [10, 9, 9] else { return false }
+        let last = page.rows[2].keys
+        guard last.first?.action.type == .shift, last.last?.action.type == .backspace,
+            last.first?.widthWeight == alphabetSideWidth, last.last?.widthWeight == alphabetSideWidth
+        else { return false }
+        return page.rows[0].keys.allSatisfy(isLetterKey) && page.rows[1].keys.allSatisfy(isLetterKey)
+            && last.dropFirst().dropLast().allSatisfy(isLetterKey)
     }
 }

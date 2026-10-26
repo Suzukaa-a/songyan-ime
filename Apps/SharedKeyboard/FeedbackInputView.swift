@@ -61,8 +61,7 @@ public final class FeedbackInputView: KeyboardPanelInputView {
             }
             // A docked wide keyboard owns only its real content frame. The blank side margins
             // must not become the nearest edge key; tools inside the frame still hit normally.
-            // The reporter uses screen coordinates, so convert the window point once.
-            if KeyboardRoutedTouch.pointIsOutsideWideContent(window.convert(windowPoint, to: nil)) {
+            if KeyboardRoutedTouch.pointIsOutsideWideContent(windowPoint, in: window) {
                 return hit
             }
         }

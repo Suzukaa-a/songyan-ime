@@ -78,31 +78,31 @@ public struct LayoutAction: Codable, Equatable, Sendable {
             guard let value, value.utf8.count == 1,
                 let byte = value.utf8.first, (33...126).contains(byte)
             else {
-                throw LayoutError.invalid("code requires one printable ASCII character")
+                throw LayoutError.invalid("输入字母的按键只能填一个英文字母、数字或符号，请修改后保存。")
             }
         case .literal:
             guard let value, !value.isEmpty else {
-                throw LayoutError.invalid("literal requires nonempty value")
+                throw LayoutError.invalid("请填写按键要输入的文字。")
             }
             if let asciiValue, asciiValue.isEmpty {
                 throw LayoutError.invalid("英文符号不能为空，请重新填写。")
             }
         case .modeSwitch:
             guard value == nil || value == "nextLayout" else {
-                throw LayoutError.invalid("modeSwitch only supports nextLayout")
+                throw LayoutError.invalid("切换布局键的设置无法识别，请重新选择。")
             }
         case .pageSwitch:
             guard let value, PageTarget(rawValue: value) != nil else {
                 throw LayoutError.invalid("翻页键只能选择字母、数字或符号页，请重新选择。")
             }
         case .languageSwitch:
-            guard value == nil || LanguageSwitchBehavior(rawValue: value!) != nil else {
+            guard value.map({ LanguageSwitchBehavior(rawValue: $0) != nil }) ?? true else {
                 throw LayoutError.invalid("中英键的行为无法识别，请重新选择。")
             }
-        case .shift, .symbolLock, .clearInput:
-            guard value == nil else { throw LayoutError.invalid("这个功能键不能带值，请重新选择。") }
-        case .space, .backspace, .enter, .globe:
-            guard value == nil else { throw LayoutError.invalid("\(type.rawValue) takes no value") }
+        case .shift, .symbolLock, .clearInput, .space, .backspace, .enter, .globe:
+            guard value == nil else {
+                throw LayoutError.invalid("这个功能键不需要填写输入的文字，请清空后保存。")
+            }
         }
     }
 }
@@ -116,8 +116,8 @@ public struct LayoutOption: Codable, Equatable, Sendable {
     }
 }
 
-/// How a key face derives its title. Nil keeps the old class semantics, so an existing catalog
-/// decodes and renders exactly as before.
+/// How a key face derives its title. Nil draws the stored label, which is what every key of a
+/// main layout file does.
 public enum LayoutKeyTitleMode: String, Codable, Sendable {
     /// The host draws the control's live native face (Return title/state, Shift icon, language,
     /// lock, page target, space, delete). The stored label is the editor/accessibility fallback.
@@ -127,15 +127,15 @@ public enum LayoutKeyTitleMode: String, Codable, Sendable {
 }
 
 public struct LayoutKey: Codable, Equatable, Sendable {
-    public let label: String
-    public let secondaryLabel: String?
+    public internal(set) var label: String
+    public internal(set) var secondaryLabel: String?
     /// Positive relative weight. In a key row or the footer it is a relative width; in a leading
     /// or trailing rail it is a relative vertical span. Omitted means 1.
-    public let width: Double?
-    public let action: LayoutAction
-    public let longPress: [LayoutOption]?
-    /// Nil keeps the legacy class semantics; see `LayoutKeyTitleMode`.
-    public let titleMode: LayoutKeyTitleMode?
+    public internal(set) var width: Double?
+    public internal(set) var action: LayoutAction
+    public internal(set) var longPress: [LayoutOption]?
+    /// Nil draws the stored label; see `LayoutKeyTitleMode`.
+    public internal(set) var titleMode: LayoutKeyTitleMode?
     public var widthWeight: Double { width ?? 1 }
 
     public init(
@@ -153,39 +153,26 @@ public struct LayoutKey: Codable, Equatable, Sendable {
 
     /// Field-preserving edits: editors must not rebuild a key and silently drop `titleMode`.
     public func title(_ label: String) -> LayoutKey {
-        LayoutKey(
-            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
-            longPress: longPress, titleMode: .custom)
+        with {
+            $0.label = label
+            $0.titleMode = .custom
+        }
     }
 
-    public func settingTitleMode(_ mode: LayoutKeyTitleMode?) -> LayoutKey {
-        LayoutKey(
-            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
-            longPress: longPress, titleMode: mode)
-    }
+    public func settingTitleMode(_ mode: LayoutKeyTitleMode?) -> LayoutKey { with { $0.titleMode = mode } }
 
-    public func settingSecondaryLabel(_ label: String?) -> LayoutKey {
-        LayoutKey(
-            label: self.label, secondaryLabel: label, width: width, action: action,
-            longPress: longPress, titleMode: titleMode)
-    }
+    public func settingSecondaryLabel(_ label: String?) -> LayoutKey { with { $0.secondaryLabel = label } }
 
-    public func settingWidth(_ width: Double?) -> LayoutKey {
-        LayoutKey(
-            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
-            longPress: longPress, titleMode: titleMode)
-    }
+    public func settingWidth(_ width: Double?) -> LayoutKey { with { $0.width = width } }
 
-    public func settingAction(_ action: LayoutAction) -> LayoutKey {
-        LayoutKey(
-            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
-            longPress: longPress, titleMode: titleMode)
-    }
+    public func settingAction(_ action: LayoutAction) -> LayoutKey { with { $0.action = action } }
 
-    public func settingLongPress(_ options: [LayoutOption]?) -> LayoutKey {
-        LayoutKey(
-            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
-            longPress: options, titleMode: titleMode)
+    public func settingLongPress(_ options: [LayoutOption]?) -> LayoutKey { with { $0.longPress = options } }
+
+    private func with(_ change: (inout LayoutKey) -> Void) -> LayoutKey {
+        var key = self
+        change(&key)
+        return key
     }
 }
 
@@ -234,14 +221,14 @@ public struct LayoutCandidateArea: Codable, Equatable, Sendable {
 }
 
 public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
-    public let id: String
-    public let name: String
+    public internal(set) var id: String
+    public internal(set) var name: String
     public let input: LayoutInput
-    public let rows: [LayoutRow]
-    public let auxiliaryAreas: [LayoutAuxiliaryArea]?
-    /// Nil keeps existing imported layouts compatible; their key structure supplies the default.
-    public let candidateArea: LayoutCandidateArea?
-    public let split: LayoutSplitConfiguration?
+    public internal(set) var rows: [LayoutRow]
+    public internal(set) var auxiliaryAreas: [LayoutAuxiliaryArea]?
+    /// Nil lets the key structure decide (see `effectiveCandidateArea`).
+    public internal(set) var candidateArea: LayoutCandidateArea?
+    public internal(set) var split: LayoutSplitConfiguration?
     public let note: String?
     /// Seconds until the alternate picker opens. Release commits one selected alternate only.
     public let longPressDelay: Double?
@@ -282,7 +269,7 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
     }
 
     public static func decode(_ data: Data) throws -> Self {
-        try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.definitionBytes, "布局文件过大")
+        try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.definitionBytes, "布局文件过大，请删掉一些按键或文字后再试。")
         let layout = try JSONDecoder().decode(Self.self, from: data)
         try layout.validate()
         return layout
@@ -293,56 +280,61 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(self)
-        try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.definitionBytes, "布局文件过大")
+        try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.definitionBytes, "布局文件过大，请删掉一些按键或文字后再试。")
         return data
     }
 
-    public func validate() throws {
-        try LayoutResourceBudget.validate(self)
+    public func validate() throws { _ = try validatedUsage() }
+
+    /// Validates the layout once and returns what it spends, so the catalog check never walks the
+    /// layout a second time.
+    func validatedUsage() throws -> LayoutResourceBudget.Usage {
+        let usage = try LayoutResourceBudget.usage(self)
         try split?.validate(rowKeyCounts: rows.map { $0.keys.count })
         guard effectiveLongPressDelay.isFinite, effectiveLongPressDelay > 0 else {
-            throw LayoutError.invalid("longPressDelay must be positive finite seconds")
+            throw LayoutError.invalid("长按等待时间要大于 0 秒，请修改后保存。")
         }
         guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
-            throw LayoutError.invalid("id and name are required")
+            throw LayoutError.invalid("请填写名称后再保存。")
         }
         if let schema = input.schemaID, schema.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw LayoutError.invalid("schemaID must not be empty")
+            throw LayoutError.invalid("这个布局指定的输入方案是空的，请重新选择输入方案。")
         }
         guard input.schemaID != nil || input.builtinLayout != nil else {
-            throw LayoutError.invalid("input requires schemaID or builtinLayout")
+            throw LayoutError.invalid("请选择这个布局适用的输入方案，或者适用的键盘（如 26 键、9 键）。")
         }
         guard !rows.isEmpty, rows.allSatisfy({ !$0.keys.isEmpty }) else {
-            throw LayoutError.invalid("rows must contain keys")
+            throw LayoutError.invalid("请至少保留一行，每行至少保留一个按键。")
         }
         let area = effectiveCandidateArea
         if area.reading && !area.candidates {
-            throw LayoutError.invalid("reading row requires a candidate area")
+            throw LayoutError.invalid("拼音提示行需要显示候选栏，请开启后保存。")
         }
         if area.reading && PhoneKeypadStructure.matches(self) {
-            throw LayoutError.invalid("phone layouts use their leading reading rail")
+            throw LayoutError.invalid("9 键的拼音显示在左侧栏，请关闭拼音提示行后保存。")
         }
         if !area.candidates && sendsEngineCode {
-            throw LayoutError.invalid("Rime code keys require a candidate area")
+            throw LayoutError.invalid("输入字母的按键需要显示候选栏，请开启后保存。")
         }
         for area in auxiliaryAreas ?? [] {
             // This is a dynamic engine-provided region, never static fake letter filters.
             if area.role == .disambiguation && !area.keys.isEmpty {
-                throw LayoutError.invalid("disambiguation keys must be supplied by the engine at runtime")
+                throw LayoutError.invalid("选字辅助区的按键由输入法自动提供，请清空其中的按键后保存。")
             }
         }
         for key in rows.flatMap(\.keys) + (auxiliaryAreas ?? []).flatMap(\.keys) {
             guard !key.label.isEmpty, key.widthWeight.isFinite, key.widthWeight > 0 else {
-                throw LayoutError.invalid("keys require label and positive finite width")
+                throw LayoutError.invalid("请填写按键标题，并把宽度设为大于 0 的数字。")
             }
             try key.action.validate()
             for option in key.longPress ?? [] {
-                guard !option.label.isEmpty else { throw LayoutError.invalid("longPress requires label") }
+                guard !option.label.isEmpty else { throw LayoutError.invalid("请填写长按项的标题。") }
                 try option.action.validate()
             }
         }
+        return usage
     }
 }
 
@@ -359,17 +351,16 @@ public extension LayoutDefinition {
     }
 
     func copy(name: String? = nil) -> LayoutDefinition {
-        LayoutDefinition(
-            id: UUID().uuidString.lowercased(), name: name ?? self.name + " 副本",
-            input: input, rows: rows, auxiliaryAreas: auxiliaryAreas,
-            note: note, longPressDelay: longPressDelay, candidateArea: candidateArea, split: split)
+        var copy = self
+        copy.id = UUID().uuidString.lowercased()
+        copy.name = name ?? self.name + " 副本"
+        return copy
     }
 
     func renamed(_ name: String) -> LayoutDefinition {
-        LayoutDefinition(
-            id: id, name: name, input: input, rows: rows,
-            auxiliaryAreas: auxiliaryAreas, note: note, longPressDelay: longPressDelay,
-            candidateArea: candidateArea, split: split)
+        var copy = self
+        copy.name = name
+        return copy
     }
 
     func key(at path: LayoutKeyPath) -> LayoutKey? {
@@ -388,40 +379,38 @@ public extension LayoutDefinition {
     /// Draft mutation deliberately allows invalid intermediate values; save validates the whole draft.
     func replacingKey(at path: LayoutKeyPath, with key: LayoutKey) -> LayoutDefinition {
         guard self.key(at: path) != nil else { return self }
-        var rows = rows
-        var areas = auxiliaryAreas
+        var copy = self
         switch path {
         case .row(let row, let index):
             var keys = rows[row].keys
             keys[index] = key
-            rows[row] = LayoutRow(keys: keys)
+            copy.rows[row] = LayoutRow(keys: keys)
         case .auxiliary(let area, let index):
-            if let original = areas?[area] {
+            if let original = auxiliaryAreas?[area] {
                 var keys = original.keys
                 keys[index] = key
-                areas?[area] = LayoutAuxiliaryArea(position: original.position, role: original.role, keys: keys)
+                copy.auxiliaryAreas?[area] = LayoutAuxiliaryArea(
+                    position: original.position, role: original.role, keys: keys)
             }
         }
-        return LayoutDefinition(
-            id: id, name: name, input: input, rows: rows,
-            auxiliaryAreas: areas, note: note, longPressDelay: longPressDelay,
-            candidateArea: candidateArea, split: split)
+        return copy
     }
 
     func settingCandidateArea(_ area: LayoutCandidateArea) -> LayoutDefinition {
-        LayoutDefinition(
-            id: id, name: name, input: input, rows: rows,
-            auxiliaryAreas: auxiliaryAreas, note: note, longPressDelay: longPressDelay,
-            candidateArea: area, split: split)
+        var copy = self
+        copy.candidateArea = area
+        return copy
     }
 
     func settingSplit(_ split: LayoutSplitConfiguration?) -> LayoutDefinition {
-        LayoutDefinition(
-            id: id, name: name, input: input, rows: rows, auxiliaryAreas: auxiliaryAreas,
-            note: note, longPressDelay: longPressDelay, candidateArea: candidateArea, split: split)
+        var copy = self
+        copy.split = split
+        return copy
     }
 }
 
+/// Every message is written for the person editing the layout: it says what is wrong and what to
+/// change, so hosts show it as is under their own title.
 public enum LayoutError: Error, LocalizedError, Equatable {
     case invalid(String)
     case duplicateID(String)
@@ -429,10 +418,10 @@ public enum LayoutError: Error, LocalizedError, Equatable {
     case lastEnabledLayout
     public var errorDescription: String? {
         switch self {
-        case .invalid(let reason): return "Invalid layout: \(reason)"
-        case .duplicateID(let id): return "Layout already exists: \(id)"
-        case .unknownID(let id): return "Unknown layout: \(id)"
-        case .lastEnabledLayout: return "Keep at least one enabled layout."
+        case .invalid(let message): return message
+        case .duplicateID: return "已经有一个相同的键盘布局，请选择替换，或者另存为副本。"
+        case .unknownID: return "找不到这个键盘布局，它可能已经被删除。"
+        case .lastEnabledLayout: return "请至少保留一个启用的布局。请先启用其他布局，再停用或移除当前布局。"
         }
     }
 }

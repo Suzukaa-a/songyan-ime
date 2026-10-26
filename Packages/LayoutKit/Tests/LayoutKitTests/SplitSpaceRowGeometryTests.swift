@@ -16,9 +16,10 @@ final class SplitSpaceRowGeometryTests: XCTestCase {
                     let right = policy.slots.dropFirst(boundary).filter { $0 != .space }.map { metrics[$0] }
                     // This checks the forced split layout at every width; the default automatic
                     // activation keeps narrow surfaces whole.
-                    let forced = LayoutSplitConfiguration(activation: .always)
-                    let requested = forced.gap(
-                        width: width, keyCount: policy.slots.count, minimumKeyWidth: 44)
+                    let forced = LayoutSplitConfiguration(activation: .always).resolved(forWidth: width)
+                    let requested =
+                        forced?.gap(
+                            width: width, keyCount: policy.slots.count, minimumKeyWidth: 44) ?? 0
                     let geometry = SplitSpaceRowGeometry(
                         width: width, requestedGap: requested, leftKeyWidths: left, rightKeyWidths: right,
                         preferredSpaceWidth: StandardKeyRowGeometry(width: width, split: forced).keyWidth * 3)

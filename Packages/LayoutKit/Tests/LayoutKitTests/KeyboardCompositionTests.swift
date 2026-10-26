@@ -4,21 +4,7 @@ import XCTest
 @testable import LayoutKit
 
 final class KeyboardCompositionTests: XCTestCase {
-    func testLegacyCatalogLoadsDefaultsWithoutRewritingLayouts() throws {
-        let layouts = [BuiltinLayouts.qwerty26]
-        let data = try JSONSerialization.data(withJSONObject: [
-            "layouts": try JSONSerialization.jsonObject(with: JSONEncoder().encode(layouts)),
-            "enabledIDs": [layouts[0].id],
-        ])
-        let registry = try JSONDecoder().decode(LayoutRegistry.self, from: data)
-        try registry.validate()
-        XCTAssertEqual(registry.layouts, layouts)
-        XCTAssertEqual(registry.enabledIDs, [layouts[0].id])
-        XCTAssertEqual(registry.pages, KeyboardPagePresets.all)
-        XCTAssertTrue(registry.compositions.isEmpty)
-    }
-
-    func testLegacyCatalogAtKeyBudgetRetainsCapacityWhenDefaultPagesAreAdded() throws {
+    func testCatalogAtTheKeyBudgetStillLoadsWithTheBuiltInPages() throws {
         let key = LayoutKey(label: "a", action: .init(.literal, value: "a"))
         let rows = Array(repeating: LayoutRow(keys: Array(repeating: key, count: 32)), count: 8)
         let layouts = (0..<16).map { index in
@@ -125,7 +111,7 @@ final class KeyboardCompositionTests: XCTestCase {
             .init(
                 keys: Array(
                     repeating: .init(label: "a", action: .init(.literal, value: "a")),
-                    count: LayoutResourceBudget.keysPerRegion + LayoutResourceBudget.pageControlRowKeys + 1))
+                    count: LayoutResourceBudget.keysPerRegion + 1))
         ]
         XCTAssertThrowsError(try page.validate())
         let tooMany = (0...LayoutResourceBudget.pages).map { index in
@@ -249,94 +235,6 @@ final class KeyboardCompositionTests: XCTestCase {
         else { return XCTFail("the ABC page pairing must stay authored") }
     }
 
-    /// A catalog saved by the previous version lists its seven pages explicitly. It must gain the
-    /// new automatic page without touching the user's copies or explicit choices, so the default
-    /// pairing can be saved and the automatic page is selectable.
-    func testOldCatalogWithExplicitPagesGainsTheAutomaticPage() throws {
-        // The previous version shipped seven presets: neither the automatic 123 page nor the
-        // authored digit pad existed yet.
-        var oldPages = KeyboardPagePresets.all.filter {
-            $0.id != KeyboardPagePresets.numericAutomatic.id && $0.id != KeyboardPagePresets.numericKeypad.id
-        }
-        XCTAssertEqual(oldPages.count, 7, "the previous version shipped seven presets")
-        var myPage = KeyboardPagePresets.numericChinese.copy(name: "我的数字页")
-        myPage.rows = [.init(keys: [.init(label: "一", action: .init(.literal, value: "1"))])]
-        // An edited built-in preset keeps its ID, so the catalog replaced it in place.
-        var editedSymbols = KeyboardPagePresets.symbolsSystem
-        editedSymbols.name = "我改过名字的符号页"
-        let presetIndex = try XCTUnwrap(oldPages.firstIndex { $0.id == editedSymbols.id })
-        oldPages[presetIndex] = editedSymbols
-        let storedPages = oldPages + [myPage]
-        var oldComposition = KeyboardComposition(mainLayoutID: BuiltinLayouts.qwerty26.id)
-        oldComposition.numericPageID = KeyboardPagePresets.numericChinese.id
-        let oldData = try JSONSerialization.data(withJSONObject: [
-            "layouts": try JSONSerialization.jsonObject(
-                with: JSONEncoder().encode([BuiltinLayouts.qwerty26, BuiltinLayouts.merged14])),
-            "enabledIDs": [BuiltinLayouts.qwerty26.id, BuiltinLayouts.merged14.id],
-            "pages": try JSONSerialization.jsonObject(with: JSONEncoder().encode(storedPages)),
-            "compositions": try JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(["quanpin:qwerty26": oldComposition])),
-        ])
-
-        let loaded = try JSONDecoder().decode(LayoutRegistry.self, from: oldData)
-        try loaded.validate()
-        XCTAssertNotNil(loaded.page(id: KeyboardPagePresets.numericAutomatic.id))
-        XCTAssertEqual(loaded.page(id: myPage.id), myPage)
-        XCTAssertEqual(loaded.page(id: KeyboardPagePresets.symbolsSystem.id)?.name, "我改过名字的符号页")
-        XCTAssertEqual(loaded.compositions["quanpin:qwerty26"], oldComposition)
-
-        // A pairing saved now can reference the automatic page; the write must survive a reload.
-        var writable = loaded
-        try writable.setComposition(
-            KeyboardComposition(mainLayoutID: BuiltinLayouts.merged14.id), for: "quanpin:merged14")
-        let reloaded = try storedRoundTrip(writable)
-        let numericID = try XCTUnwrap(reloaded.compositions["quanpin:merged14"]?.numericPageID)
-        XCTAssertEqual(numericID, KeyboardPagePresets.numericAutomatic.id)
-        XCTAssertEqual(reloaded.page(id: numericID)?.numericPresentation, .automatic)
-        // The old explicit choice is untouched by the upgrade and by the new pairing.
-        XCTAssertEqual(reloaded.compositions["quanpin:qwerty26"]?.numericPageID, KeyboardPagePresets.numericChinese.id)
-        XCTAssertEqual(reloaded.page(id: myPage.id), myPage)
-    }
-
-    /// Copy-and-edit materialises an automatic page; a copy never keeps following the live keyboard.
-    func testAutomaticPageCopiesMaterialiseEditableContent() throws {
-        let chinese = KeyboardPagePresets.numericAutomatic.copy()
-        XCTAssertNil(chinese.numericPresentation)
-        XCTAssertEqual(chinese.kind, .numeric)
-        XCTAssertNotEqual(chinese.id, KeyboardPagePresets.numericAutomatic.id)
-        // The copy carries the tenth-column Delete the legacy renderer synthesized.
-        XCTAssertEqual(chinese.rows.map { $0.keys.count }, [10, 10, 10])
-        for row in 0..<2 { XCTAssertEqual(chinese.rows[row], KeyboardPagePresets.numericChinese.rows[row]) }
-        XCTAssertEqual(
-            chinese.rows[2].keys.dropLast().map(\.label),
-            KeyboardPagePresets.numericChinese.rows[2].keys.map(\.label))
-        XCTAssertEqual(chinese.rows[2].keys.last?.action.type, .backspace)
-        XCTAssertEqual(chinese.chrome?.bottom.count, 6)
-        try chinese.validate()
-
-        let english = KeyboardPagePresets.numericAutomatic.copy(numericMarks: .ascii)
-        XCTAssertNil(english.numericPresentation)
-        XCTAssertEqual(english.rows.map { $0.keys.count }, [10, 10, 10])
-        XCTAssertEqual(english.rows[2].keys.last?.action.type, .backspace)
-        try english.validate()
-
-        let symbols = KeyboardPagePresets.symbolsSystem.copy()
-        XCTAssertEqual(symbols.symbolPresentation, .rows)
-        XCTAssertFalse(symbols.rows.isEmpty, "the symbol copy must carry the rows it stands for")
-        XCTAssertEqual(symbols.rows.map { $0.keys.count }, [10, 10, 10])
-        XCTAssertEqual(symbols.rows[2].keys.last?.action.type, .backspace)
-        try symbols.validate()
-
-        // Copying to an authored page must not shrink the preset or add crafted keys to it.
-        XCTAssertEqual(KeyboardPagePresets.numericChinese.rows.map { $0.keys.count }, [10, 10, 9])
-        XCTAssertEqual(KeyboardPagePresets.numericEnglish.rows.map { $0.keys.count }, [10, 10, 9])
-        XCTAssertEqual(KeyboardPagePresets.symbolsSystem.rows.map { $0.keys.count }, [10, 10, 9])
-        XCTAssertNil(KeyboardPagePresets.numericChinese.chrome)
-        XCTAssertNil(KeyboardPagePresets.symbolsSystem.chrome)
-    }
-
-    /// An automatic 123 page owns no keys, so authored content in one is rejected rather than
-    /// silently ignored by the key area.
     func testAutomaticPageRejectsAuthoredContent() throws {
         XCTAssertNoThrow(try KeyboardPagePresets.numericAutomatic.validate())
         XCTAssertThrowsError(
@@ -355,34 +253,6 @@ final class KeyboardCompositionTests: XCTestCase {
                 id: "auto-with-symbol-presentation", name: "自动 123", kind: .numeric, rows: [],
                 symbolPresentation: .rows, numericPresentation: .automatic
             ).validate())
-    }
-
-    /// The previous version allowed 96 pages in total. A catalog saved at that limit gains the
-    /// shipped presets on load, so it must still validate and be written back.
-    func testCatalogAtThePageBudgetStillLoadsAfterTheAutomaticPageIsMerged() throws {
-        let oldPresets = KeyboardPagePresets.all.filter { $0.id != KeyboardPagePresets.numericAutomatic.id }
-        let userPages = (0..<(LayoutResourceBudget.pages - oldPresets.count)).map { index in
-            var copy = KeyboardPagePresets.englishQwerty
-            copy.id = "my-page-\(index)"
-            return copy
-        }
-        let storedPages = oldPresets + userPages
-        XCTAssertEqual(storedPages.count, LayoutResourceBudget.pages)
-        let data = try JSONSerialization.data(withJSONObject: [
-            "layouts": try JSONSerialization.jsonObject(with: JSONEncoder().encode([BuiltinLayouts.qwerty26])),
-            "enabledIDs": [BuiltinLayouts.qwerty26.id],
-            "pages": try JSONSerialization.jsonObject(with: JSONEncoder().encode(storedPages)),
-        ])
-
-        let loaded = try JSONDecoder().decode(LayoutRegistry.self, from: data)
-        try loaded.validate()
-        XCTAssertNotNil(loaded.page(id: KeyboardPagePresets.numericAutomatic.id))
-        XCTAssertEqual(loaded.pages.count, LayoutResourceBudget.pages + 1)
-        // The user's own pages are untouched, and the merged catalog can be written and read again.
-        XCTAssertEqual(loaded.page(id: userPages[0].id), userPages[0])
-        let reloaded = try storedRoundTrip(loaded)
-        XCTAssertEqual(reloaded.pages.count, LayoutResourceBudget.pages + 1)
-        XCTAssertEqual(reloaded.page(id: userPages[0].id), userPages[0])
     }
 
     private func storedRoundTrip(_ registry: LayoutRegistry) throws -> LayoutRegistry {

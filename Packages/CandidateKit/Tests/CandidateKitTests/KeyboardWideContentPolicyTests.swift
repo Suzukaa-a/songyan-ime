@@ -1,3 +1,4 @@
+import LayoutKit
 import XCTest
 
 @testable import CandidateKit
@@ -117,11 +118,11 @@ final class KeyboardWideContentPolicyTests: XCTestCase {
     func testOneHandAndWideContentRangesNeverOverlap() {
         for width in stride(from: 300.0, through: 1200.0, by: 1.0) {
             let oneHand = KeyboardOneHandLayoutPolicy.plan(
-                mode: .left, panelWidth: width, isPhonePortrait: true)
+                mode: .left, panelWidth: width, isAvailable: true)
             let wide = KeyboardWideContentPolicy.plan(
                 panelWidth: width, maximumContentWidth: 520, dock: .center)
             XCTAssertFalse(oneHand.active && wide.active, "width \(width)")
-            if width > KeyboardWideContentPolicy.minimumActivePanelWidth {
+            if width > KeyboardSurfaceWidth.phoneMaximum {
                 XCTAssertFalse(oneHand.active, "width \(width)")
             } else {
                 XCTAssertFalse(wide.active, "width \(width)")

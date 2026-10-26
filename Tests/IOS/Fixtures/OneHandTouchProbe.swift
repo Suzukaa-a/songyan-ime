@@ -82,7 +82,7 @@ final class KeyboardFeedbackService {
         let plan = KeyboardOneHandLayoutPolicy.plan(
             mode: .left,
             panelWidth: Double(Self.panelWidth),
-            isPhonePortrait: true)
+            isAvailable: true)
         record(
             "planActiveAt390", plan.active && plan.contentWidth == 331 && plan.gutterWidth == 59,
             "active=\(plan.active) content=\(plan.contentWidth) gutter=\(plan.gutterWidth)")

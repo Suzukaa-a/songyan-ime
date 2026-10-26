@@ -5,9 +5,7 @@ import SwiftUI
 struct KeyboardRowsEditor: View {
     @Binding var rows: [LayoutRow]
     @Binding var selected: LayoutKeyPath
-    /// An authored page row also carries the function keys materialization may add, so its
-    /// allowance is larger than a main layout row's.
-    var rowKeyLimit = LayoutResourceBudget.keysPerRegion
+    private let rowKeyLimit = LayoutResourceBudget.keysPerRegion
 
     var body: some View {
         Section("行与按键") {
@@ -138,7 +136,7 @@ struct KeyboardSplitEditor: View {
     var allowsInheritance = false
     var inheritanceTitle = "跟随主布局开关与间距"
     /// No stored split means the split is off, never the initializer's default-on value.
-    private var configuration: LayoutSplitConfiguration { split ?? LayoutSplitConfiguration(enabled: false) }
+    private var configuration: LayoutSplitConfiguration { split ?? LayoutSplitConfiguration(activation: .off) }
 
     /// The stored cut, or the same middle default the keyboard uses before a cut is saved.
     private var breaks: [Int] {
@@ -154,19 +152,19 @@ struct KeyboardSplitEditor: View {
                     inheritanceTitle,
                     isOn: Binding(
                         get: { split == nil },
-                        set: { follows in split = follows ? nil : LayoutSplitConfiguration(enabled: false) }))
+                        set: { follows in split = follows ? nil : LayoutSplitConfiguration(activation: .off) }))
             }
             if !allowsInheritance || split != nil {
                 Toggle(
                     "拆分键盘",
                     isOn: Binding(
-                        get: { split?.enabled == true },
-                        set: { enabled in update { $0.enabled = enabled } }))
-                if split?.enabled == true {
+                        get: { configuration.activation != .off },
+                        set: { enabled in update { $0.activation = enabled ? .automatic : .off } }))
+                if configuration.activation != .off {
                     Picker(
                         "拆分时机",
                         selection: Binding(
-                            get: { configuration.activation ?? .automatic },
+                            get: { configuration.activation },
                             set: { activation in update { $0.activation = activation } })
                     ) {
                         Text("宽屏时").tag(LayoutSplitConfiguration.Activation.automatic)
@@ -175,9 +173,9 @@ struct KeyboardSplitEditor: View {
                     Toggle(
                         "自动间距",
                         isOn: Binding(
-                            get: { configuration.automaticGap == true },
+                            get: { configuration.automaticGap },
                             set: { automatic in update { $0.automaticGap = automatic } }))
-                    if configuration.automaticGap != true {
+                    if !configuration.automaticGap {
                         Slider(
                             value: Binding(
                                 get: { configuration.gapFraction },
@@ -227,7 +225,7 @@ struct KeyboardSplitEditor: View {
 struct KeyboardChromeKeysEditor: View {
     @Binding var chrome: KeyboardPageChrome
     @Binding var selected: KeyboardPageKeyPath
-    /// A categorised page's left rail is category navigation, so it has no authored keys.
+    /// A categorized page's left rail is category navigation, so it has no authored keys.
     var allowsLeading = true
 
     var body: some View {

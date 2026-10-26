@@ -350,20 +350,20 @@ final class DefinitionResolutionMemo {
             // The 26/14/18 shells are structural: main-row long-press, label and title edits keep
             // the native columns/Shift/Delete/separator geometry, while the footer identity below
             // stays separate so an edited control row is rendered instead of covered up.
-            isBundledQwertyMainShell = active.map(BuiltinLayouts.matchesQwerty26MainShell) == true
+            isBundledQwertyMainShell = active.map { BuiltinLayouts.matchesMainShell($0, as: .qwerty26) } == true
             switch active?.input.builtinLayout {
             case .some(.merged14):
-                isBundledMergedPad = active.map(BuiltinLayouts.matchesMerged14MainShell) == true
+                isBundledMergedPad = active.map { BuiltinLayouts.matchesMainShell($0, as: .merged14) } == true
                 isBundledControlRowPolicy =
-                    active.map(BuiltinLayouts.matchesMerged14ControlRowPolicy) == true
+                    active.map { BuiltinLayouts.matchesControlRowPolicy($0, as: .merged14) } == true
             case .some(.merged18):
-                isBundledMergedPad = active.map(BuiltinLayouts.matchesMerged18MainShell) == true
+                isBundledMergedPad = active.map { BuiltinLayouts.matchesMainShell($0, as: .merged18) } == true
                 isBundledControlRowPolicy =
-                    active.map(BuiltinLayouts.matchesMerged18ControlRowPolicy) == true
+                    active.map { BuiltinLayouts.matchesControlRowPolicy($0, as: .merged18) } == true
             case .some(.qwerty26):
                 isBundledMergedPad = false
                 isBundledControlRowPolicy =
-                    active.map(BuiltinLayouts.matchesQwerty26ControlRowPolicy) == true
+                    active.map { BuiltinLayouts.matchesControlRowPolicy($0, as: .qwerty26) } == true
             default:
                 isBundledMergedPad = false
                 isBundledControlRowPolicy = false

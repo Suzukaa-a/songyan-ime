@@ -6,7 +6,7 @@ public struct StandardKeyRowGeometry: Equatable, Sendable {
     public let keyWidth: Double
     public let thirdRowSideWidth: Double
 
-    public init(width: Double, split: LayoutSplitConfiguration? = nil, spacing: Double = 4) {
+    public init(width: Double, split: ActiveLayoutSplit? = nil, spacing: Double = 4) {
         let width = max(0, width)
         gap = split?.gap(width: width, keyCount: 10, spacing: spacing) ?? 0
         keyWidth = max(0, (width - gap - spacing * 9) / 10)

@@ -564,31 +564,28 @@ enum KeyboardRoutedTouch {
 
     // MARK: Wide content blank exclusion
 
-    /// The real content frame of a docked wide keyboard, so the blank margins beside it
-    /// never route to the nearest key. The frame is owned by the reporter view: a replacing
-    /// panel (rotation, dock change) must not have its region cleared by the old owner.
-    private static weak var wideContentOwner: AnyObject?
-    private static var wideContentWindowFrame: CGRect?
+    /// The view spanning a docked wide keyboard's real content, so the blank margins beside it
+    /// never route to the nearest key. Its frame is read at hit-test time in window space, so it
+    /// cannot go stale; a deallocated or replaced reporter leaves no region behind.
+    private static weak var wideContentView: UIView?
 
-    static func registerWideContentFrame(owner: AnyObject, frame: CGRect?) {
-        guard let frame else {
-            guard wideContentOwner === owner else { return }
-            wideContentOwner = nil
-            wideContentWindowFrame = nil
-            clear()
-            return
+    /// Only the registered view may retire its region; an old view must not clear a replacement.
+    static func registerWideContent(_ view: UIView, active: Bool) {
+        if active {
+            guard wideContentView !== view else { return }
+            wideContentView = view
+        } else {
+            guard wideContentView === view else { return }
+            wideContentView = nil
         }
-        guard frame.width > 0, frame.height > 0 else { return }
-        if wideContentOwner !== owner || wideContentWindowFrame != frame {
-            wideContentOwner = owner
-            wideContentWindowFrame = frame
-            // Keys moved under a recorded window point; the route cannot survive.
-            clear()
-        }
+        // Keys moved under a recorded window point; the route cannot survive.
+        clear()
     }
 
-    static func pointIsOutsideWideContent(_ windowPoint: CGPoint) -> Bool {
-        guard let frame = wideContentWindowFrame else { return false }
+    static func pointIsOutsideWideContent(_ windowPoint: CGPoint, in window: UIWindow) -> Bool {
+        guard let view = wideContentView, view.window === window else { return false }
+        let frame = view.convert(view.bounds, to: window)
+        guard frame.width > 0, frame.height > 0 else { return false }
         return !frame.contains(windowPoint)
     }
 
@@ -616,12 +613,60 @@ class SkinnedButton: UIButton, KeyboardKeyHitTarget {
     private let capLayer = SkinCapLayer()
     private let releaseAnimator = KeyboardKeyReleaseAnimator()
     override var isHighlighted: Bool { didSet { setNeedsLayout() } }
+    /// Author face of a native control (Shift, globe, Delete): a title replaces the glyph.
+    private(set) var authorTitle: String?
+    private var glyphName: String?
+    /// The author's secondary label under the face; created on first use.
+    private var authorSubtitleLabel: UILabel?
+    private var showsAuthorSubtitle: Bool { authorSubtitleLabel?.isHidden == false }
+
+    /// Rendering only: touch handling stays the native control's.
+    func applyAuthorFace(title: String?, subtitle: String?, glyph: String) {
+        let title = title?.isEmpty == false ? title : nil
+        if let title {
+            if authorTitle != title || glyphName != nil {
+                glyphName = nil
+                setImage(nil, for: .normal)
+                setTitle(title, for: .normal)
+                titleLabel?.adjustsFontSizeToFitWidth = true
+                titleLabel?.minimumScaleFactor = 0.6
+            }
+        } else if authorTitle != nil || glyphName != glyph {
+            setTitle(nil, for: .normal)
+            glyphName = glyph
+            setImage(UIImage(systemName: glyph), for: .normal)
+        }
+        authorTitle = title
+        let subtitle = subtitle?.isEmpty == false ? subtitle : nil
+        guard subtitle != nil || showsAuthorSubtitle else { return }
+        let label = authorSubtitleLabel ?? makeAuthorSubtitleLabel()
+        label.text = subtitle
+        label.isHidden = subtitle == nil
+        setNeedsLayout()
+    }
+
+    private func makeAuthorSubtitleLabel() -> UILabel {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.isUserInteractionEnabled = false
+        addSubview(label)
+        authorSubtitleLabel = label
+        return label
+    }
+
     override func layoutSubviews() {
         // A frame write on a transformed layer is undefined: start every pass
         // from identity and re-apply the press physics at the end.
         releaseAnimator.resetPressVisual(layers: pressVisualLayers)
         super.layoutSubviews()
         let role = isHighlighted ? "pressed" : skinRole
+        if let label = authorSubtitleLabel, !label.isHidden {
+            let visual = appearance.visualRect(in: bounds)
+            label.font = appearance.uiFont(appearance.skin.typography.secondarySize)
+            label.textColor = appearance.text(on: role, secondary: true)
+            label.frame = CGRect(
+                x: visual.minX + 3, y: visual.maxY - 16, width: max(0, visual.width - 6), height: 14)
+        }
         capLayer.update(in: self, appearance: appearance, role: role, pressed: isHighlighted)
         releaseAnimator.update(layer: capLayer, isPressed: isHighlighted)
         releaseAnimator.updatePressVisual(container: layer, layers: pressVisualLayers, isPressed: isHighlighted)
@@ -633,6 +678,12 @@ class SkinnedButton: UIButton, KeyboardKeyHitTarget {
     }
     /// The keycap surface plus its glyphs move together; the button's own layer
     /// (hit testing / tracking geometry) is deliberately not transformed.
-    private var pressVisualLayers: [CALayer?] { [capLayer, titleLabel?.layer, imageView?.layer] }
-    override func contentRect(forBounds bounds: CGRect) -> CGRect { appearance.visualRect(in: bounds) }
+    private var pressVisualLayers: [CALayer?] {
+        [capLayer, titleLabel?.layer, imageView?.layer, authorSubtitleLabel?.layer]
+    }
+    /// A secondary label lifts the title/glyph so the two read as one face.
+    override func contentRect(forBounds bounds: CGRect) -> CGRect {
+        let rect = appearance.visualRect(in: bounds)
+        return showsAuthorSubtitle ? rect.offsetBy(dx: 0, dy: -4) : rect
+    }
 }

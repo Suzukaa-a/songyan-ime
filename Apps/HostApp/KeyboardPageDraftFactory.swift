@@ -16,7 +16,7 @@ enum KeyboardPageDraftFactory {
     }
 
     /// Opens an existing page for editing with the same id and name. Function keys become authored
-    /// chrome and a categorised page gets the categories the keyboard currently shows, because the
+    /// chrome and a categorized page gets the categories the keyboard currently shows, because the
     /// editor mutates data and can never read that library on the main thread.
     static func editableDraft(
         _ page: KeyboardPageDefinition, numericForm: KeyboardNumericForm = .rows,
@@ -39,7 +39,7 @@ enum KeyboardPageDraftFactory {
     }
 
     /// A copy always carries the current function keys as real data. An automatic 123 page is
-    /// materialised in the shape the caller selects (the running main layout's digit pad or the
+    /// materialized in the shape the caller selects (the running main layout's digit pad or the
     /// ten-column row page), and an automatic symbol page in the presentation requested.
     static func copy(
         _ page: KeyboardPageDefinition, presentation: KeyboardSymbolPresentation? = nil,
@@ -68,7 +68,7 @@ enum KeyboardPageDraftFactory {
                 try copy.validate()
                 return copy
             case .categorized:
-                // Categorised copies take the live library snapshot below; their initial branch
+                // Categorized copies take the live library snapshot below; their initial branch
                 // follows the keyboard unless the caller pinned one.
                 base.chrome = nil
                 base.symbolPresentation = .categorized
@@ -87,12 +87,6 @@ enum KeyboardPageDraftFactory {
         if page.resolvesAtRuntime { copy.defaultSymbolMarks = numericMarks }
         try copy.validate()
         return copy
-    }
-
-    /// The user-facing text for a copy failure: validation reasons are already written for people.
-    static func message(for error: Error) -> String {
-        if case LayoutError.invalid(let reason) = error { return reason }
-        return error.localizedDescription
     }
 
     private static func numericCopyName(marks: KeyboardNumericMarks, form: KeyboardNumericForm) -> String {

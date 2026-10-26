@@ -2,9 +2,9 @@ import Foundation
 
 /// The authored function area of a page: the footer row and the two side rails.
 ///
-/// `KeyboardPageDefinition.chrome == nil` keeps the exact legacy synthesis, so an old catalog
-/// renders as before. A non-nil chrome is fully authored: the host draws only these keys and
-/// never invents a Shift, Delete, footer or rail a user deleted or never added.
+/// `KeyboardPageDefinition.chrome == nil` draws the native controls (built-in pages). A non-nil
+/// chrome is fully authored: the host draws only these keys and never invents a Shift, Delete,
+/// footer or rail a user deleted or never added.
 public struct KeyboardPageChrome: Codable, Equatable, Sendable {
     public enum Region: String, Codable, CaseIterable, Hashable, Sendable {
         /// Footer row under the key area. Key `width` is a relative width.
@@ -72,13 +72,9 @@ public struct KeyboardPageChrome: Codable, Equatable, Sendable {
         return keys.map(\.widthWeight)
     }
 
+    /// Key counts are part of the page budget (`LayoutResourceBudget.usage(_:)`).
     func validate() throws {
-        for region in Region.allCases {
-            let keys = keys(in: region)
-            try LayoutResourceBudget.check(
-                keys.count <= LayoutResourceBudget.keysPerRegion, "单侧功能键过多")
-            for key in keys { try KeyboardPageDefinition.validateKey(key) }
-        }
+        for key in allKeys { try KeyboardPageDefinition.validateKey(key) }
         for (width, detail) in [
             (leadingWidth, "请把左侧栏宽度设为大于 0 的数字。"),
             (trailingWidth, "请把右侧栏宽度设为大于 0 的数字。"),

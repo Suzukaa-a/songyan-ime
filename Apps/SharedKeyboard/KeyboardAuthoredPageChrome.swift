@@ -33,7 +33,7 @@ struct KeyboardAuthoredPageMetrics: Equatable {
         let height = keyHeight.isFinite ? max(0, keyHeight) : 0
         let spacing = Self.spacing
         let rows = Double(max(0, rowCount))
-        // A materialised keypad/category page left the rail widths nil so its shell keeps the
+        // A materialized keypad/category page left the rail widths nil so its shell keeps the
         // built-in phone keypad geometry it was copied from.
         let defaultRail = PhoneKeypadMetrics.resolve(width: width, rowHeight: height).railWidth
         var leading = hasLeading ? Self.railWidth(leadingWidth ?? defaultRail, rootWidth: width) : 0
@@ -80,7 +80,7 @@ struct KeyboardPageAuthoredActionTable {
         let path: KeyboardPageKeyPath
         let action: LayoutAction
         /// A long-press option: on an English letter page it types an explicit variant instead of
-        /// the plain code, exactly like the legacy page keycap path.
+        /// the plain code, exactly like a built-in page keycap.
         let isAlternate: Bool
     }
 
@@ -151,7 +151,7 @@ struct KeyboardPageAuthoredState: Equatable {
     /// the language key title/action read this.
     var usesASCIIPunctuation = false
     /// Explicit category decision. A trailing rail alone must never tag a keypad/row page as the
-    /// categorised grid (that changes the language key's return/toggle semantics).
+    /// categorized grid (that changes the language key's return/toggle semantics).
     var usesCategorySymbolPage = false
 
     var shiftActive: Bool { shiftState.isActive }
@@ -166,7 +166,7 @@ struct KeyboardPageAuthoredState: Equatable {
     }
 
     /// The real title of a key: the authored label for .custom, otherwise the live native title.
-    /// A nil titleMode keeps the legacy class semantics (draw the stored label).
+    /// A nil titleMode keeps per-action semantics (see below).
     func title(for key: LayoutKey) -> String {
         switch key.titleMode {
         case .custom:
@@ -174,9 +174,9 @@ struct KeyboardPageAuthoredState: Equatable {
         case .automatic:
             return automaticTitle(for: key)
         case nil:
-            // Legacy class semantics stay per action type: a legacy inline Return always drew the
-            // host/composition title whatever label it stored, while a legacy space drew its label.
-            // Materialisation must not freeze an old Return into a stale label.
+            // Without a title mode, Return draws the live host/composition title whatever label it
+            // stores, while space draws its label; copying a page must not freeze Return into a
+            // stale label.
             return key.action.type == .enter ? returnTitle : key.label
         }
     }
@@ -185,25 +185,14 @@ struct KeyboardPageAuthoredState: Equatable {
         switch key.action.type {
         case .enter: return returnTitle
         case .space: return isEnglishMode ? "space" : "空格"
-        case .languageSwitch:
-            return controlPolicy.languageTitle(for: key.action.languageSwitchBehavior)
-        case .pageSwitch:
-            switch key.action.pageSwitchTarget {
-            case .letters: return "返回"
-            case .numeric: return "123"
-            case .symbols: return "符号"
-            case nil: return key.label
-            }
         case .literal:
             return key.literalFaceTitle(usesASCIIPunctuation: usesASCIIPunctuation)
-        case .symbolLock: return "锁定"
-        case .clearInput: return "重输"
-        case .shift: return "上档"
-        default: return key.label
+        default:
+            return KeyboardPageControlFace.title(for: key, policy: controlPolicy) ?? key.label
         }
     }
 
-    /// Native disabled state. clearInput is the old 重输: it only clears a live composition.
+    /// Native disabled state. clearInput (重输) only clears a live composition.
     func isEnabled(_ key: LayoutKey) -> Bool {
         if key.action.type == .clearInput { return isComposing }
         if key.action.type == .shift { return isEnglishMode }
@@ -218,6 +207,40 @@ struct KeyboardPageAuthoredState: Equatable {
         case .symbolLock: return symbolLocked ? "已开启" : "已关闭"
         case .shift: return shiftState == .locked ? "大写锁定" : (shiftState == .once ? "下一字母大写" : "小写")
         default: return nil
+        }
+    }
+}
+
+/// Automatic faces of the page UI controls. Authored pages and main-layout definition keys read
+/// this one table, so a control never carries two names.
+enum KeyboardPageControlFace {
+    /// The native title of a page UI control, or nil for any other action.
+    static func title(for key: LayoutKey, policy: KeyboardControlPolicy) -> String? {
+        switch key.action.type {
+        case .pageSwitch:
+            switch key.action.pageSwitchTarget {
+            case .letters: return "返回"
+            case .numeric: return "123"
+            case .symbols: return "符号"
+            case nil: return key.label
+            }
+        case .languageSwitch: return policy.languageTitle(for: key.action.languageSwitchBehavior)
+        case .symbolLock: return "锁定"
+        case .clearInput: return "重输"
+        case .shift: return "上档"
+        default: return nil
+        }
+    }
+
+    /// The spoken name of a page UI control, or nil for any other action.
+    static func accessibilityLabel(for key: LayoutKey, policy: KeyboardControlPolicy) -> String? {
+        switch key.action.type {
+        case .pageSwitch where key.action.pageSwitchTarget == .letters: return "返回主键盘"
+        case .pageSwitch: return title(for: key, policy: policy).map { "打开\($0)页" }
+        case .languageSwitch: return policy.languageAccessibilityLabel(for: key.action.languageSwitchBehavior)
+        case .symbolLock: return "锁定符号页"
+        case .shift: return "上档键"
+        default: return title(for: key, policy: policy)
         }
     }
 }
@@ -242,8 +265,8 @@ struct KeyboardPageAuthoredActions {
     /// key with no authored long press keeps that system menu instead of losing it.
     var languageMenuAlternates: [KeyCap] = []
     var handleLanguageMenu: ((KeyCap) -> Void)? = nil
-    /// Native repeating delete: receives whether this call is a repeat, so the legacy rule of no
-    /// haptic/sound per repeat survives authored pages too.
+    /// Native repeating delete: receives whether this call is a repeat, so authored pages keep the
+    /// native rule of no haptic/sound per repeat.
     var performNativeDelete: ((KeyboardPageKeyPath, Bool) -> Void)? = nil
 }
 
@@ -261,21 +284,10 @@ extension LayoutAction {
     /// The single ASCII letter this literal key types, or nil for symbols and multi-character text.
     var singleASCIILetter: String? {
         // A bilingual pair is typed through literalValue on every branch; it must never fall back
-        // to the legacy English single-letter code path (value=a, asciiValue=★ stays a literal).
+        // to the English single-letter code path (value=a, asciiValue=★ stays a literal).
         guard type == .literal, asciiValue == nil, let value = value, value.utf8.count == 1,
             let character = value.first, character.isLetter, character.isASCII
         else { return nil }
         return value
-    }
-}
-
-extension LayoutSplitConfiguration {
-    /// Render-only resolution: the root keyboard width decides automatic splitting exactly once.
-    /// Nested rows receive rail-narrowed widths, so the settled copy pins activation to .always to
-    /// stop those inner geometries from re-applying the automatic threshold. Stored data is untouched.
-    func resolvedForRender(rootWidth: Double) -> LayoutSplitConfiguration? {
-        guard var active = resolved(forWidth: rootWidth) else { return nil }
-        active.activation = .always
-        return active
     }
 }

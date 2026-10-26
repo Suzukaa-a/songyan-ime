@@ -59,6 +59,9 @@ class KeyboardViewController: UIInputViewController {
     /// From `viewWillAppear` to `viewDidDisappear`. A window alone is not proof: a host
     /// can keep a dismissed controller's view attached.
     private var isOnScreen = false
+    /// This controller was the active one when its keyboard started to hide; only it may
+    /// budget the next presentation, once off screen.
+    private var preparesNextPresentation = false
     private lazy var panelHostLifetime = KeyboardPanelHostLifetime { [weak self] in
         guard let self else { return false }
         return Self.activeController === self
@@ -405,6 +408,7 @@ class KeyboardViewController: UIInputViewController {
         // text/selection callback); reading earlier crashes in documentIdentifier.
         hostDocumentAttachPending = true
         isOnScreen = true
+        preparesNextPresentation = false
         retiresPanelWhenHidden = false
         if hostingController == nil { installPanelHost() }
         adoptPresentationShell()
@@ -721,8 +725,8 @@ class KeyboardViewController: UIInputViewController {
     func syncInputModeSwitchKey() {
         guard !hostDocumentAttachPending, Self.activeController === self else { return }
         let needed = needsInputModeSwitchKey
-        // The app validates new/imported layouts against this real requirement; the write is once
-        // per process on a background queue, never on the key or first-frame path.
+        // The app validates new/imported layouts against this real requirement. Read once per
+        // appearance; only a changed value is written, on a background queue.
         KeyboardSystemRequirements.recordNeedsInputModeSwitchKey(needed)
         if route.needsInputModeSwitchKey != needed { route.needsInputModeSwitchKey = needed }
     }
@@ -730,6 +734,7 @@ class KeyboardViewController: UIInputViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         hostDocumentAttachPending = false
+        preparesNextPresentation = Self.activeController === self
         endPresentationGeometry()
         selectionSaveGeneration &+= 1
         hostAppearanceToken = nil
@@ -771,6 +776,9 @@ class KeyboardViewController: UIInputViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         isOnScreen = false
+        // A controller that claimed the keyboard in the meantime owns the next presentation.
+        if preparesNextPresentation, Self.activeController == nil { prepareNextPresentationGeometry() }
+        preparesNextPresentation = false
         if retiresPanelWhenHidden, Self.activeController !== self { retirePanelHost() }
     }
 

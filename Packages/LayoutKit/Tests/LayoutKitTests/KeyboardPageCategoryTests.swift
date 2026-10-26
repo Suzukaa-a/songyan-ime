@@ -91,11 +91,11 @@ final class KeyboardPageCategoryTests: XCTestCase {
         XCTAssertThrowsError(try page([recent]).validate())
     }
 
-    func testLegacyBrowserAndRowPagesDecodeWithoutCategories() throws {
-        let legacy = """
+    func testBrowserAndRowPagesDecodeWithoutCategories() throws {
+        let browserJSON = """
             {"id":"old-browser","name":"分类符号","kind":"symbols","rows":[],"symbolPresentation":"categorized"}
             """
-        let browser = try JSONDecoder().decode(KeyboardPageDefinition.self, from: Data(legacy.utf8))
+        let browser = try JSONDecoder().decode(KeyboardPageDefinition.self, from: Data(browserJSON.utf8))
         XCTAssertNil(browser.categories)
         try browser.validate()
         let row = KeyboardPagePresets.numericChinese

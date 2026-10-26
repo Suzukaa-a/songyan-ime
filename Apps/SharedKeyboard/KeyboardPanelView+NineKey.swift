@@ -392,7 +392,7 @@ extension KeyboardPanelView {
                 if usesFixedEditingRail { t9FixedEditingRail(metrics) } else { t9Rail(.trailing, metrics: metrics) }
             },
             bottom: { metrics in
-                phoneControlRow(metrics, splitOverride: .resolving(page: nil, main: categorySplit))
+                phoneControlRow(metrics, splitOverride: categorySplit?.withoutRowBreaks)
             }
         )
         // Every visit opens on 常用. Also picks up library edits made in the app

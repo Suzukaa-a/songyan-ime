@@ -6,7 +6,7 @@ import SwiftUI
 struct StableKeyboardControlRow<Content: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let policy: KeyboardControlPolicy
-    var split: LayoutSplitConfiguration? = nil
+    var split: ActiveLayoutSplit? = nil
     var splitRowIndex = 3
     @ViewBuilder var content: (KeyboardControlPolicy.Slot) -> Content
 
@@ -15,7 +15,7 @@ struct StableKeyboardControlRow<Content: View>: View {
             let boundary = split.breakIndex(row: splitRowIndex, keyCount: policy.slots.count)
             let left = Array(policy.slots.prefix(boundary)).filter { $0 != .space }
             let right = Array(policy.slots.dropFirst(boundary)).filter { $0 != .space }
-            let widths = policy.metrics(width: 320)
+            let widths = policy.metrics(width: SplitSpaceRowBudget.controlRowWidth)
             SplitSpaceKeyboardRow(
                 leftKeys: left, rightKeys: right, leftWidths: left.map { widths[$0] },
                 rightWidths: right.map { widths[$0] }, split: split,
@@ -37,28 +37,43 @@ struct StableKeyboardControlRow<Content: View>: View {
     }
 }
 
-/// Each native space control owns its own touch and cursor-pan session.
+/// Split control rows size their controls as the compact control row would at this width; the two
+/// space bars share the rest.
+enum SplitSpaceRowBudget {
+    static let controlRowWidth: Double = 320
+}
+
+/// The one split row with a space bar in each half; each native space control owns its own
+/// touch and cursor-pan session.
 struct SplitSpaceKeyboardRow<Key: Hashable, KeyContent: View, Space: View, Fallback: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let leftKeys: [Key]
     let rightKeys: [Key]
     let leftWidths: [Double]
     let rightWidths: [Double]
-    let split: LayoutSplitConfiguration
+    let split: ActiveLayoutSplit
     var spaceWidthMultiplier = 3.0
+    /// The gutter to request; nil asks the split at this row's own width.
+    var requestedGap: Double? = nil
+    var spacing: Double = 4
     @ViewBuilder var key: (Key) -> KeyContent
     @ViewBuilder var space: () -> Space
+    /// Drawn instead of the built-in scrolling row when the surface is too narrow for two usable
+    /// spaces, only if `narrowUsesFallback` is set.
     @ViewBuilder var fallback: () -> Fallback
+    var narrowUsesFallback = false
 
     var body: some View {
         GeometryReader { proxy in
-            let requested = split.gap(
-                width: Double(proxy.size.width), keyCount: max(2, leftKeys.count + rightKeys.count + 1),
-                minimumKeyWidth: 44)
+            let requested =
+                requestedGap
+                ?? split.gap(
+                    width: Double(proxy.size.width), keyCount: max(2, leftKeys.count + rightKeys.count + 1),
+                    minimumKeyWidth: 44)
             let letterWidth = StandardKeyRowGeometry(width: Double(proxy.size.width), split: split).keyWidth
             if let geometry = SplitSpaceRowGeometry(
                 width: Double(proxy.size.width), requestedGap: requested,
-                leftKeyWidths: leftWidths, rightKeyWidths: rightWidths,
+                leftKeyWidths: leftWidths, rightKeyWidths: rightWidths, spacing: spacing,
                 preferredSpaceWidth: letterWidth * spaceWidthMultiplier)
             {
                 HStack(spacing: 0) {
@@ -76,6 +91,8 @@ struct SplitSpaceKeyboardRow<Key: Hashable, KeyContent: View, Space: View, Fallb
                         }
                     }.frame(width: geometry.rightWidth)
                 }
+            } else if narrowUsesFallback {
+                fallback()
             } else {
                 // The user asked for a split and the surface is too narrow for two usable spaces:
                 // keep both spaces and scroll the row instead of silently dropping one.
@@ -107,7 +124,7 @@ struct SplitSpaceKeyboardRow<Key: Hashable, KeyContent: View, Space: View, Fallb
 ///  * width — `PhoneKeypadMetrics.resolve` splits the proposed width into
 ///    leading rail + gap + 3×3 pad + gap + trailing rail under an explicit
 ///    identity, so the grid and the bottom control row always share one content
-///    edge. Without a split, the compact shell is centred as one unit on wide
+///    edge. Without a split, the compact shell is centered as one unit on wide
 ///    surfaces. Splitting keeps the rail dimensions and expands the gap across
 ///    the available width so both hands can reach their keys.
 ///  * height — digit row *i*, every rail slot and the control row are derived

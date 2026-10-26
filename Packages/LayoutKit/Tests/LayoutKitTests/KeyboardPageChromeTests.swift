@@ -2,25 +2,25 @@ import XCTest
 
 @testable import LayoutKit
 
-/// The authored function area: chrome data, the stable key path, materialised drafts and the
+/// The authored function area: chrome data, the stable key path, materialized drafts and the
 /// title-mode contract. No source strings or hashes: every assertion is real data behaviour.
 final class KeyboardPageChromeTests: XCTestCase {
     // MARK: - Compatibility
 
-    func testLegacyPageStaysReadableAndMaterialisingDoesNotWriteIt() throws {
-        let legacy = KeyboardPagePresets.englishQwerty
-        let data = try JSONEncoder().encode(legacy)
+    func testNativeControlsPageStaysReadableAndMaterializingDoesNotWriteIt() throws {
+        let native = KeyboardPagePresets.englishQwerty
+        let data = try JSONEncoder().encode(native)
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertNil(object["chrome"], "a legacy page must not gain chrome on the wire")
+        XCTAssertNil(object["chrome"], "a page on native controls must not gain chrome on the wire")
         let decoded = try JSONDecoder().decode(KeyboardPageDefinition.self, from: data)
-        XCTAssertEqual(decoded, legacy)
+        XCTAssertEqual(decoded, native)
         XCTAssertNil(decoded.chrome)
 
-        let materialised = decoded.materialized()
-        XCTAssertNil(decoded.chrome, "materialising a value must not write into the stored page")
-        XCTAssertNotNil(materialised.chrome)
-        XCTAssertEqual(materialised.id, decoded.id)
-        XCTAssertEqual(materialised.name, decoded.name)
+        let materialized = decoded.materialized()
+        XCTAssertNil(decoded.chrome, "materializing a value must not write into the stored page")
+        XCTAssertNotNil(materialized.chrome)
+        XCTAssertEqual(materialized.id, decoded.id)
+        XCTAssertEqual(materialized.name, decoded.name)
     }
 
     func testTitleModeEncodesAndOldKeysDecodeAsNil() throws {
@@ -30,8 +30,8 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(object["titleMode"] as? String, "custom")
         XCTAssertEqual(try JSONDecoder().decode(LayoutKey.self, from: JSONEncoder().encode(custom)), custom)
 
-        let legacy = Data("{\"label\":\"q\",\"action\":{\"type\":\"literal\",\"value\":\"q\"}}".utf8)
-        let decoded = try JSONDecoder().decode(LayoutKey.self, from: legacy)
+        let plain = Data("{\"label\":\"q\",\"action\":{\"type\":\"literal\",\"value\":\"q\"}}".utf8)
+        let decoded = try JSONDecoder().decode(LayoutKey.self, from: plain)
         XCTAssertNil(decoded.titleMode)
         XCTAssertNil(decoded.width)
     }
@@ -54,9 +54,9 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(key.settingAction(.init(.space)).longPress, key.longPress)
     }
 
-    // MARK: - Materialisation defaults
+    // MARK: - Materialization defaults
 
-    func testMaterialisedABCCarriesShiftDeleteAndNativeFooter() throws {
+    func testMaterializedABCCarriesShiftDeleteAndNativeFooter() throws {
         let page = KeyboardPagePresets.englishQwerty.materialized()
         XCTAssertEqual(page.rows.map { $0.keys.count }, [10, 9, 9])
         XCTAssertEqual(page.rows[0], KeyboardPagePresets.englishQwerty.rows[0])
@@ -87,7 +87,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertTrue(bottom.allSatisfy { $0.titleMode == .automatic })
         XCTAssertTrue(page.chrome?.leading.isEmpty == true)
         XCTAssertTrue(page.chrome?.trailing.isEmpty == true)
-        XCTAssertEqual(page.materialized(), page, "materialisation is idempotent")
+        XCTAssertEqual(page.materialized(), page, "materialization is idempotent")
         try page.validate()
     }
 
@@ -96,8 +96,8 @@ final class KeyboardPageChromeTests: XCTestCase {
         for page in [
             KeyboardPagePresets.englishQwerty, KeyboardPagePresets.numericChinese, KeyboardPagePresets.symbolsChinese,
         ] {
-            let materialised = page.materialized()
-            XCTAssertEqual(materialised.chrome?.bottom.map(\.widthWeight), [1, 1, 1, 4, 1, 1])
+            let materialized = page.materialized()
+            XCTAssertEqual(materialized.chrome?.bottom.map(\.widthWeight), [1, 1, 1, 4, 1, 1])
         }
         let categorized = KeyboardPagePresets.symbolsCategorized.materialized()
         XCTAssertEqual(categorized.chrome?.bottom.map(\.widthWeight), [1, 1, 1, 4, 1])
@@ -108,7 +108,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(keypad.chrome?.trailing.map(\.widthWeight), [1, 1, 2])
     }
 
-    func testMaterialisedNumericRowPageKeepsTenColumnsAndFrozenMarks() throws {
+    func testMaterializedNumericRowPageKeepsTenColumnsAndFrozenMarks() throws {
         let chinese = KeyboardPagePresets.numericChinese.materialized()
         XCTAssertNil(chinese.numericPresentation)
         XCTAssertEqual(chinese.rows.map { $0.keys.count }, [10, 10, 10])
@@ -150,7 +150,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(symbols.chrome?.bottom[4].action.pageSwitchTarget, .numeric)
     }
 
-    func testMaterialisedAutomaticSymbolPageBecomesAuthoredRows() throws {
+    func testMaterializedAutomaticSymbolPageBecomesAuthoredRows() throws {
         let page = KeyboardPagePresets.symbolsSystem.materialized()
         XCTAssertEqual(page.symbolPresentation, .rows)
         XCTAssertEqual(page.rows.map { $0.keys.count }, [10, 10, 10])
@@ -161,7 +161,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         try page.validate()
     }
 
-    func testMaterialisedCategoryPageMovesNavigationToTrailingRail() throws {
+    func testMaterializedCategoryPageMovesNavigationToTrailingRail() throws {
         let page = KeyboardPagePresets.symbolsCategorized.materialized()
         XCTAssertTrue(page.rows.isEmpty)
         XCTAssertEqual(page.symbolPresentation, .categorized)
@@ -178,11 +178,11 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertTrue(chrome.leading.isEmpty)
         try page.validate()
 
-        // A legacy categorized page keeps its browser rows; materialising only adds chrome.
-        var legacyBrowser = KeyboardPagePresets.symbolsCategorized
-        legacyBrowser.rows = KeyboardPagePresets.symbolsChinese.rows
-        let kept = legacyBrowser.materialized()
-        XCTAssertEqual(kept.rows, legacyBrowser.rows)
+        // A categorized page with authored rows keeps its browser rows; materializing only adds chrome.
+        var rowsBrowser = KeyboardPagePresets.symbolsCategorized
+        rowsBrowser.rows = KeyboardPagePresets.symbolsChinese.rows
+        let kept = rowsBrowser.materialized()
+        XCTAssertEqual(kept.rows, rowsBrowser.rows)
         XCTAssertEqual(kept.chrome?.trailing.count, 3)
         try kept.validate()
     }
@@ -208,7 +208,6 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(preset.numericPresentation, .keypad)
         XCTAssertEqual(preset.name, "数字盘 123")
         try preset.validate()
-        XCTAssertTrue(KeyboardPagePresets.codeOwnedIDs.contains(preset.id))
         XCTAssertTrue(KeyboardPagePresets.all.contains { $0.id == preset.id })
         XCTAssertEqual(KeyboardPagePresets.mergingInto([]).filter { $0.id == preset.id }.count, 1)
 
@@ -232,44 +231,44 @@ final class KeyboardPageChromeTests: XCTestCase {
     // MARK: - Split cut and shift insertion
 
     func testInsertingShiftMovesTheStoredCutByOneOnly() throws {
-        let legacy = KeyboardPageDefinition(
+        let native = KeyboardPageDefinition(
             id: "cut.abc", name: "切开 ABC", kind: .english,
             rows: KeyboardPagePresets.englishQwerty.rows,
             split: LayoutSplitConfiguration(rowBreaks: [5, 4, 3]))
-        let materialised = legacy.materialized()
-        XCTAssertEqual(materialised.rows[2].keys.count, 9)
-        XCTAssertEqual(materialised.split?.rowBreaks, [5, 4, 4], "the cut moved with the inserted Shift")
+        let materialized = native.materialized()
+        XCTAssertEqual(materialized.rows[2].keys.count, 9)
+        XCTAssertEqual(materialized.split?.rowBreaks, [5, 4, 4], "the cut moved with the inserted Shift")
         let geometry = KeyboardPageRowGeometry(
-            width: 834, page: materialised, row: 2, split: materialised.split)
+            width: 834, page: materialized, row: 2, split: materialized.split?.resolved(forWidth: 834))
         XCTAssertEqual(geometry.splitIndex, 4, "the authored row index is the stored cut itself")
         XCTAssertEqual(geometry.keyWidths.count, geometry.keyIndices.count)
         XCTAssertEqual(geometry.keyIndices.count, 9)
-        try materialised.validate()
+        try materialized.validate()
 
-        let legacyNumeric = KeyboardPageDefinition(
+        let nativeNumeric = KeyboardPageDefinition(
             id: "cut.num", name: "切开数字", kind: .numeric,
             rows: KeyboardPagePresets.numericChinese.rows,
             split: LayoutSplitConfiguration(rowBreaks: [5, 4, 3]))
-        let numeric = legacyNumeric.materialized()
+        let numeric = nativeNumeric.materialized()
         XCTAssertEqual(numeric.split?.rowBreaks, [5, 4, 3], "an appended Delete does not move a cut")
         XCTAssertEqual(numeric.rows[2].keys.count, 10)
         try numeric.validate()
     }
 
-    func testDefaultCutOnTheMaterialisedShiftRowIsTheFullRowMiddle() {
-        let legacy = KeyboardPageDefinition(
+    func testDefaultCutOnTheMaterializedShiftRowIsTheFullRowMiddle() {
+        let native = KeyboardPageDefinition(
             id: "default.cut", name: "默认切分 ABC", kind: .english,
             rows: KeyboardPagePresets.englishQwerty.rows,
             split: LayoutSplitConfiguration(rowBreaks: [5, 4]))
-        let materialised = legacy.materialized()
+        let materialized = native.materialized()
         let geometry = KeyboardPageRowGeometry(
-            width: 834, page: materialised, row: 2, split: materialised.split)
+            width: 834, page: materialized, row: 2, split: materialized.split?.resolved(forWidth: 834))
         XCTAssertEqual(geometry.splitIndex, 5, "Shift + 4 letters before the cut")
     }
 
     // MARK: - Deletion, movement and fidelity
 
-    func testDeletingFunctionKeysIsNotUndoneByMaterialisation() throws {
+    func testDeletingFunctionKeysIsNotUndoneByMaterialization() throws {
         var edited = KeyboardPagePresets.englishQwerty.materialized()
         edited.chrome?.bottom.removeLast()
         edited.rows[2] = LayoutRow(keys: Array(edited.rows[2].keys.dropLast()))
@@ -316,28 +315,28 @@ final class KeyboardPageChromeTests: XCTestCase {
             keys: [LayoutKey(label: "⏎", action: .init(.enter))])
         var page = KeyboardPagePresets.symbolsCategorized
         page.categories = [category]
-        let materialised = page.materialized()
-        XCTAssertEqual(materialised.categories?.count, 1)
-        XCTAssertEqual(materialised.allKeys.count, 1 + materialised.chromeKeys.count)
-        XCTAssertTrue(materialised.allKeys.contains { $0.action.type == .enter })
-        try materialised.validate()
+        let materialized = page.materialized()
+        XCTAssertEqual(materialized.categories?.count, 1)
+        XCTAssertEqual(materialized.allKeys.count, 1 + materialized.chromeKeys.count)
+        XCTAssertTrue(materialized.allKeys.contains { $0.action.type == .enter })
+        try materialized.validate()
     }
 
-    func testFunctionKeyContentSurvivesMaterialisation() throws {
+    func testFunctionKeyContentSurvivesMaterialization() throws {
         var page = KeyboardPagePresets.numericChinese.materialized()
         var bottom = try XCTUnwrap(page.chrome?.bottom)
         let option = LayoutOption(label: "小键盘", action: .pageSwitch(.symbols))
         bottom[0] = bottom[0].settingLongPress([option])
         bottom[1] = bottom[1].title("翻页")
         page.chrome?.bottom = bottom
-        let materialised = page.materialized()
-        XCTAssertEqual(materialised.chrome?.bottom[0].longPress, [option])
-        XCTAssertEqual(materialised.chrome?.bottom[1].titleMode, .custom)
-        XCTAssertEqual(materialised.chrome?.bottom[1].label, "翻页")
-        try materialised.validate()
+        let materialized = page.materialized()
+        XCTAssertEqual(materialized.chrome?.bottom[0].longPress, [option])
+        XCTAssertEqual(materialized.chrome?.bottom[1].titleMode, .custom)
+        XCTAssertEqual(materialized.chrome?.bottom[1].label, "翻页")
+        try materialized.validate()
     }
 
-    func testCopyMaterialisesAndAssignsANewIdentity() throws {
+    func testCopyMaterializesAndAssignsANewIdentity() throws {
         let original = KeyboardPagePresets.numericAutomatic
         let copy = original.copy(name: "我的数字盘", numericForm: .phoneDigitPad)
         XCTAssertNotEqual(copy.id, original.id)

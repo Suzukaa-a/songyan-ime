@@ -129,7 +129,7 @@ struct KeyboardPageManagementView: View {
                 editing = try await KeyboardPageDraftFactory.copy(
                     page, presentation: presentation, numericMarks: numericMarks, numericForm: numericForm)
             } catch let failure {
-                error = "页面没有复制成功：\(KeyboardPageDraftFactory.message(for: failure))"
+                error = LayoutManager.friendly(failure, context: .pageCopy)
             }
         }
     }

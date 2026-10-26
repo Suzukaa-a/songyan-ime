@@ -1,61 +1,53 @@
 import Foundation
 
+/// Widths at or below this are phone-sized surfaces (a folded cover screen is 466 pt): they keep one
+/// keyboard under the automatic split, may narrow for one-handed use and never cap their content.
+public enum KeyboardSurfaceWidth {
+    public static let phoneMaximum = 600.0
+}
+
 /// A saved split follows the available keyboard width, including floating windows.
 public struct LayoutSplitConfiguration: Codable, Equatable, Sendable {
     /// When a split is shown. Independent from `automaticGap`: this decides whether to split at
     /// all, `automaticGap` only decides how much gutter an active split keeps.
     public enum Activation: String, Codable, Sendable {
-        /// Split only on wide surfaces: a one-hand phone or folded cover screen keeps one
-        /// keyboard. The old `enabled: true` catalogs decode to this.
+        /// Saved row cuts and spacing stay, but rows are never split.
+        case off
+        /// Split only on wide surfaces: a one-hand phone or folded cover screen keeps one keyboard.
         case automatic
         /// Split at every width; the user explicitly asked for two halves.
         case always
     }
 
-    /// Widths at or below this stay unsplit under `.automatic`. A folded cover screen (466 pt)
-    /// and a portrait phone fit one hand; tablet and landscape widths do not.
-    public static let automaticMaximumWidth = 600.0
-
-    public var enabled: Bool
+    public var activation: Activation
     public var rowBreaks: [Int]
     public var gapFraction: Double
-    /// Nil preserves the explicit spacing of catalogs saved before automatic spacing.
-    public var automaticGap: Bool?
-    /// How the split decides whether to appear. Nil means `.automatic`.
-    public var activation: Activation?
+    /// The gutter follows the width instead of `gapFraction`.
+    public var automaticGap: Bool
     public static let defaultGapFraction = 0.32
-    public static let maximumThumbHalfWidth = 280.0
 
-    public init(
-        enabled: Bool = true, rowBreaks: [Int] = [], gapFraction: Double? = nil,
-        activation: Activation? = nil
-    ) {
-        self.enabled = enabled
+    public init(activation: Activation = .automatic, rowBreaks: [Int] = [], gapFraction: Double? = nil) {
+        self.activation = activation
         self.rowBreaks = rowBreaks
         self.gapFraction = gapFraction ?? Self.defaultGapFraction
-        automaticGap = gapFraction == nil ? true : nil
-        self.activation = activation
+        automaticGap = gapFraction == nil
     }
 
-    /// Whether this split really shows at `width`. `.always` ignores the width rule; `.automatic`
-    /// (the nil default) keeps narrow surfaces whole.
+    /// Whether this split really shows at `width`, measured on the whole keyboard.
     public func isActive(width: Double) -> Bool {
-        guard enabled else { return false }
-        guard activation != .always else { return true }
-        return width.isFinite && width > Self.automaticMaximumWidth
+        switch activation {
+        case .off: return false
+        case .always: return true
+        case .automatic: return width.isFinite && width > KeyboardSurfaceWidth.phoneMaximum
+        }
     }
 
-    /// The split to render at this width, or nil when the row stays whole. Renderers/previews
-    /// take this once per layout pass instead of reading `enabled` alone.
-    ///
-    /// The width check happens once against the whole keyboard. The returned copy is marked
-    /// `.always` (only in memory, never saved) so an inner key area narrowed by rails cannot make
-    /// the automatic rule switch the split off a second time.
-    public func resolved(forWidth width: Double) -> LayoutSplitConfiguration? {
+    /// The split to render at this width, or nil when rows stay whole. Renderers and previews
+    /// resolve once against the whole keyboard, so an inner key area narrowed by rails can never
+    /// switch the split off a second time.
+    public func resolved(forWidth width: Double) -> ActiveLayoutSplit? {
         guard isActive(width: width) else { return nil }
-        var resolved = self
-        resolved.activation = .always
-        return resolved
+        return ActiveLayoutSplit(rowBreaks: rowBreaks, gapFraction: gapFraction, automaticGap: automaticGap)
     }
 
     public static func resolving(page: Self?, main: Self?) -> Self? {
@@ -67,9 +59,12 @@ public struct LayoutSplitConfiguration: Codable, Equatable, Sendable {
     }
 
     public func validate(rowKeyCounts: [Int]) throws {
-        guard gapFraction.isFinite, (0...0.85).contains(gapFraction),
-            rowBreaks.count <= rowKeyCounts.count
-        else { throw LayoutError.invalid("拆分间距应在 0% 到 85% 之间，请调整后保存。") }
+        guard gapFraction.isFinite, (0...0.85).contains(gapFraction) else {
+            throw LayoutError.invalid("拆分间距应在 0% 到 85% 之间，请调整后保存。")
+        }
+        guard rowBreaks.count <= rowKeyCounts.count else {
+            throw LayoutError.invalid("拆分位置比按键行还多，请重新设置拆分位置。")
+        }
         for (row, count) in rowBreaks.enumerated() {
             guard rowKeyCounts[row] <= 1 || (1..<rowKeyCounts[row]).contains(count) else {
                 throw LayoutError.invalid("拆分位置应在两个按键之间，请调整后保存。")
@@ -77,33 +72,66 @@ public struct LayoutSplitConfiguration: Codable, Equatable, Sendable {
         }
     }
 
-    /// Character index of the split in a row, ignoring the width activation rule.
+    /// Character index of the split in a row, whatever the width; editors show it even when the
+    /// current surface keeps the row whole.
     public func breakIndex(row: Int, keyCount: Int) -> Int {
+        ActiveLayoutSplit.breakIndex(rowBreaks: rowBreaks, row: row, keyCount: keyCount)
+    }
+}
+
+/// A split that is showing at the current width. Only `LayoutSplitConfiguration.resolved(forWidth:)`
+/// creates one, and it is never stored, so geometry never re-applies the width rule.
+public struct ActiveLayoutSplit: Equatable, Sendable {
+    public let rowBreaks: [Int]
+    public let gapFraction: Double
+    public let automaticGap: Bool
+
+    /// Each half stays within one thumb's reach on large surfaces.
+    public static let maximumThumbHalfWidth = 280.0
+    /// Automatic spacing lets a key grow to this width before the rest becomes gutter, so a few
+    /// columns on a tablet do not stretch into slabs.
+    public static let maximumAutomaticKeyWidth = 84.0
+    /// Automatic spacing never shrinks a key below this width.
+    public static let minimumAutomaticKeyWidth = 32.0
+
+    /// A nested area (a category grid) inside an already-resolved page: its own setting wins and is
+    /// resolved at `width`; otherwise it inherits the page's active spacing with its own row cuts.
+    public static func resolving(
+        nested: LayoutSplitConfiguration?, parent: ActiveLayoutSplit?, width: Double
+    ) -> ActiveLayoutSplit? {
+        if let nested { return nested.resolved(forWidth: width) }
+        return parent?.withoutRowBreaks
+    }
+
+    /// The same spacing for an area with different key counts, which picks its own row cuts.
+    public var withoutRowBreaks: ActiveLayoutSplit {
+        ActiveLayoutSplit(rowBreaks: [], gapFraction: gapFraction, automaticGap: automaticGap)
+    }
+
+    /// The split index in a row.
+    public func breakIndex(row: Int, keyCount: Int) -> Int {
+        Self.breakIndex(rowBreaks: rowBreaks, row: row, keyCount: keyCount)
+    }
+
+    static func breakIndex(rowBreaks: [Int], row: Int, keyCount: Int) -> Int {
         guard keyCount > 1 else { return keyCount }
         let requested = rowBreaks.indices.contains(row) ? rowBreaks[row] : (keyCount + 1) / 2
         return min(keyCount - 1, max(1, requested))
     }
 
-    /// The split index to render at this width, or nil when the row stays whole.
-    public func breakIndex(row: Int, keyCount: Int, width: Double) -> Int? {
-        guard isActive(width: width) else { return nil }
-        return breakIndex(row: row, keyCount: keyCount)
-    }
-
     public func gap(
         width: Double, keyCount: Int, spacing: Double = 4, minimumKeyWidth: Double = 28
     ) -> Double {
-        guard isActive(width: width), keyCount > 1 else { return 0 }
-        let automatic = automaticGap == true
-        let keyFloor = automatic ? max(32, minimumKeyWidth) : minimumKeyWidth
+        guard keyCount > 1 else { return 0 }
+        let keyFloor = automaticGap ? max(Self.minimumAutomaticKeyWidth, minimumKeyWidth) : minimumKeyWidth
         let room = max(0, width - Double(keyCount) * keyFloor - Double(keyCount - 1) * spacing)
         // Keep large surfaces within thumb reach, while narrow windows keep usable keys.
         let maximumContentWidth = min(
             Self.maximumThumbHalfWidth * 2,
-            Double(keyCount) * PhoneKeypadMetrics.preferredDigitWidth + Double(keyCount - 1) * spacing)
+            Double(keyCount) * Self.maximumAutomaticKeyWidth + Double(keyCount - 1) * spacing)
         let requested =
-            automatic
-            ? max(width * Self.defaultGapFraction, width - maximumContentWidth)
+            automaticGap
+            ? max(width * LayoutSplitConfiguration.defaultGapFraction, width - maximumContentWidth)
             : width * gapFraction
         let result = min(requested, room)
         return result > spacing ? result : 0

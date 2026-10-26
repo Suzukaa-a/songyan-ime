@@ -21,7 +21,7 @@ extension KeyboardPanelView {
 
     /// The bundled phone shell passes its columns so the bottom keys line up
     /// under the rail and digit columns above them.
-    func phoneControlRow(_ metrics: PhoneKeypadMetrics, splitOverride: LayoutSplitConfiguration? = nil) -> some View {
+    func phoneControlRow(_ metrics: PhoneKeypadMetrics, splitOverride: ActiveLayoutSplit? = nil) -> some View {
         controlRow(
             columns: usesFixedEditingRail
                 ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil, splitOverride: splitOverride)
@@ -45,7 +45,7 @@ extension KeyboardPanelView {
                 || (pageDefinition == nil && (usesPhoneDefinition || prefersCategorySymbolPage)))
     }
 
-    func controlRow(columns: KeyboardControlPolicy.PhoneColumns?, splitOverride: LayoutSplitConfiguration? = nil)
+    func controlRow(columns: KeyboardControlPolicy.PhoneColumns?, splitOverride: ActiveLayoutSplit? = nil)
         -> some View
     {
         ControlRow(
@@ -139,7 +139,7 @@ extension KeyboardPanelView {
     }
 
     /// The language key's long-press menu (user keyboards, then More tools). It backs both the
-    /// legacy control row and an authored languageSwitch key that declares no long press.
+    /// built-in control row and an authored languageSwitch key that declares no long press.
     func handleLanguageMenuCap(_ cap: KeyCap) {
         if cap.id == moreToolsCapID {
             // "More tools...": opens the utilities panel, separate from the candidate bar. The last item of the long-press menu,

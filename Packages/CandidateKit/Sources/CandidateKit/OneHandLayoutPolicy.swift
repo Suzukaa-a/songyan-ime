@@ -1,4 +1,5 @@
 import Foundation
+import LayoutKit
 
 /// One-handed keyboard choice: which side the key content hugs, if any.
 public enum KeyboardOneHandMode: String, CaseIterable, Sendable {
@@ -43,26 +44,21 @@ public enum KeyboardOneHandLayoutPolicy {
     public static let minimumGutterWidth: Double = 44
     /// Standard iPhone portrait widths start here.
     public static let minimumPanelWidth: Double = 375
-    /// Keep narrowing within phone-sized surfaces, even before size classes update.
-    public static let maximumPanelWidth: Double = 600
 
     public static func isAvailable(
         panelWidth: Double, isPhone: Bool, compactHeight: Bool, regularWidth: Bool
     ) -> Bool {
-        isPhone && !compactHeight && !regularWidth
-            && panelWidth >= minimumPanelWidth && panelWidth <= maximumPanelWidth
+        isPhone && !compactHeight && !regularWidth && fitsPhoneWidth(panelWidth)
     }
 
+    /// `isAvailable` is the caller's `isAvailable(...)` result for the same surface.
     public static func plan(
         mode: KeyboardOneHandMode,
         panelWidth: Double,
-        isPhonePortrait: Bool
+        isAvailable: Bool
     ) -> KeyboardOneHandPlan {
-        guard mode != .off,
-            isPhonePortrait,
-            panelWidth >= minimumPanelWidth,
-            panelWidth <= maximumPanelWidth
-        else { return .inactive(panelWidth: panelWidth) }
+        // The width is checked again because a resize can land before the availability facts update.
+        guard mode != .off, isAvailable, fitsPhoneWidth(panelWidth) else { return .inactive(panelWidth: panelWidth) }
         let content = max(minimumContentWidth, (panelWidth * contentRatio).rounded(.down))
         let gutter = panelWidth - content
         guard gutter >= minimumGutterWidth else { return .inactive(panelWidth: panelWidth) }
@@ -71,5 +67,10 @@ public enum KeyboardOneHandLayoutPolicy {
             contentWidth: content,
             gutterWidth: gutter,
             gutterOnLeft: mode == .right)
+    }
+
+    /// Narrowing stays within phone-sized surfaces, even before size classes update.
+    private static func fitsPhoneWidth(_ width: Double) -> Bool {
+        width >= minimumPanelWidth && width <= KeyboardSurfaceWidth.phoneMaximum
     }
 }

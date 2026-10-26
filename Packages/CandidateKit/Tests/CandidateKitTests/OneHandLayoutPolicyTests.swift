@@ -24,10 +24,10 @@ final class OneHandLayoutPolicyTests: XCTestCase {
     func testOffModeStaysFullWidthAtEveryPanelWidth() {
         for width in [320.0, 375, 390, 428, 600, 664, 744, 1024, 1366] {
             for mode in [KeyboardOneHandMode.left, .right] {
-                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isPhonePortrait: false)
+                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isAvailable: false)
                 XCTAssertEqual(plan, .inactive(panelWidth: width), "width \(width)")
             }
-            let off = KeyboardOneHandLayoutPolicy.plan(mode: .off, panelWidth: width, isPhonePortrait: true)
+            let off = KeyboardOneHandLayoutPolicy.plan(mode: .off, panelWidth: width, isAvailable: true)
             XCTAssertEqual(off, .inactive(panelWidth: width))
         }
     }
@@ -35,7 +35,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
     func testLandscapePadAndUnknownWidthsStayFullWidth() {
         for width in [0.0, 1, 374.9, 600.1, 664, 744, 1024, 1180, 1366] {
             // Explicit non-portrait facts: landscape phones and all iPad contexts.
-            let plan = KeyboardOneHandLayoutPolicy.plan(mode: .left, panelWidth: width, isPhonePortrait: false)
+            let plan = KeyboardOneHandLayoutPolicy.plan(mode: .left, panelWidth: width, isAvailable: false)
             XCTAssertEqual(plan, .inactive(panelWidth: width), "width \(width)")
         }
     }
@@ -63,7 +63,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
         XCTAssertTrue(available)
         for mode in [KeyboardOneHandMode.left, .right] {
             let plan = KeyboardOneHandLayoutPolicy.plan(
-                mode: mode, panelWidth: 466, isPhonePortrait: available)
+                mode: mode, panelWidth: 466, isAvailable: available)
             XCTAssertTrue(plan.active)
             XCTAssertEqual(plan.contentWidth, 396)
             XCTAssertEqual(plan.gutterWidth, 70)
@@ -78,7 +78,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
             XCTAssertFalse(available)
             for mode in [KeyboardOneHandMode.left, .right] {
                 let plan = KeyboardOneHandLayoutPolicy.plan(
-                    mode: mode, panelWidth: width, isPhonePortrait: available)
+                    mode: mode, panelWidth: width, isAvailable: available)
                 XCTAssertEqual(plan, .inactive(panelWidth: width))
             }
         }
@@ -89,7 +89,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
             let available = KeyboardOneHandLayoutPolicy.isAvailable(
                 panelWidth: width, isPhone: true, compactHeight: false, regularWidth: false)
             let plan = KeyboardOneHandLayoutPolicy.plan(
-                mode: .right, panelWidth: width, isPhonePortrait: available)
+                mode: .right, panelWidth: width, isAvailable: available)
             if width == 402 {
                 XCTAssertTrue(plan.active)
                 XCTAssertEqual(plan.contentWidth, 341)
@@ -120,7 +120,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
         ]
         for (width, content) in cases {
             for mode in [KeyboardOneHandMode.left, .right] {
-                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isPhonePortrait: true)
+                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isAvailable: true)
                 XCTAssertTrue(plan.active, "width \(width)")
                 XCTAssertEqual(plan.contentWidth, Double(content), accuracy: 0.001, "width \(width)")
                 XCTAssertEqual(plan.gutterWidth, width - Double(content), accuracy: 0.001, "width \(width)")
@@ -142,7 +142,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
     /// 320pt content is exactly the floor: a panel whose 85% share would fall
     /// below it still activates by taking the floor (and a wider gutter).
     func testContentFloorBeatsRatioWithoutDisabling() {
-        let plan = KeyboardOneHandLayoutPolicy.plan(mode: .left, panelWidth: 375, isPhonePortrait: true)
+        let plan = KeyboardOneHandLayoutPolicy.plan(mode: .left, panelWidth: 375, isAvailable: true)
         XCTAssertEqual(plan.contentWidth, 320)
         XCTAssertEqual(plan.gutterWidth, 55)
     }
@@ -154,7 +154,7 @@ final class OneHandLayoutPolicyTests: XCTestCase {
     func testPlanTilesPanelExactlyOnBothEdges() {
         for width in stride(from: 375.0, through: 600.0, by: 1.0) {
             for mode in [KeyboardOneHandMode.left, .right] {
-                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isPhonePortrait: true)
+                let plan = KeyboardOneHandLayoutPolicy.plan(mode: mode, panelWidth: width, isAvailable: true)
                 XCTAssertTrue(plan.active)
                 XCTAssertEqual(plan.contentWidth + plan.gutterWidth, width, accuracy: 0.001)
                 XCTAssertFalse(plan.contentWidth.isNaN)

@@ -38,7 +38,6 @@ public struct KeyboardPageCategory: Codable, Equatable, Identifiable, Sendable {
             throw LayoutError.invalid("分类列数应在 1 到 \(LayoutResourceBudget.categoryColumns) 之间。")
         }
         guard source == .recent || !keys.isEmpty else { throw LayoutError.invalid("分类请至少保留一个按键。") }
-        try LayoutResourceBudget.check(keys.count <= LayoutResourceBudget.categoryKeys, "分类按键过多")
         for key in keys { try KeyboardPageDefinition.validateKey(key) }
         // Recent content changes independently of the fixed-key backup.
         let rowCount =

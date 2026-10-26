@@ -1,10 +1,11 @@
 import Foundation
+import LayoutKit
 
 /// Where a width-capped keyboard content sits on a surface wider than its cap.
 public enum KeyboardContentDock: String, CaseIterable, Sendable {
     case left, center, right
 
-    /// Unknown or missing stored values fall back to centre, the neutral default.
+    /// Unknown or missing stored values fall back to center, the neutral default.
     public static func resolve(_ storedValue: String?) -> Self {
         storedValue.flatMap(Self.init(rawValue:)) ?? .center
     }
@@ -29,11 +30,9 @@ public struct KeyboardWideContentPlan: Equatable, Sendable {
 }
 
 /// Keeps wide layouts from stretching: above a phone-sized surface the content is capped and
-/// docked left, centre or right. The policy only does geometry — layout identity, split, height,
+/// docked left, center or right. The policy only does geometry — layout identity, split, height,
 /// preferences and system gestures stay with their owners.
 public enum KeyboardWideContentPolicy {
-    /// Phone-sized surfaces keep their existing full-width geometry.
-    public static let minimumActivePanelWidth: Double = 600
     /// The 9-key outer frame keeps the inner 436pt phone shell intact with a 4pt gutter per side
     /// (`436 + 2 * 4 = 444`); the reconcile is left to the layout that draws the shell.
     public static let phoneNineMaximumContentWidth: Double = 444
@@ -41,14 +40,15 @@ public enum KeyboardWideContentPolicy {
     public static let mergedMaximumContentWidth: Double = 520
 
     /// Returns the real content width and insets for this surface. A nil or oversized cap, a
-    /// phone-sized surface, and malformed widths all stay inactive at full width.
+    /// phone-sized surface (`KeyboardSurfaceWidth.phoneMaximum`), and malformed widths all stay
+    /// inactive at full width.
     public static func plan(
         panelWidth: Double,
         maximumContentWidth: Double?,
         dock: KeyboardContentDock
     ) -> KeyboardWideContentPlan {
         let width = normalized(panelWidth)
-        guard width > minimumActivePanelWidth,
+        guard width > KeyboardSurfaceWidth.phoneMaximum,
             let maximumContentWidth,
             maximumContentWidth.isFinite,
             maximumContentWidth > 0,

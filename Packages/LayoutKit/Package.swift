@@ -7,7 +7,7 @@ let package = Package(
     products: [.library(name: "LayoutKit", targets: ["LayoutKit"])],
     targets: [
         .target(name: "LayoutKit"),
-        .testTarget(name: "LayoutKitTests", dependencies: ["LayoutKit"]),
+        .testTarget(name: "LayoutKitTests", dependencies: ["LayoutKit"], resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
 )

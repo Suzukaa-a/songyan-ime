@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// The last known system requirement for a keyboard-switch entry.
 ///
@@ -14,9 +13,15 @@ public enum KeyboardSystemRequirements {
     private static let writeQueue = DispatchQueue(
         label: "app.songyan.keyboard.systemRequirements", qos: .utility)
 
+    /// The value this process last wrote; repeated appearances with the same answer write nothing.
+    @MainActor private static var lastRecorded: Bool?
+
     /// Keyboard side: called on the appearance path only; the write leaves the key and first-frame
     /// paths because it runs on the serial background queue.
+    @MainActor
     public static func recordNeedsInputModeSwitchKey(_ needed: Bool) {
+        guard lastRecorded != needed else { return }
+        lastRecorded = needed
         let key = needsInputModeSwitchKeyKey
         writeQueue.async {
             KeyboardRecipeStore.sharedDefaults()?.set(needed, forKey: key)

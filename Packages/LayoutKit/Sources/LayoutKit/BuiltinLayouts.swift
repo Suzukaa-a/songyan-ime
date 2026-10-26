@@ -17,14 +17,14 @@ public enum BuiltinLayouts {
         note: "两个字母合用一个键，轻点输入。输入方案支持时，向左或向右滑动可只输入左边或右边的字母。",
         // Wide surfaces split by default so both thumbs reach the merged pairs; a saved split,
         // including an explicit off, stays authoritative and is never migrated back on.
-        split: LayoutSplitConfiguration(enabled: true, activation: .automatic))
+        split: LayoutSplitConfiguration())
 
     /// Every key must be easy to hit, single letters included. Two-unit pairs would leave
     /// the singles as the narrowest caps on the pad (about 38 pt on a 420 pt phone), so pairs
     /// give width back: 1.7 units against 1.3, caps about 1.33 : 1, close to the widely shared
     /// 18-key skin for Baidu's keyboard (stock Chinese keyboards ship no 18-key pad). Pairs
     /// stay wider because one cap carries two letters and the sideways swipe. All upper-row
-    /// singles and pairs share one width each, so row 2 (9.0 units) sits centred under row 1
+    /// singles and pairs share one width each, so row 2 (9.0 units) sits centered under row 1
     /// (10.3) half a single key in from each side, the same stagger as 26-key A under Q.
     public static let merged18 = LayoutDefinition(
         id: "merged18", name: "18 键", input: .init(builtinLayout: .merged18),
@@ -35,7 +35,7 @@ public enum BuiltinLayouts {
             ], singleWidth: 1.3, pairWidth: 1.7) + [controls],
         note: "部分键由两个字母合用，轻点输入。输入方案支持时，向左或向右滑动可只输入左边或右边的字母。",
         // Same wide-surface default as 14-key; qwerty26 and phone9 keep their layout default.
-        split: LayoutSplitConfiguration(enabled: true, activation: .automatic))
+        split: LayoutSplitConfiguration())
 
     public static let phone9 = LayoutDefinition(
         id: "phone9", name: "9 键", input: .init(builtinLayout: .phone9),
@@ -320,9 +320,19 @@ public enum BuiltinLayouts {
     }
 }
 
-// MARK: - Bundled 9-key identity
+// MARK: - Bundled shell identity
 
 public extension BuiltinLayouts {
+    /// The bundled layout of one keyboard shape.
+    static func preset(for layout: LayoutInput.Builtin) -> LayoutDefinition {
+        switch layout {
+        case .qwerty26: return qwerty26
+        case .merged14: return merged14
+        case .merged18: return merged18
+        case .phone9: return phone9
+        }
+    }
+
     /// Narrow visual-shell identity for the bundled 9-key.
     ///
     /// The native phone shell draws its own control row and side rails, so everything there must still
@@ -330,33 +340,20 @@ public extension BuiltinLayouts {
     /// because the shell renders those keys from the definition. A definition that differs anywhere
     /// else falls back to the author-layout renderer instead of being silently covered up.
     static func matchesPhone9VisualShell(_ definition: LayoutDefinition) -> Bool {
-        guard definition.input == phone9.input,
-            definition.input.builtinLayout == .phone9,
-            definition.input.schemaID == nil,
+        guard matchesPhone9PrimarySemantics(definition),
             definition.rows.count == phone9.rows.count,
-            definition.auxiliaryAreas == phone9.auxiliaryAreas
+            definition.auxiliaryAreas == phone9.auxiliaryAreas,
+            // The shell injects a fixed policy control row, so its declaration must be untouched:
+            // long-press edits there would be lost if this stayed true.
+            definition.rows.last == phone9.rows.last
         else { return false }
-        guard let mainRows = Self.phone9MainRows(definition.rows),
-            let presetMainRows = Self.phone9MainRows(phone9.rows)
-        else { return false }
-        for (row, presetRow) in zip(mainRows, presetMainRows) {
-            guard row.keys.count == presetRow.keys.count else { return false }
-            for (key, presetKey) in zip(row.keys, presetRow.keys) {
-                guard key.label == presetKey.label,
-                    key.secondaryLabel == presetKey.secondaryLabel,
-                    key.width == presetKey.width,
-                    key.action == presetKey.action,
-                    key.titleMode == presetKey.titleMode
-                else { return false }
+        let count = PhoneKeypadMetrics.mainRowCount
+        return zip(definition.rows.prefix(count), phone9.rows.prefix(count)).allSatisfy { row, presetRow in
+            zip(row.keys, presetRow.keys).allSatisfy { key, presetKey in
+                key.label == presetKey.label && key.secondaryLabel == presetKey.secondaryLabel
+                    && key.titleMode == presetKey.titleMode
             }
         }
-        // The shell injects a fixed policy control row, so its declaration must be untouched:
-        // long-press edits there would be lost if this stayed true.
-        guard let controlRow = definition.rows.last,
-            let presetControlRow = phone9.rows.last,
-            controlRow == presetControlRow
-        else { return false }
-        return true
     }
 
     /// Pure primary-gesture semantics for the known bundled 9-key.
@@ -368,98 +365,45 @@ public extension BuiltinLayouts {
     /// injected shell chrome (the shell uses matchesPhone9VisualShell, which rejects control/rail
     /// edits). Unknown schemas and other builtin layouts stay false.
     static func matchesPhone9PrimarySemantics(_ definition: LayoutDefinition) -> Bool {
-        guard definition.input == phone9.input,
-            definition.input.builtinLayout == .phone9,
-            definition.input.schemaID == nil,
-            let mainRows = Self.phone9MainRows(definition.rows),
-            let presetMainRows = Self.phone9MainRows(phone9.rows)
+        definition.input == phone9.input && mainRowsMatch(definition, phone9)
+    }
+
+    /// Structural main-shell identity for the bundled 26/14/18-key: the three letter rows still carry
+    /// the preset widths and actions, so the standard shell can synthesize Shift/Delete and
+    /// equal-width columns. Faces and long-press menus are rendered from the definition, so they
+    /// are ignored; the control row is checked separately by `matchesControlRowPolicy(_:as:)`.
+    static func matchesMainShell(_ definition: LayoutDefinition, as layout: LayoutInput.Builtin) -> Bool {
+        let preset = preset(for: layout)
+        let count = PhoneKeypadMetrics.mainRowCount
+        guard definition.input == preset.input, definition.auxiliaryAreas == preset.auxiliaryAreas,
+            definition.rows.count == count || definition.rows.count == count + 1,
+            mainRowsMatch(definition, preset)
         else { return false }
-        for (row, presetRow) in zip(mainRows, presetMainRows) {
-            guard row.keys.count == presetRow.keys.count else { return false }
-            for (key, presetKey) in zip(row.keys, presetRow.keys) {
-                // Author label/secondary/title/long-press edits are face metadata; the actions and
-                // weights are what the primary gesture reads.
-                guard key.width == presetKey.width, key.action == presetKey.action else { return false }
-            }
+        // The standard renderers only draw the main rows (and, for merged pads, their single
+        // synthesized separator/Delete row). A fourth row must still be a non-encoding control row;
+        // an encoding row would be silently dropped by the shell, so fall back instead.
+        return definition.rows.dropFirst(count).allSatisfy { row in
+            row.keys.allSatisfy { $0.action.type != .code && $0.action.type != .literal }
         }
-        return true
-    }
-
-    /// The phone main area is the first three rows by declaration, not by inferring a control row:
-    /// the shell identity compares the whole declaration separately, so an edited fourth row must
-    /// not change which keys the gestures read.
-    private static func phone9MainRows(_ rows: [LayoutRow]) -> [LayoutRow]? {
-        guard rows.count >= PhoneKeypadMetrics.mainRowCount else { return nil }
-        return Array(rows.prefix(PhoneKeypadMetrics.mainRowCount))
-    }
-}
-
-// MARK: - Bundled 26/14/18 shell identity
-
-public extension BuiltinLayouts {
-    /// Structural main-shell identity for the bundled 26-key: the three letter rows still carry the
-    /// preset widths and actions, so the standard shell can synthesize Shift/Delete and equal-width
-    /// columns. Faces and long-press menus are rendered from the definition, so they are ignored;
-    /// the control row is deliberately ignored here and checked separately by the footer identity.
-    static func matchesQwerty26MainShell(_ definition: LayoutDefinition) -> Bool {
-        matchesMainShell(definition, preset: qwerty26, mainRowCount: PhoneKeypadMetrics.mainRowCount)
-    }
-
-    static func matchesMerged14MainShell(_ definition: LayoutDefinition) -> Bool {
-        matchesMainShell(definition, preset: merged14, mainRowCount: PhoneKeypadMetrics.mainRowCount)
-    }
-
-    static func matchesMerged18MainShell(_ definition: LayoutDefinition) -> Bool {
-        matchesMainShell(definition, preset: merged18, mainRowCount: PhoneKeypadMetrics.mainRowCount)
     }
 
     /// The bundled footer policy draws its own control row, so the declared control row must still
     /// be the preset (every field, including long-press menus); otherwise the author layout bar must
     /// render the edited row instead of hiding it.
-    static func matchesQwerty26ControlRowPolicy(_ definition: LayoutDefinition) -> Bool {
-        matchesControlRowPolicy(definition, preset: qwerty26)
+    static func matchesControlRowPolicy(_ definition: LayoutDefinition, as layout: LayoutInput.Builtin) -> Bool {
+        definition.rows.count == PhoneKeypadMetrics.mainRowCount + 1
+            && matchesMainShell(definition, as: layout)
+            && definition.rows.last == preset(for: layout).rows.last
     }
 
-    static func matchesMerged14ControlRowPolicy(_ definition: LayoutDefinition) -> Bool {
-        matchesControlRowPolicy(definition, preset: merged14)
-    }
-
-    static func matchesMerged18ControlRowPolicy(_ definition: LayoutDefinition) -> Bool {
-        matchesControlRowPolicy(definition, preset: merged18)
-    }
-
-    private static func matchesMainShell(
-        _ definition: LayoutDefinition, preset: LayoutDefinition, mainRowCount: Int
-    ) -> Bool {
-        guard definition.input == preset.input, definition.input.schemaID == nil,
-            definition.auxiliaryAreas == preset.auxiliaryAreas
-        else { return false }
-        // The standard renderers only draw the main rows (and, for merged pads, their single
-        // synthesized separator/Delete row). A fourth row must still be a non-encoding control row;
-        // an extra or encoding row would be silently dropped by the shell, so fall back instead.
-        guard definition.rows.count == mainRowCount || definition.rows.count == mainRowCount + 1
-        else { return false }
-        if definition.rows.count == mainRowCount + 1 {
-            let control = definition.rows[mainRowCount]
-            guard control.keys.allSatisfy({ $0.action.type != .code && $0.action.type != .literal })
-            else { return false }
+    /// The main area is the first three rows by declaration, not by inferring a control row: the
+    /// key count, width and primary action of each main key must still be the preset's.
+    private static func mainRowsMatch(_ definition: LayoutDefinition, _ preset: LayoutDefinition) -> Bool {
+        let count = PhoneKeypadMetrics.mainRowCount
+        guard definition.rows.count >= count else { return false }
+        return zip(definition.rows.prefix(count), preset.rows.prefix(count)).allSatisfy { row, presetRow in
+            row.keys.count == presetRow.keys.count
+                && zip(row.keys, presetRow.keys).allSatisfy { $0.width == $1.width && $0.action == $1.action }
         }
-        let mainRows = Array(definition.rows.prefix(mainRowCount))
-        let presetMainRows = Array(preset.rows.prefix(mainRowCount))
-        for (row, presetRow) in zip(mainRows, presetMainRows) {
-            guard row.keys.count == presetRow.keys.count else { return false }
-            for (key, presetKey) in zip(row.keys, presetRow.keys) {
-                guard key.width == presetKey.width, key.action == presetKey.action else { return false }
-            }
-        }
-        return true
-    }
-
-    private static func matchesControlRowPolicy(_ definition: LayoutDefinition, preset: LayoutDefinition) -> Bool {
-        guard definition.rows.count == PhoneKeypadMetrics.mainRowCount + 1,
-            matchesMainShell(
-                definition, preset: preset, mainRowCount: PhoneKeypadMetrics.mainRowCount)
-        else { return false }
-        return definition.rows.last == preset.rows.last
     }
 }

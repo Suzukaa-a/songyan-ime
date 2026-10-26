@@ -69,7 +69,7 @@ extension KeyboardPanelView {
 
     func definitionRow(
         _ row: LayoutRow, id: String, inset: CGFloat = 0,
-        spacing: CGFloat = 4, split: LayoutSplitConfiguration? = nil, rowIndex: Int = 0,
+        spacing: CGFloat = 4, split: ActiveLayoutSplit? = nil, rowIndex: Int = 0,
         fixedKeyWidth: CGFloat? = nil, splitGap: CGFloat? = nil
     ) -> some View {
         let keys = visibleKeys(row.keys)
@@ -264,14 +264,13 @@ extension KeyboardPanelView {
     }
 
     /// Main-layout definition dispatch: page-level UI actions run in the UI layer, engine actions
-    /// keep the exact legacy handler path. Main actions never pass through the category recorder,
+    /// keep the engine handler path. Main actions never pass through the category recorder,
     /// which intentionally rejects plain codes.
     private func performDefinitionFaceAction(
         _ action: LayoutAction, alternate: Bool, onAction: ((KeyAction, Bool) -> Void)?
     ) {
         if action.type.isPageUI {
-            performAuthoredPageAction(
-                path: .chrome(.bottom, key: 0), action: action, isAlternate: alternate)
+            performAuthoredPageAction(action, isAlternate: alternate)
         } else if let onAction {
             onAction(keyAction(action), true)
         } else {
@@ -373,34 +372,12 @@ extension KeyboardPanelView {
 
     private func definitionUIActionTitle(_ key: LayoutKey) -> String {
         guard key.titleMode == .automatic else { return key.label }
-        switch key.action.type {
-        case .pageSwitch:
-            switch key.action.pageSwitchTarget {
-            case .letters: return "返回"
-            case .numeric: return "123"
-            case .symbols: return "符号"
-            case nil: return key.label
-            }
-        case .languageSwitch:
-            return controlPolicy.languageTitle(for: key.action.languageSwitchBehavior)
-        case .symbolLock: return "锁定"
-        case .clearInput: return "重输"
-        case .shift: return "上档"
-        default: return key.label
-        }
+        return KeyboardPageControlFace.title(for: key, policy: controlPolicy) ?? key.label
     }
 
     private func definitionUIActionAccessibility(_ key: LayoutKey) -> String {
         guard key.titleMode == .automatic else { return key.label }
-        switch key.action.type {
-        case .languageSwitch:
-            return controlPolicy.languageAccessibilityLabel(
-                for: key.action.languageSwitchBehavior)
-        case .pageSwitch where key.action.pageSwitchTarget == .letters:
-            return "返回主键盘"
-        default:
-            return definitionUIActionTitle(key)
-        }
+        return KeyboardPageControlFace.accessibilityLabel(for: key, policy: controlPolicy) ?? key.label
     }
 
     private func definitionUIActionRole(_ key: LayoutKey) -> String? {
@@ -643,14 +620,17 @@ extension KeyboardPanelView {
     /// so those ids are resolved by the unchanged main-row action.
     private func knownMainShellPresetKey(for id: String, key: LayoutKey) -> LayoutKey? {
         guard let preset = knownMainShellPreset else { return nil }
+        // Runs per rendered key: scan in place instead of building arrays.
         if id.hasPrefix("merged-") {
-            return preset.rows.prefix(PhoneKeypadMetrics.mainRowCount)
-                .flatMap(\.keys)
-                .first { $0.action == key.action }
+            for row in preset.rows.prefix(PhoneKeypadMetrics.mainRowCount) {
+                if let match = row.keys.first(where: { $0.action == key.action }) { return match }
+            }
+            return nil
         }
         guard id.hasPrefix("row-") else { return nil }
-        let parts = id.split(separator: "-")
-        guard parts.count == 3, let row = Int(parts[1]), let column = Int(parts[2]),
+        let address = id.dropFirst(4)
+        guard let dash = address.firstIndex(of: "-"),
+            let row = Int(address[..<dash]), let column = Int(address[address.index(after: dash)...]),
             preset.rows.indices.contains(row), preset.rows[row].keys.indices.contains(column)
         else { return nil }
         return preset.rows[row].keys[column]
@@ -819,18 +799,20 @@ extension KeyboardPanelView {
                     && (keys[$0].action.type != .globe || systemKeyboardSwitch != nil)
             }
             let dedupe = footerShortcutDedupe
-            let left =
-                (dedupe.numeric ? [] : [-1]) + (dedupe.symbols ? [] : [-2])
-                + (!definitionHasGlobe && systemKeyboardSwitch != nil ? [-3] : [])
-                + visible.filter { $0 < boundary }
-            let right = visible.filter { $0 >= boundary } + (dedupe.layout ? [] : [-4])
+            let shortcuts: [LayoutFooterItem] =
+                (dedupe.numeric ? [] : [.numericShortcut]) + (dedupe.symbols ? [] : [.symbolShortcut])
+                + (!definitionHasGlobe && systemKeyboardSwitch != nil ? [.globe] : [])
+            let left = shortcuts + visible.filter { $0 < boundary }.map(LayoutFooterItem.key)
+            let right =
+                visible.filter { $0 >= boundary }.map(LayoutFooterItem.key)
+                + (dedupe.layout ? [] : [LayoutFooterItem.layoutSwitch])
             let space =
                 keys.first { $0.action.type == .space }
                 ?? LayoutKey(label: "空格", width: 4, action: .init(.space))
             SplitSpaceKeyboardRow(
                 leftKeys: left, rightKeys: right,
-                leftWidths: left.map { $0 < 0 ? 44 : max(44, keys[$0].widthWeight * 44) },
-                rightWidths: right.map { $0 < 0 ? 44 : max(44, keys[$0].widthWeight * 44) }, split: split,
+                leftWidths: left.map { $0.width(keys: keys) },
+                rightWidths: right.map { $0.width(keys: keys) }, split: split,
                 spaceWidthMultiplier: 3 * space.widthWeight / 4,
                 key: { layoutFooterKey($0, keys: keys) },
                 space: { definitionKey(space, id: "controls-space") },
@@ -841,18 +823,18 @@ extension KeyboardPanelView {
     }
 
     @ViewBuilder
-    private func layoutFooterKey(_ item: Int, keys: [LayoutKey]) -> some View {
+    private func layoutFooterKey(_ item: LayoutFooterItem, keys: [LayoutKey]) -> some View {
         switch item {
-        case -1: layoutPageShortcut("123", target: .numeric)
-        case -2: layoutPageShortcut(KeyboardControlPolicy.symbolPageTitle, target: .symbols)
-        case -3:
+        case .numericShortcut: layoutPageShortcut("123", target: .numeric)
+        case .symbolShortcut: layoutPageShortcut(KeyboardControlPolicy.symbolPageTitle, target: .symbols)
+        case .globe:
             if let systemKeyboardSwitch {
                 NativeInputModeKey(
                     handleEvent: systemKeyboardSwitch,
                     accessibilitySwitch: { controller.handle(.switchKeyboard) })
             }
-        case -4: modeSwitchKey
-        default: definitionKey(keys[item], id: "controls-\(item)")
+        case .layoutSwitch: modeSwitchKey
+        case .key(let index): definitionKey(keys[index], id: "controls-\(index)")
         }
     }
 
@@ -957,5 +939,19 @@ extension KeyboardPanelView {
     var expandedCandidates: some View {
         candidateRendererView(expanded: true)
             .frame(height: mainAreaHeight)
+    }
+}
+
+/// One slot of the split author control row: a shortcut the bar adds, or a declared key.
+private enum LayoutFooterItem: Hashable {
+    case numericShortcut
+    case symbolShortcut
+    case globe
+    case layoutSwitch
+    case key(Int)
+
+    func width(keys: [LayoutKey]) -> Double {
+        guard case .key(let index) = self else { return 44 }
+        return max(44, keys[index].widthWeight * 44)
     }
 }

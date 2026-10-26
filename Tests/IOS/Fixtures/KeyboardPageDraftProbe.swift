@@ -59,7 +59,7 @@ struct Probe {
         firstRow[0] = authorKey
         modified.rows[0] = LayoutRow(keys: firstRow)
         modified.split = LayoutSplitConfiguration(
-            rowBreaks: [3, 3], gapFraction: 0.4, activation: .always)
+            activation: .always, rowBreaks: [3, 3], gapFraction: 0.4)
 
         let rowsCopy = try await KeyboardPageDraftProbe.copy(modified, presentation: .rows)
         check(rowsCopy.id != modified.id, "copy gets a new id")
@@ -74,7 +74,7 @@ struct Probe {
         check(copiedKey?.titleMode == .custom, "author title mode survives")
         check(copiedKey?.longPress?.first?.label == "长按", "author long press survives")
         check(copiedKey?.longPress?.first?.action.value == "开心", "author long press action survives")
-        check(rowsCopy.split?.enabled == true, "author split stays enabled")
+        check(rowsCopy.split?.rowBreaks == [3, 3], "author split cuts survive")
         check(rowsCopy.split?.gapFraction == 0.4, "author split gap survives")
         check(rowsCopy.split?.activation == .always, "author split activation survives")
         check(modified.rows[0].keys[0].label == "笑脸", "the source page is not mutated")

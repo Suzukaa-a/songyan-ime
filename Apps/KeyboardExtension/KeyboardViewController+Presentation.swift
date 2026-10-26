@@ -119,15 +119,19 @@ extension KeyboardViewController {
             ])
     }
 
+    /// Ends this controller's presentation. The shell keeps its budget while the keyboard
+    /// animates out; nothing is resized here.
+    func endPresentationGeometry() {
+        (viewIfLoaded as? KeyboardPanelInputView)?.endPresentation()
+    }
+
     /// A new presentation is the only time iOS measures a new height: budget it for the
     /// definition selected now (a layout switched during the last presentation was
-    /// only re-fitted inside that one's shell). Kept until the keyboard is dismissed.
-    func endPresentationGeometry() {
+    /// only re-fitted inside that one's shell). UIKit can measure the reused input view
+    /// before the next viewWillAppear, so the caller runs this once the keyboard is off
+    /// screen; the hosting constraint follows in `adoptPresentationShell`.
+    func prepareNextPresentationGeometry() {
         guard let input = viewIfLoaded as? KeyboardPanelInputView else { return }
-        input.endPresentation()
-        guard Self.activeController === self else { return }
-        // UIKit can measure the reused input view before the next viewWillAppear.
-        // Prepare that budget now so it cannot cache the outgoing layout's height.
         let budget = KeyboardInitialPresentation.load().presentationBudget(
             compact: traitCollection.verticalSizeClass == .compact)
         let height = CGFloat(budget.shellHeight)

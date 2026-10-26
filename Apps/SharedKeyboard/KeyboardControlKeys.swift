@@ -19,7 +19,7 @@ struct ControlRow<ModeKey: View>: View {
     let onPage: (KeyboardPage) -> Void
     let onKey: (KeyAction) -> Void
     var phoneColumns: KeyboardControlPolicy.PhoneColumns? = nil
-    var split: LayoutSplitConfiguration? = nil
+    var split: ActiveLayoutSplit? = nil
     var splitRowIndex = 3
     /// Whether the symbol page stays open after a symbol is typed.
     var symbolPageLocked = false
@@ -123,7 +123,7 @@ struct ReturnKey: View {
     var alternates: [KeyCap] = []
     var longPressDelay: TimeInterval = 0.35
     /// An authored page passes its own page key address so tap routing can find the action;
-    /// legacy callers keep the shared "return" id.
+    /// other callers keep the shared "return" id.
     var capID = "return"
     var subtitle: String? = nil
     let onSelect: (KeyCap) -> Void
@@ -209,34 +209,13 @@ struct ShiftKey: UIViewRepresentable {
         button.tap = tap
         button.double = doubleTap
         button.shiftState = state
-        if let customTitle, !customTitle.isEmpty {
-            if button.customTitle != customTitle {
-                button.customTitle = customTitle
-                button.symbolName = nil
-                button.setImage(nil, for: .normal)
-                button.titleLabel?.font = appearance.uiFont(appearance.controlTextSize)
-                button.titleLabel?.adjustsFontSizeToFitWidth = true
-                button.titleLabel?.minimumScaleFactor = 0.6
-                button.setTitleColor(appearance.text(on: state == .off ? "control" : "selected"), for: .normal)
-                button.setTitle(customTitle, for: .normal)
-            }
-        } else {
-            if button.customTitle != nil {
-                button.customTitle = nil
-                button.setTitle(nil, for: .normal)
-            }
-            let symbol = state == .locked ? "capslock.fill" : (state == .once ? "shift.fill" : "shift")
-            if button.symbolName != symbol {
-                button.symbolName = symbol
-                button.setImage(UIImage(systemName: symbol), for: .normal)
-            }
-        }
+        // An author title takes the glyph's place; its color follows the skin role per state.
+        button.applyAuthorFace(
+            title: customTitle, subtitle: subtitle,
+            glyph: state == .locked ? "capslock.fill" : (state == .once ? "shift.fill" : "shift"))
         // Shift has no effect in Chinese mode: it should also look disabled, rather than being an unresponsive key.
         button.alpha = isEnglishMode ? 1 : 0.4
-        button.apply(
-            subtitle: subtitle,
-            color: appearance.text(on: state == .off ? "control" : "selected", secondary: true))
-        button.accessibilityLabel = customTitle?.isEmpty == false ? customTitle! : "上档键"
+        button.accessibilityLabel = button.authorTitle ?? "上档键"
         button.accessibilityTraits = state == .locked ? [.keyboardKey, .selected] : .keyboardKey
         let shiftValue =
             !isEnglishMode ? "中文" : (state == .off ? "小写" : (state == .once ? "下一字母大写" : "大写锁定"))
@@ -254,42 +233,6 @@ struct ShiftKey: UIViewRepresentable {
     }
 
     final class ShiftButton: SkinnedButton {
-        var symbolName: String?
-        /// Set when the author titled this Shift key: the glyph gives way to the author label.
-        var customTitle: String?
-        private var authorSubtitle: String?
-        private lazy var authorSubtitleLabel: UILabel = {
-            let label = UILabel()
-            label.textAlignment = .center
-            label.isUserInteractionEnabled = false
-            label.font = .systemFont(ofSize: 10)
-            label.textColor = .secondaryLabel
-            label.isHidden = true
-            addSubview(label)
-            return label
-        }()
-
-        /// The secondary label is author data and must really be drawn, not only announced.
-        func apply(subtitle: String?, color: UIColor) {
-            authorSubtitle = subtitle?.isEmpty == false ? subtitle : nil
-            authorSubtitleLabel.text = authorSubtitle
-            authorSubtitleLabel.textColor = color
-            authorSubtitleLabel.isHidden = authorSubtitle == nil
-            setNeedsLayout()
-        }
-
-        override func layoutSubviews() {
-            // UIKit lays out unshifted content; resetting prevents cumulative offsets.
-            titleLabel?.transform = .identity
-            imageView?.transform = .identity
-            super.layoutSubviews()
-            let lift = authorSubtitle == nil ? CGAffineTransform.identity : CGAffineTransform(translationX: 0, y: -4)
-            titleLabel?.transform = lift
-            imageView?.transform = lift
-            guard authorSubtitle != nil else { return }
-            authorSubtitleLabel.frame = CGRect(
-                x: 3, y: bounds.maxY - 16, width: max(0, bounds.width - 6), height: 14)
-        }
         var tap: (() -> Void)?
         var double: (() -> Void)?
         var shiftState: ShiftState = .off
@@ -629,7 +572,7 @@ struct NativeInputModeKey: UIViewRepresentable {
         button.addTarget(button, action: #selector(InputModeButton.forwardEvent(_:event:)), for: .allTouchEvents)
         button.handleEvent = handleEvent
         button.accessibilitySwitch = accessibilitySwitch
-        button.apply(title: title, subtitle: subtitle)
+        apply(to: button)
         return button
     }
 
@@ -637,67 +580,18 @@ struct NativeInputModeKey: UIViewRepresentable {
         button.appearance = appearance
         button.handleEvent = handleEvent
         button.accessibilitySwitch = accessibilitySwitch
-        button.apply(title: title, subtitle: subtitle)
+        apply(to: button)
+    }
+
+    private func apply(to button: InputModeButton) {
+        button.applyAuthorFace(title: title, subtitle: subtitle, glyph: "globe")
+        button.accessibilityLabel = button.authorTitle ?? "切换系统输入法"
     }
 
     final class InputModeButton: SkinnedButton {
         override var emitsTouchDownFeedback: Bool { false }
         var handleEvent: ((UIView, UIEvent) -> Void)?
         var accessibilitySwitch: (() -> Void)?
-        private let authorSubtitleLabel = UILabel()
-        private var authorTitle: String?
-        private var authorSubtitle: String?
-
-        override init(frame: CGRect) {
-            super.init(frame: frame)
-            authorSubtitleLabel.textAlignment = .center
-            authorSubtitleLabel.isUserInteractionEnabled = false
-            authorSubtitleLabel.isHidden = true
-            addSubview(authorSubtitleLabel)
-        }
-
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-        func apply(title: String?, subtitle: String?) {
-            authorTitle = title?.isEmpty == false ? title : nil
-            authorSubtitle = subtitle?.isEmpty == false ? subtitle : nil
-            if let authorTitle {
-                setImage(nil, for: .normal)
-                setTitle(authorTitle, for: .normal)
-                setTitleColor(appearance.text(on: "control"), for: .normal)
-                titleLabel?.font = appearance.uiFont(appearance.controlTextSize)
-                titleLabel?.adjustsFontSizeToFitWidth = true
-                titleLabel?.minimumScaleFactor = 0.6
-            } else {
-                setTitle(nil, for: .normal)
-                if image(for: .normal) == nil {
-                    setImage(UIImage(systemName: "globe"), for: .normal)
-                }
-            }
-            authorSubtitleLabel.text = authorSubtitle
-            authorSubtitleLabel.font = appearance.uiFont(appearance.skin.typography.secondarySize)
-            authorSubtitleLabel.textColor = appearance.text(on: "control", secondary: true)
-            authorSubtitleLabel.isHidden = authorSubtitle == nil
-            accessibilityLabel = authorTitle ?? "切换系统输入法"
-            setNeedsLayout()
-        }
-
-        override func layoutSubviews() {
-            // UIKit lays out unshifted content; resetting prevents cumulative offsets.
-            titleLabel?.transform = .identity
-            imageView?.transform = .identity
-            super.layoutSubviews()
-            let lift = authorSubtitle == nil ? CGAffineTransform.identity : CGAffineTransform(translationX: 0, y: -4)
-            titleLabel?.transform = lift
-            imageView?.transform = lift
-            authorSubtitleLabel.frame =
-                authorSubtitle == nil
-                ? .zero
-                : CGRect(
-                    x: appearance.visualRect(in: bounds).minX + 3,
-                    y: bounds.maxY - 16,
-                    width: max(0, bounds.width - 6), height: 14)
-        }
 
         @objc func forwardEvent(_ sender: UIButton, event: UIEvent) {
             handleEvent?(sender, event)
@@ -716,7 +610,7 @@ struct RepeatingDeleteKey: UIViewRepresentable {
     @Environment(\.keyboardAppearance) private var appearance
     @Environment(\.isEnabled) private var isEnabled
     /// An author label replaces the delete glyph; a secondary label shows under it. The repeat
-    /// gesture is untouched, because the author data must not silently lose native behaviour.
+    /// gesture is untouched, because the author data must not silently lose native behavior.
     var title: String? = nil
     var subtitle: String? = nil
     let action: (Bool) -> Void
@@ -741,7 +635,7 @@ struct RepeatingDeleteKey: UIViewRepresentable {
         // As with letter/space keys: under VoiceOver touch typing, lifting the finger triggers it, rather than needing a double tap.
         button.accessibilityTraits = .keyboardKey
         button.action = action
-        button.apply(title: title, subtitle: subtitle)
+        apply(to: button)
         return button
     }
 
@@ -749,11 +643,16 @@ struct RepeatingDeleteKey: UIViewRepresentable {
         button.hostLifetime = hostLifetime
         button.action = action
         button.appearance = appearance
-        button.apply(title: title, subtitle: subtitle)
+        apply(to: button)
         if button.isEnabled != isEnabled { button.isEnabled = isEnabled }
     }
 
     static func dismantleUIView(_ button: DeleteButton, coordinator: ()) { button.stopRepeating() }
+
+    private func apply(to button: DeleteButton) {
+        button.applyAuthorFace(title: title, subtitle: subtitle, glyph: "delete.left")
+        button.accessibilityLabel = button.authorTitle ?? "退格"
+    }
 
     final class DeleteButton: SkinnedButton {
         var hostLifetime: KeyboardPanelHostLifetime? {
@@ -766,52 +665,6 @@ struct RepeatingDeleteKey: UIViewRepresentable {
         var action: ((Bool) -> Void)?
         private var timer: Timer?
         private var repeatCount = 0
-        private let authorSubtitleLabel = UILabel()
-        private var authorTitle: String?
-        private var authorSubtitle: String?
-
-        /// The author label replaces the glyph, the secondary label sits underneath. Rendering
-        /// only: the repeat timer and touch targets stay those of the native delete key.
-        func apply(title: String?, subtitle: String?) {
-            authorTitle = title?.isEmpty == false ? title : nil
-            authorSubtitle = subtitle?.isEmpty == false ? subtitle : nil
-            if let authorTitle {
-                setImage(nil, for: .normal)
-                setTitle(authorTitle, for: .normal)
-                setTitleColor(appearance.text(on: skinRole), for: .normal)
-                titleLabel?.font = appearance.uiFont(appearance.controlTextSize)
-                titleLabel?.adjustsFontSizeToFitWidth = true
-                titleLabel?.minimumScaleFactor = 0.6
-            } else {
-                setTitle(nil, for: .normal)
-                if image(for: .normal) == nil {
-                    setImage(UIImage(systemName: "delete.left"), for: .normal)
-                }
-            }
-            authorSubtitleLabel.text = authorSubtitle
-            authorSubtitleLabel.font = appearance.uiFont(appearance.skin.typography.secondarySize)
-            authorSubtitleLabel.textColor = appearance.text(on: skinRole, secondary: true)
-            authorSubtitleLabel.isHidden = authorSubtitle == nil
-            accessibilityLabel = authorTitle ?? "退格"
-            setNeedsLayout()
-        }
-
-        override func layoutSubviews() {
-            // UIKit lays out unshifted content; resetting prevents cumulative offsets.
-            titleLabel?.transform = .identity
-            imageView?.transform = .identity
-            super.layoutSubviews()
-            let lift = authorSubtitle == nil ? CGAffineTransform.identity : CGAffineTransform(translationX: 0, y: -4)
-            titleLabel?.transform = lift
-            imageView?.transform = lift
-            authorSubtitleLabel.frame =
-                authorSubtitle == nil
-                ? .zero
-                : CGRect(
-                    x: appearance.visualRect(in: bounds).minX + 3,
-                    y: bounds.maxY - 16,
-                    width: max(0, bounds.width - 6), height: 14)
-        }
 
         override var isEnabled: Bool {
             didSet { if !isEnabled { stopRepeating() } }
@@ -829,10 +682,6 @@ struct RepeatingDeleteKey: UIViewRepresentable {
         override init(frame: CGRect) {
             super.init(frame: frame)
             layer.cornerRadius = 6
-            authorSubtitleLabel.textAlignment = .center
-            authorSubtitleLabel.isUserInteractionEnabled = false
-            authorSubtitleLabel.isHidden = true
-            addSubview(authorSubtitleLabel)
             addTarget(self, action: #selector(beginRepeating), for: .touchDown)
             addTarget(
                 self, action: #selector(stopRepeating),

@@ -51,7 +51,7 @@ public struct KeyboardPreviewView: View {
     private var definition: LayoutDefinition {
         !editing && mode == "英文" ? BuiltinLayouts.qwerty26.settingSplit(layout.split) : layout
     }
-    private var activeSplit: LayoutSplitConfiguration? {
+    private var activeSplit: ActiveLayoutSplit? {
         definition.split?.resolved(forWidth: Double(previewWidth))
     }
     /// The bundled preset whose shape this definition has. Shape, not full equality: a copy that only
@@ -70,13 +70,13 @@ public struct KeyboardPreviewView: View {
     /// native merged columns and synthesized separator/Delete stay.
     private var merged: Bool {
         preset?.id == BuiltinLayouts.merged14.id || preset?.id == BuiltinLayouts.merged18.id
-            || BuiltinLayouts.matchesMerged14MainShell(definition)
-            || BuiltinLayouts.matchesMerged18MainShell(definition)
+            || BuiltinLayouts.matchesMainShell(definition, as: .merged14)
+            || BuiltinLayouts.matchesMainShell(definition, as: .merged18)
     }
     /// Same structural identity as the runtime: Chinese keeps the standard 26-key shell after
     /// metadata edits; English always uses the built-in English shell.
     private var qwerty: Bool {
-        preset?.id == BuiltinLayouts.qwerty26.id || BuiltinLayouts.matchesQwerty26MainShell(definition)
+        preset?.id == BuiltinLayouts.qwerty26.id || BuiltinLayouts.matchesMainShell(definition, as: .qwerty26)
     }
     /// Structural phone shell selection mirrors the runtime's `PhoneKeypadStructure` decision.
     private var phoneShape: Bool {
@@ -89,9 +89,7 @@ public struct KeyboardPreviewView: View {
     }
     private var phone: Bool { phoneShape }
     private var bundledControlRowPolicy: Bool {
-        BuiltinLayouts.matchesQwerty26ControlRowPolicy(definition)
-            || BuiltinLayouts.matchesMerged14ControlRowPolicy(definition)
-            || BuiltinLayouts.matchesMerged18ControlRowPolicy(definition)
+        [.qwerty26, .merged14, .merged18].contains { BuiltinLayouts.matchesControlRowPolicy(definition, as: $0) }
     }
     private var controls: Bool {
         definition.rows.last?.keys.allSatisfy { $0.action.type != .code && $0.action.type != .literal } == true
@@ -621,7 +619,7 @@ public struct KeyboardPreviewView: View {
     }
 
     private func authoredPageControlRow(
-        _ page: KeyboardPageDefinition, browser: Bool, split: LayoutSplitConfiguration?,
+        _ page: KeyboardPageDefinition, browser: Bool, split: ActiveLayoutSplit?,
         columns: KeyboardControlPolicy.PhoneColumns?
     ) -> some View {
         let policy = KeyboardControlPolicy(

@@ -83,9 +83,7 @@ extension KeyboardPanelView {
     /// the merged pad's separator, the bundled 9-key first key. Plain letter rows do not,
     /// so starting or ending a word does not rebuild every letter key.
     private var keyRowsReadComposition: Bool {
-        if let pageDefinition {
-            return Self.pageReadsComposition(pageDefinition)
-        }
+        if pageDefinition != nil { return pageDefinitionReadsComposition }
         guard page == .letters, !controller.isEnglishMode else { return false }
         if usesBundledMergedPad || isBuiltinPhonePad || usesStandardT9 { return true }
         let auxiliary = (activeDefinition?.auxiliaryAreas ?? []).flatMap(\.keys)
@@ -95,11 +93,10 @@ extension KeyboardPanelView {
         }
     }
 
-    /// The M2 return dependency covers every authored region: a top-level enter keeps drawing the
-    /// live title/enabled state, and a clear-input key keeps its live enabled state. Categories are
-    /// included because their authored keys are top-level page content too.
+    /// Every authored region counts: an Enter key draws the live Return title and enabled state,
+    /// a clear-input key its live enabled state. Category content is top-level page content too.
     static func pageReadsComposition(_ page: KeyboardPageDefinition) -> Bool {
-        page.allKeys.contains { $0.action.type == .enter || $0.action.type == .clearInput }
+        page.containsKey { $0.action.type == .enter || $0.action.type == .clearInput }
     }
 
     var keyAreaRenderToken: KeyAreaRenderToken { keyAreaRenderToken(phone: nil) }
@@ -146,7 +143,9 @@ extension KeyboardPanelView {
             hasSystemKeyboardSwitch: systemKeyboardSwitch != nil,
             allowsCursorMovement: allowsCursorMovement,
             prefersCategorySymbolPage: prefersCategorySymbolPage,
-            symbolPageLocked: symbolPageLocked)
+            symbolPageLocked: symbolPageLocked,
+            symbolCategoryID: phoneSymbolCategoryID,
+            showsExpandedCandidates: showsExpandedCandidates)
     }
 
     var usesConfiguredLayout: Bool { page == .letters && !controller.isEnglishMode && pageDefinition == nil }
@@ -194,7 +193,7 @@ extension KeyboardPanelView {
             readingKeys: CompactSpellingLayout.readingKeyMap(for: activeDefinition))
     }
 
-    /// The 123 rows, or the row-shaped #+= page's (the categorised page has no rows).
+    /// The 123 rows, or the row-shaped #+= page's (the categorized page has no rows).
     var symbolRows: [KeyboardRow] {
         page == .symbols
             ? SymbolPageTable.symbolRows(ascii: effectiveUsesASCIIPunctuation)

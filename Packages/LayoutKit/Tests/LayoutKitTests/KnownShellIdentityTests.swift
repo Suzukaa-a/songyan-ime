@@ -157,18 +157,14 @@ final class KnownShellIdentityTests: XCTestCase {
 
     private func expectedMain(_ definition: LayoutDefinition) -> Bool {
         switch definition.input.builtinLayout {
-        case .qwerty26: return BuiltinLayouts.matchesQwerty26MainShell(definition)
-        case .merged14: return BuiltinLayouts.matchesMerged14MainShell(definition)
-        case .merged18: return BuiltinLayouts.matchesMerged18MainShell(definition)
+        case .some(let kind) where kind != .phone9: return BuiltinLayouts.matchesMainShell(definition, as: kind)
         default: return false
         }
     }
 
     private func expectedControl(_ definition: LayoutDefinition) -> Bool {
         switch definition.input.builtinLayout {
-        case .qwerty26: return BuiltinLayouts.matchesQwerty26ControlRowPolicy(definition)
-        case .merged14: return BuiltinLayouts.matchesMerged14ControlRowPolicy(definition)
-        case .merged18: return BuiltinLayouts.matchesMerged18ControlRowPolicy(definition)
+        case .some(let kind) where kind != .phone9: return BuiltinLayouts.matchesControlRowPolicy(definition, as: kind)
         default: return false
         }
     }

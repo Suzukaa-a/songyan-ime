@@ -13,15 +13,16 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         layouts = try values.decode([LayoutDefinition].self, forKey: .layouts)
         enabledIDs = try values.decode([String].self, forKey: .enabledIDs)
+        // Pages, their order and pairings are absent from catalogs written before pages existed.
         let storedPages = try values.decodeIfPresent([KeyboardPageDefinition].self, forKey: .pages) ?? []
-        // A catalog saved before a built-in page existed still gets it: the default pairings
-        // reference pages by ID, so a missing preset would otherwise fail every composition save.
+        // Saves omit unchanged built-in pages, and a release may add one; the default pairings
+        // reference pages by ID, so every built-in page must be present after loading.
         let merged = KeyboardPagePresets.mergingInto(storedPages)
         if let pageOrder = try values.decodeIfPresent([String].self, forKey: .pageOrder) {
             // Saves omit unchanged presets; the order list restores their original positions so a
             // save/load round trip does not reshuffle the page library. A repeated ID is corrupt
-            // external input: keep every entry so validate() rejects it exactly as before instead
-            // of a dictionary silently swallowing one copy.
+            // input: keep every entry so validate() rejects it instead of a dictionary silently
+            // swallowing one copy.
             var byID: [String: KeyboardPageDefinition] = [:]
             var hasDuplicateID = false
             for page in merged where byID.updateValue(page, forKey: page.id) != nil {
@@ -80,6 +81,24 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         compositions[keyboardID] ?? KeyboardComposition(mainLayoutID: defaultMainLayoutID)
     }
 
+    /// The saved pairing, or the default one built on `defaultMainLayoutID(for:)`.
+    public func composition(for key: KeyboardCompositionKey) -> KeyboardComposition {
+        compositions[key.rawValue] ?? KeyboardComposition(mainLayoutID: defaultMainLayoutID(for: key))
+    }
+
+    /// The main layout a keyboard uses while it has no saved pairing. Mirrors the extension's
+    /// fallback when the session has no explicit choice: the first enabled layout built for this
+    /// keyboard's shape that the input method may use, then the first enabled layout that only
+    /// names the input method, then the bundled layout of that shape.
+    public func defaultMainLayoutID(for key: KeyboardCompositionKey) -> String {
+        let candidates = enabledLayouts.filter {
+            $0.supportsComposition(inputMethodID: key.inputMethodID, layout: key.layout)
+        }
+        return candidates.first { $0.input.builtinLayout == key.layout }?.id
+            ?? candidates.first { $0.input.builtinLayout == nil }?.id
+            ?? BuiltinLayouts.preset(for: key.layout).id
+    }
+
     public mutating func savePage(_ page: KeyboardPageDefinition) throws {
         var candidate = self
         if let index = candidate.pages.firstIndex(where: { $0.id == page.id }) {
@@ -92,7 +111,7 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
     }
 
     public mutating func removePage(id: String) throws {
-        guard page(id: id) != nil else { throw LayoutError.unknownID(id) }
+        guard page(id: id) != nil else { throw LayoutError.invalid("找不到这个页面，它可能已经被删除。") }
         guard
             !compositions.values.contains(where: {
                 $0.symbolPageID == id || $0.numericPageID == id || $0.englishPageID == id
@@ -110,8 +129,7 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
     @discardableResult
     public mutating func pruneCompositions(where isObsoleteInputMethod: (String) -> Bool) -> Int {
         let obsolete = compositions.keys.filter { key in
-            guard let separator = key.lastIndex(of: ":") else { return false }
-            return isObsoleteInputMethod(String(key[..<separator]))
+            KeyboardCompositionKey(key).map { isObsoleteInputMethod($0.inputMethodID) } ?? false
         }
         for key in obsolete { compositions.removeValue(forKey: key) }
         return obsolete.count
@@ -194,34 +212,48 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         return BuiltinLayouts.all.first(where: isSupported).map { [$0] } ?? []
     }
 
+    /// Every layout and page is validated exactly once; the catalog totals reuse those results.
+    /// The extension runs this on every load.
     public func validate() throws {
-        try LayoutResourceBudget.validate(self)
         guard !enabledIDs.isEmpty else { throw LayoutError.lastEnabledLayout }
         guard Set(layouts.map(\.id)).count == layouts.count,
             Set(enabledIDs).count == enabledIDs.count
         else {
-            throw LayoutError.invalid("duplicate layout IDs")
+            throw LayoutError.invalid("布局列表里有重复的布局，请删掉其中一个后重试。")
         }
-        guard Set(pages.map { $0.id }).count == pages.count else {
-            throw LayoutError.invalid("页面标识重复，请重新复制页面。")
+        guard Set(pages.map(\.id)).count == pages.count else {
+            throw LayoutError.invalid("页面库里有重复的页面，请删掉其中一个后重试。")
         }
-        for page in pages { try page.validate() }
+        var layoutUsage = LayoutResourceBudget.Usage()
+        for layout in layouts { layoutUsage.add(try layout.validatedUsage()) }
+        // Unchanged built-in pages ship in code and are merged into every catalog, so they are
+        // not charged; an edited one is user content like any other page.
+        var userPageCount = 0
+        var userPageUsage = LayoutResourceBudget.Usage()
+        for page in pages {
+            let usage = try page.validatedUsage()
+            guard !KeyboardPagePresets.isUnmodifiedPreset(page) else { continue }
+            userPageCount += 1
+            userPageUsage.add(usage)
+        }
+        try LayoutResourceBudget.checkCatalog(
+            self, layoutUsage: layoutUsage, userPageCount: userPageCount, userPageUsage: userPageUsage)
         for (keyboardID, composition) in compositions {
-            guard !keyboardID.isEmpty, keyboardID.utf8.count <= 512 else {
+            guard keyboardID.utf8.count <= 512, let key = KeyboardCompositionKey(keyboardID) else {
                 throw LayoutError.invalid("找不到要搭配的键盘，请重新选择。")
             }
-            guard let separator = keyboardID.lastIndex(of: ":"), separator != keyboardID.startIndex,
-                let kind = LayoutInput.Builtin(rawValue: String(keyboardID[keyboardID.index(after: separator)...])),
-                let main = layout(id: composition.mainLayoutID),
-                main.supportsComposition(inputMethodID: String(keyboardID[..<separator]), layout: kind)
-            else { throw LayoutError.invalid("主布局与输入方式不兼容，请重新选择。") }
+            guard let main = layout(id: composition.mainLayoutID) else {
+                throw LayoutError.invalid("搭配的键盘布局已经不存在，请重新选择键盘布局。")
+            }
+            guard main.supportsComposition(inputMethodID: key.inputMethodID, layout: key.layout) else {
+                throw LayoutError.invalid("这个键盘布局不适用于当前输入方式，请换一个键盘布局。")
+            }
             for kind in KeyboardPageKind.allCases {
                 guard page(id: composition.pageID(for: kind))?.kind == kind else {
-                    throw LayoutError.invalid("找不到搭配的页面，请重新选择。")
+                    throw LayoutError.invalid("搭配的页面已经不存在，请重新选择页面。")
                 }
             }
         }
-        for layout in layouts { try layout.validate() }
         for id in enabledIDs where layout(id: id) == nil { throw LayoutError.unknownID(id) }
     }
 }
@@ -250,7 +282,9 @@ public struct LayoutStore: Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(registry)
-        try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.catalogBytes, "布局目录文件过大")
+        try LayoutResourceBudget.check(
+            data.count <= LayoutResourceBudget.catalogBytes,
+            "所有布局和页面加起来太大了，没能保存，请先删掉一些不用的布局或页面。")
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         try data.write(to: catalogURL, options: .atomic)
     }

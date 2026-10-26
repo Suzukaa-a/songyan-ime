@@ -2,7 +2,7 @@ import Foundation
 
 /// Footer widths for an authored page, shared by the runtime and the preview.
 ///
-/// A materialised default footer is the same key set the built-in control row draws. Recognising
+/// A materialized default footer is the same key set the built-in control row draws. Recognizing
 /// that structure (actions/targets and the frozen default widths — never an ID or label) keeps the
 /// built-in control-row budget, so copying a page does not immediately squeeze the bottom row that
 /// was tuned for it. Any changed width or structure falls back to the real authored relative
@@ -35,7 +35,7 @@ public struct KeyboardPageFooterGeometry: Equatable, Sendable {
             return
         }
         let available = max(0, resolvedWidth - spacing * Double(keys.count - 1))
-        // Normalise through the shared projection: legal but huge finite weights must not overflow
+        // Normalize through the shared projection: legal but huge finite weights must not overflow
         // the sum or the per-key multiplication into NaN frames.
         let projection = LayoutRowWidthProjection(weights: keys.map(\.widthWeight))
         if projection.keyFractions.contains(where: { $0 > 0 }) {
@@ -47,23 +47,15 @@ public struct KeyboardPageFooterGeometry: Equatable, Sendable {
     }
 
     /// The frozen default footer shape: globe first, then the control row's slots in order, with
-    /// space at width 4 and every other default key at nil (= native budget width).
+    /// the default space weight and every other default key at nil (= native budget width).
     private static func isDefaultFooter(keys: [LayoutKey], policy: KeyboardControlPolicy) -> Bool {
         let slots = policy.slots
         guard keys.count == slots.count else { return false }
         for (key, slot) in zip(keys, slots) {
-            guard key.width == (slot == .space ? 4 : nil) else { return false }
+            guard key.width == (slot == .space ? KeyboardPageDefaultShape.footerSpaceWidth : nil) else { return false }
             guard matches(key.action, expected: policy.key(at: slot), policy: policy) else { return false }
         }
         return true
-    }
-
-    private static func pageTarget(of policy: KeyboardControlPolicy) -> LayoutAction.PageTarget {
-        switch policy.pageTarget {
-        case .letters: return .letters
-        case .numeric: return .numeric
-        case .symbols: return .symbols
-        }
     }
 
     private static func matches(
@@ -71,12 +63,12 @@ public struct KeyboardPageFooterGeometry: Equatable, Sendable {
     ) -> Bool {
         switch expected {
         case .page:
-            return action.pageSwitchTarget == pageTarget(of: policy)
+            return action.pageSwitchTarget == policy.pageTarget
         case .returnToLetters:
             // The row pages' left switch is a return, not a language toggle.
             return action.pageSwitchTarget == .letters
         case .language:
-            // The categorised default return keeps the native language/tools menu, so it may be an
+            // The categorized default return keeps the native language/tools menu, so it may be an
             // explicit `.letters` language key as well as the page-following nil form.
             guard action.type == .languageSwitch else { return false }
             if policy.page == .symbols && policy.usesCategorySymbolPage {
@@ -95,7 +87,7 @@ public struct KeyboardPageFooterGeometry: Equatable, Sendable {
             return action.type == .symbolLock
         case .utility:
             // Only the digit pad's utility position resolves here: the fixed 0 key.
-            return action.type == .literal && action.value == "0"
+            return action.type == .literal && action.value == KeyboardPageDefaultShape.keypadZero
         }
     }
 }

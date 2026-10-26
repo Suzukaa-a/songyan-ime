@@ -14,6 +14,19 @@ public extension KeyboardPageDefinition {
         rows.flatMap(\.keys) + (categories ?? []).flatMap(\.keys) + chromeKeys
     }
 
+    /// `allKeys.contains(where:)` without building the combined array; render paths call it.
+    func containsKey(where predicate: (LayoutKey) throws -> Bool) rethrows -> Bool {
+        for row in rows {
+            if try row.keys.contains(where: predicate) { return true }
+        }
+        for category in categories ?? [] {
+            if try category.keys.contains(where: predicate) { return true }
+        }
+        guard let chrome else { return false }
+        return try chrome.bottom.contains(where: predicate) || chrome.leading.contains(where: predicate)
+            || chrome.trailing.contains(where: predicate)
+    }
+
     /// Authored function keys only; rows and categories may contain controls too.
     var chromeKeys: [LayoutKey] { chrome?.allKeys ?? [] }
 

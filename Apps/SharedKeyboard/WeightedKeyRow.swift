@@ -47,7 +47,7 @@ struct KeyAreaRenderToken: Equatable {
     let shuangpinHintRevision: UInt64
     let activeDefinition: LayoutDefinition?
     let pageDefinition: KeyboardPageDefinition?
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     let layout: KeyboardLayoutKind
     let selectedSchemaID: String
     let inputMode: InputMode
@@ -71,6 +71,10 @@ struct KeyAreaRenderToken: Equatable {
     let prefersCategorySymbolPage: Bool
     /// Authored symbol-lock keys redraw their selected state; the token is what lets the gate see it.
     let symbolPageLocked: Bool
+    /// The open category of a categorized authored page (its rail and grid render inside the gate).
+    let symbolCategoryID: String
+    /// An authored page swaps its main area for the expanded candidate list inside the gate.
+    let showsExpandedCandidates: Bool
 }
 
 /// `.equatable()` gate: while the token is unchanged SwiftUI skips recomputing `content`, and subviews'
@@ -103,7 +107,7 @@ struct WeightedKeyRow: View {
     var isEnabled: (KeyCap) -> Bool = { _ in true }
     var showsKeyPreview = false
     var visualRole: String? = nil
-    var split: LayoutSplitConfiguration? = nil
+    var split: ActiveLayoutSplit? = nil
     var rowIndex = 0
     var fixedKeyWidth: CGFloat? = nil
     var splitGap: CGFloat? = nil

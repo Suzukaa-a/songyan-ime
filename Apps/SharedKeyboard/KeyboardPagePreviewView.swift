@@ -25,7 +25,7 @@ struct KeyboardCategoryGrid<Key: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let keys: [LayoutKey]
     let columns: Int
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     @ViewBuilder var key: (LayoutKey, Int) -> Key
 
     var body: some View {
@@ -111,9 +111,10 @@ public struct KeyboardPagePreviewView: View {
 
     public var body: some View {
         // The whole preview surface decides the split once; rows inside never re-apply the
-        // automatic width threshold after a rail narrowed them.
-        let split = LayoutSplitConfiguration.resolving(page: page.split, main: inheritedSplit)?
-            .resolved(forWidth: Double(previewWidth))
+        // automatic width threshold after a rail narrowed them. A nested full preview gets the
+        // stored setting and resolves it against the same surface.
+        let pageSplit = LayoutSplitConfiguration.resolving(page: page.split, main: inheritedSplit)
+        let split = pageSplit?.resolved(forWidth: Double(previewWidth))
         let resolution = KeyboardPageResolver.resolve(
             page: page, kind: page.kind,
             // A preview has no live session: it shows the page's own initial branch (Chinese when
@@ -129,18 +130,18 @@ public struct KeyboardPagePreviewView: View {
                     authoredChromePreview(authored, split: split)
                 } else {
                     KeyboardPreviewView(
-                        layout: authored.layoutDefinition.settingSplit(split),
+                        layout: authored.layoutDefinition.settingSplit(pageSplit),
                         pageDefinition: authored, pageUsesPhoneLayout: isPhoneLayout,
                         onSelectKey: authored.usesSymbolBrowser ? nil : legacySelection,
                         onSelectCategoryKey: onSelectCategoryKey, selectedCategoryKey: selectedCategoryKey)
                 }
             case .automaticSymbolPage:
                 KeyboardPreviewView(
-                    layout: page.layoutDefinition.settingSplit(split),
+                    layout: page.layoutDefinition.settingSplit(pageSplit),
                     pageDefinition: page, pageUsesPhoneLayout: isPhoneLayout,
                     onSelectCategoryKey: onSelectCategoryKey, selectedCategoryKey: selectedCategoryKey)
             case .automaticNumeric(let form, let marks):
-                automaticNumericPreview(form: form, marks: marks, split: split)
+                automaticNumericPreview(form: form, marks: marks, pageSplit: pageSplit)
             case .builtIn:
                 EmptyView()
             }
@@ -152,7 +153,7 @@ public struct KeyboardPagePreviewView: View {
 
     /// A page with authored chrome is drawn by the same shell as the live keyboard, so the editor
     /// sees exactly the geometry, rails and footer the keyboard will run.
-    private func authoredChromePreview(_ page: KeyboardPageDefinition, split: LayoutSplitConfiguration?)
+    private func authoredChromePreview(_ page: KeyboardPageDefinition, split: ActiveLayoutSplit?)
         -> some View
     {
         KeyboardAuthoredPageView(
@@ -272,23 +273,23 @@ public struct KeyboardPagePreviewView: View {
 
     @ViewBuilder
     private func automaticNumericPreview(
-        form: KeyboardNumericForm, marks: KeyboardNumericMarks, split: LayoutSplitConfiguration?
+        form: KeyboardNumericForm, marks: KeyboardNumericMarks, pageSplit: LayoutSplitConfiguration?
     ) -> some View {
         switch form {
         case .rows:
-            automaticNumericRowsPreview(marks: marks, split: split)
+            automaticNumericRowsPreview(marks: marks, pageSplit: pageSplit)
         case .phoneDigitPad:
-            KeyboardPhoneNumericPagePreview(marks: marks, split: split)
+            KeyboardPhoneNumericPagePreview(marks: marks, split: pageSplit?.resolved(forWidth: Double(previewWidth)))
         }
     }
 
     /// The ten-column form a non-keypad layout shows; the preview shows the Chinese marks (the
     /// running keyboard switches to the ASCII marks for English and ASCII fields).
     private func automaticNumericRowsPreview(
-        marks: KeyboardNumericMarks, split: LayoutSplitConfiguration?
+        marks: KeyboardNumericMarks, pageSplit: LayoutSplitConfiguration?
     ) -> some View {
         let resolved = marks == .ascii ? KeyboardPagePresets.numericEnglish : KeyboardPagePresets.numericChinese
-        return KeyboardPreviewView(layout: resolved.layoutDefinition.settingSplit(split), pageDefinition: resolved)
+        return KeyboardPreviewView(layout: resolved.layoutDefinition.settingSplit(pageSplit), pageDefinition: resolved)
     }
 }
 
@@ -296,7 +297,7 @@ public struct KeyboardPagePreviewView: View {
 /// bottom row that carries 0. An automatic 123 page shows this form on a phone main layout.
 struct KeyboardPhoneNumericPagePreview: View {
     let marks: KeyboardNumericMarks
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
 
     private var ascii: Bool { marks == .ascii }
     private var digitRows: [[KeyCap]] {
@@ -368,9 +369,9 @@ struct KeyboardCategoryPagePreview<Key: View, Footer: View>: View {
     @State private var selected: String?
     @State private var previewWidth: CGFloat = 0
     let page: KeyboardPageDefinition
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     @ViewBuilder var key: (LayoutKey, String, Int) -> Key
-    @ViewBuilder var footer: (PhoneKeypadMetrics, LayoutSplitConfiguration?) -> Footer
+    @ViewBuilder var footer: (PhoneKeypadMetrics, ActiveLayoutSplit?) -> Footer
 
     private var categories: [SymbolPageTable.PhoneSymbolCategory] {
         if let categories = page.categories {
@@ -387,8 +388,7 @@ struct KeyboardCategoryPagePreview<Key: View, Footer: View>: View {
     var body: some View {
         let categories = categories
         let open = categories.first { $0.id == selected } ?? categories[0]
-        let active = LayoutSplitConfiguration.resolving(page: open.split, main: split)?
-            .resolved(forWidth: Double(previewWidth))
+        let active = ActiveLayoutSplit.resolving(nested: open.split, parent: split, width: Double(previewWidth))
         return StablePhoneKeypadShell(
             trailingSpansControlRow: true, expandsForSplit: active != nil,
             leading: { metrics in
@@ -437,7 +437,7 @@ struct KeyboardCategoryPagePreview<Key: View, Footer: View>: View {
                     ControlKeyFace(text: "重输").opacity(0.45).frame(height: CGFloat(slots[1].height))
                     ReturnKey(title: "换行") { _ in }.frame(height: CGFloat(slots[2].height))
                 }
-            }, bottom: { metrics in footer(metrics, .resolving(page: nil, main: active)) }
+            }, bottom: { metrics in footer(metrics, active?.withoutRowBreaks) }
         )
         .modifier(PreviewWidthProbe(width: $previewWidth))
         .task { await library.reload().value }
@@ -447,7 +447,7 @@ struct KeyboardCategoryPagePreview<Key: View, Footer: View>: View {
 struct KeyboardPageRows<Key: View, Shift: View, Delete: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let page: KeyboardPageDefinition
-    let split: LayoutSplitConfiguration?
+    let split: ActiveLayoutSplit?
     var showsGlobe = true
     @ViewBuilder var key: (LayoutKey, Int, Int) -> Key
     @ViewBuilder var shift: () -> Shift

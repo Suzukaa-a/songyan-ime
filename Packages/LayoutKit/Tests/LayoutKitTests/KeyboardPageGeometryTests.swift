@@ -6,7 +6,7 @@ final class KeyboardPageGeometryTests: XCTestCase {
     func testAlphabetPreviewUsesTheRuntimeTenColumnGridAndControls() {
         let page = KeyboardPagePresets.englishQwerty
         for width in [320.0, 466, 834, 1194] {
-            let split = LayoutSplitConfiguration()
+            let split = LayoutSplitConfiguration().resolved(forWidth: width)
             let rows = page.rows.indices.map {
                 KeyboardPageRowGeometry(width: width, page: page, row: $0, split: split)
             }
@@ -25,8 +25,10 @@ final class KeyboardPageGeometryTests: XCTestCase {
             KeyboardPagePresets.numericChinese, KeyboardPagePresets.numericEnglish, KeyboardPagePresets.symbolsChinese,
             KeyboardPagePresets.symbolsEnglish,
         ] {
-            let first = KeyboardPageRowGeometry(width: 834, page: page, row: 0, split: LayoutSplitConfiguration())
-            let third = KeyboardPageRowGeometry(width: 834, page: page, row: 2, split: LayoutSplitConfiguration())
+            let first = KeyboardPageRowGeometry(
+                width: 834, page: page, row: 0, split: LayoutSplitConfiguration().resolved(forWidth: 834))
+            let third = KeyboardPageRowGeometry(
+                width: 834, page: page, row: 2, split: LayoutSplitConfiguration().resolved(forWidth: 834))
             XCTAssertTrue(third.showsDelete)
             XCTAssertEqual(third.keyWidths.count, 9)
             XCTAssertEqual(third.sideWidth, first.keyWidths[0], accuracy: 0.001)
@@ -51,7 +53,7 @@ final class KeyboardPageGeometryTests: XCTestCase {
 
     func testCategoryTailRowsKeepTheWidthsOfTheirFullRowCounterparts() {
         for weights in [[2.0, 1, 1, 1], [2, 2, 2, 2], [3, 1, 3, 1]] {
-            for split in [nil, LayoutSplitConfiguration()] {
+            for split in [nil, LayoutSplitConfiguration().resolved(forWidth: 650)] {
                 let full = KeyboardCategoryRowGeometry(width: 650, columns: 4, weights: weights, row: 0, split: split)
                 for count in 1...3 {
                     let tail = KeyboardCategoryRowGeometry(
@@ -76,12 +78,32 @@ final class KeyboardPageGeometryTests: XCTestCase {
         XCTAssertEqual(uneven.keyWidths[0], uneven.keyWidths[1] * 3, accuracy: 0.001)
     }
 
+    /// Imported pages can carry more keys than their declared column count, or none at all.
+    func testCategoryRowsWiderThanTheirColumnsOrEmptyStayWithinTheKeyboard() {
+        let crowded = KeyboardCategoryRowGeometry(width: 400, columns: 2, weights: [1, 1, 1, 1, 1], row: 0, split: nil)
+        XCTAssertEqual(crowded.keyWidths.count, 5)
+        XCTAssertEqual(crowded.usedWidth, 400, accuracy: 0.001)
+        for keyWidth in crowded.keyWidths { XCTAssertEqual(keyWidth, crowded.keyWidths[0], accuracy: 0.001) }
+
+        for columns in [0, 4] {
+            let empty = KeyboardCategoryRowGeometry(width: 400, columns: columns, weights: [], row: 0, split: nil)
+            XCTAssertTrue(empty.keyWidths.isEmpty)
+            XCTAssertEqual(empty.usedWidth, 0)
+            XCTAssertEqual(empty.gap, 0)
+        }
+
+        let split = LayoutSplitConfiguration(activation: .always).resolved(forWidth: 834)
+        let splitRow = KeyboardCategoryRowGeometry(width: 834, columns: 0, weights: [1, 1, 1], row: 0, split: split)
+        XCTAssertEqual(splitRow.keyWidths.count, 3)
+        XCTAssertLessThanOrEqual(splitRow.usedWidth, 834 + 0.001)
+    }
+
     // MARK: - Authored chrome geometry
 
     func testAuthoredStandardAlphabetKeepsEqualColumnsAndRealSideWidths() {
         let page = KeyboardPagePresets.englishQwerty.materialized()
         for width in [320.0, 466, 834] {
-            let split = LayoutSplitConfiguration()
+            let split = LayoutSplitConfiguration().resolved(forWidth: width)
             let standard = StandardKeyRowGeometry(width: width, split: split)
             let first = KeyboardPageRowGeometry(width: width, page: page, row: 0, split: split)
             let second = KeyboardPageRowGeometry(width: width, page: page, row: 1, split: split)
@@ -102,23 +124,22 @@ final class KeyboardPageGeometryTests: XCTestCase {
                 XCTAssertEqual(keyWidth, standard.keyWidth, accuracy: 0.001)
             }
             // The row's own area plus the two sides and their gaps still sums to the keyboard width.
-            XCTAssertEqual(
-                third.keyWidths.dropFirst().dropLast().reduce(0, +) + standard.gap
-                    + Double(6) * 4 + third.inset * 2 + standard.thirdRowSideWidth * 2 + 8, width,
-                accuracy: 0.001)
+            let letters: Double = third.keyWidths.dropFirst().dropLast().reduce(0, +)
+            let sides: Double = third.inset * 2 + standard.thirdRowSideWidth * 2 + 8
+            XCTAssertEqual(letters + standard.gap + 6 * 4 + sides, width, accuracy: 0.001)
         }
     }
 
     func testChangedSideWeightReallyGetsNarrower() {
         let materialized = KeyboardPagePresets.englishQwerty.materialized()
         let baseline = KeyboardPageRowGeometry(
-            width: 834, page: materialized, row: 2, split: LayoutSplitConfiguration())
+            width: 834, page: materialized, row: 2, split: LayoutSplitConfiguration().resolved(forWidth: 834))
         var changed = materialized
         var lastRow = changed.rows[2].keys
         lastRow[0] = lastRow[0].settingWidth(1)
         changed.rows[2] = LayoutRow(keys: lastRow)
         let geometry = KeyboardPageRowGeometry(
-            width: 834, page: changed, row: 2, split: LayoutSplitConfiguration())
+            width: 834, page: changed, row: 2, split: LayoutSplitConfiguration().resolved(forWidth: 834))
         XCTAssertFalse(geometry.usesStandardAlphabet)
         XCTAssertLessThan(geometry.keyWidths[0], baseline.keyWidths[0])
         XCTAssertEqual(geometry.keyWidths[0], geometry.keyWidths[1], accuracy: 0.001)
@@ -132,7 +153,7 @@ final class KeyboardPageGeometryTests: XCTestCase {
         lastRow[1] = lastRow[1].settingAction(.init(.space))
         changed.rows[2] = LayoutRow(keys: lastRow)
         let geometry = KeyboardPageRowGeometry(
-            width: 834, page: changed, row: 2, split: LayoutSplitConfiguration())
+            width: 834, page: changed, row: 2, split: LayoutSplitConfiguration().resolved(forWidth: 834))
         XCTAssertFalse(geometry.usesStandardAlphabet)
 
         var firstRowChanged = materialized
@@ -141,14 +162,14 @@ final class KeyboardPageGeometryTests: XCTestCase {
         firstRowChanged.rows[0] = LayoutRow(keys: firstRow)
         XCTAssertFalse(
             KeyboardPageRowGeometry(
-                width: 834, page: firstRowChanged, row: 0, split: LayoutSplitConfiguration()
+                width: 834, page: firstRowChanged, row: 0, split: LayoutSplitConfiguration().resolved(forWidth: 834)
             ).usesStandardAlphabet)
     }
 
-    func testMaterialisedNumericRowKeepsTenEqualColumns() {
+    func testMaterializedNumericRowKeepsTenEqualColumns() {
         let page = KeyboardPagePresets.numericChinese.materialized()
         for width in [320.0, 466, 834] {
-            let split = LayoutSplitConfiguration()
+            let split = LayoutSplitConfiguration().resolved(forWidth: width)
             let standard = StandardKeyRowGeometry(width: width, split: split)
             for row in 0..<page.rows.count {
                 let geometry = KeyboardPageRowGeometry(width: width, page: page, row: row, split: split)

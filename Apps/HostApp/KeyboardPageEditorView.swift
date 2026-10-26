@@ -90,8 +90,7 @@ struct KeyboardPageEditorView: View {
                             draft.rows = rows
                             draft = draft.settingSplit(
                                 KeyboardSplitEditor.adjusted(draft.split, rows: splitEditorRows))
-                        }), selected: selectedRowBinding,
-                    rowKeyLimit: LayoutResourceBudget.keysPerRegion + LayoutResourceBudget.pageControlRowKeys)
+                        }), selected: selectedRowBinding)
             }
             // The footer cut lives at index rows.count, so its authored row joins the cut list.
             KeyboardSplitEditor(
@@ -304,7 +303,7 @@ struct KeyboardPageEditorView: View {
         switch target {
         case .rows:
             guard let last = draft.rows.last else { return false }
-            return last.keys.count < LayoutResourceBudget.keysPerRegion + LayoutResourceBudget.pageControlRowKeys
+            return last.keys.count < LayoutResourceBudget.keysPerRegion
         case .chrome(let region):
             return !chromeIsFull(region)
         }
@@ -375,9 +374,7 @@ struct KeyboardPageEditorView: View {
             guard !page.rows.isEmpty else { return nil }
             let row = page.rows.count - 1
             var keys = page.rows[row].keys
-            guard keys.count < LayoutResourceBudget.keysPerRegion + LayoutResourceBudget.pageControlRowKeys else {
-                return nil
-            }
+            guard keys.count < LayoutResourceBudget.keysPerRegion else { return nil }
             keys.append(key)
             page.rows[row] = LayoutRow(keys: keys)
             page.split = KeyboardSplitEditor.adjusted(page.split, rows: splitRows(of: page))

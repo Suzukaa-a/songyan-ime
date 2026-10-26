@@ -164,13 +164,13 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertEqual(automaticChineseCopy.defaultSymbolMarks, .chinese)
         XCTAssertEqual(automaticChineseCopy.rows[1].keys[2].label, "：")
 
-        // A legacy authored page without an initial branch is never guessed one.
-        let legacy = KeyboardPageDefinition(
-            id: "legacy.rows", name: "旧行页", kind: .numeric,
+        // An authored page without an initial branch is never guessed one.
+        let unmarked = KeyboardPageDefinition(
+            id: "unmarked.rows", name: "旧行页", kind: .numeric,
             rows: [LayoutRow(keys: [LayoutKey(label: "1", action: .init(.literal, value: "1"))])])
-        XCTAssertNil(legacy.defaultSymbolMarks)
-        XCTAssertNil(legacy.materialized().defaultSymbolMarks)
-        XCTAssertNil(legacy.copy().defaultSymbolMarks)
+        XCTAssertNil(unmarked.defaultSymbolMarks)
+        XCTAssertNil(unmarked.materialized().defaultSymbolMarks)
+        XCTAssertNil(unmarked.copy().defaultSymbolMarks)
     }
 
     func testAutomaticSymbolCopySnapshotsTheChosenInitialLanguage() throws {
@@ -220,16 +220,16 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertNil(copy.rows[0].keys[0].action.asciiValue)
         XCTAssertEqual(copy.rows[0].keys[0].action.literalValue(usesASCIIPunctuation: true), "固定")
 
-        // Materialising a legacy row page only appends the controls the renderer used to synthesize;
+        // Materializing a row page on native controls only appends the controls the renderer draws;
         // it never rewrites an author literal.
-        let legacy = KeyboardPageDefinition(
-            id: "author.legacy", name: "作者旧页", kind: .numeric,
+        let native = KeyboardPageDefinition(
+            id: "author.native", name: "作者旧页", kind: .numeric,
             rows: [LayoutRow(keys: [fixed, LayoutKey(label: "2", action: .init(.literal, value: "2"))])])
-        let materialised = legacy.materialized()
-        XCTAssertEqual(Array(materialised.rows[0].keys.prefix(2)), legacy.rows[0].keys)
-        XCTAssertEqual(materialised.rows[0].keys.count, 3)  // Delete appended
-        XCTAssertNil(materialised.rows[0].keys[0].action.asciiValue)
-        try materialised.validate()
+        let materialized = native.materialized()
+        XCTAssertEqual(Array(materialized.rows[0].keys.prefix(2)), native.rows[0].keys)
+        XCTAssertEqual(materialized.rows[0].keys.count, 3)  // Delete appended
+        XCTAssertNil(materialized.rows[0].keys[0].action.asciiValue)
+        try materialized.validate()
     }
 
     // MARK: - Frozen default footers and policy mapping
@@ -347,12 +347,12 @@ final class BilingualLiteralTests: XCTestCase {
         }
     }
 
-    // MARK: - Legacy wire decoder
+    // MARK: - Pages saved without the newer fields
 
-    func testLegacyJSONWithoutNewFieldsStaysReadableAndFixed() throws {
+    func testLiteralWithoutASCIICounterpartKeepsFixedText() throws {
         let json = Data(
             """
-            {"id":"old.pair","name":"旧页","kind":"numeric","rows":[{"keys":[{"label":"。","action":{"type":"literal","value":"。"}}]}]}
+            {"id":"fixed.pair","name":"固定标点","kind":"numeric","rows":[{"keys":[{"label":"。","action":{"type":"literal","value":"。"}}]}]}
             """.utf8)
         let page = try JSONDecoder().decode(KeyboardPageDefinition.self, from: json)
         XCTAssertNil(page.defaultSymbolMarks)

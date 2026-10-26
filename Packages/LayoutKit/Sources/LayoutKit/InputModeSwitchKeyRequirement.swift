@@ -26,9 +26,9 @@ public extension LayoutDefinition {
 public extension KeyboardPageDefinition {
     /// True when the page really offers a globe entry point.
     ///
-    /// A legacy page (`chrome == nil`) still draws the built-in footer's globe until the editor
-    /// materialises it, so it counts. Authored pages must carry the globe as data: rows on a row
-    /// page, or the permanent function area. A categorised page's categories (and their recent
+    /// A native-control page (`chrome == nil`) draws the built-in footer's globe, so it counts.
+    /// Authored pages must carry the globe as data: rows on a row page, or the permanent function
+    /// area. A categorized page's categories (and their recent
     /// snapshot) are content backups, not the fixed entry point, so only its chrome counts.
     var hasInputModeSwitchKey: Bool {
         guard let chrome else { return true }

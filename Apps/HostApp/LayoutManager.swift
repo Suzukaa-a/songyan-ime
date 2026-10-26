@@ -4,7 +4,23 @@ import KeyboardCore
 import LayoutKit
 
 /// What a failed write belongs to, so its message names the right thing.
-enum LayoutMessageContext { case layout, page, composition, imported }
+/// What the user was doing when a catalog write failed; it only decides the message's lead-in.
+enum LayoutMessageContext {
+    case layout, layoutRemoval, page, pageRemoval, pageCopy, composition, imported
+
+    /// Page and pairing alerts already say what failed in their title, so their messages start
+    /// directly with the reason.
+    var prefix: String {
+        switch self {
+        case .layout: return "键盘布局没有保存："
+        case .layoutRemoval: return "键盘布局没有删除："
+        case .pageRemoval: return "页面没有删除："
+        case .pageCopy: return "页面没有复制成功："
+        case .imported: return "布局没有导入："
+        case .page, .composition: return ""
+        }
+    }
+}
 
 /// DIY layout management (single-writer coordinator on the host app side).
 ///
@@ -242,12 +258,7 @@ final class LayoutManager: ObservableObject {
     }
 
     private nonisolated static func storageNotReadyMessage(_ context: LayoutMessageContext) -> String {
-        switch context {
-        case .layout: return "布局存储位置尚未就绪，请稍后重试。"
-        case .page: return "页面没有保存：存储位置还没就绪，请稍后重试。"
-        case .composition: return "搭配没有保存：存储位置还没就绪，请稍后重试。"
-        case .imported: return "布局没有导入：存储位置还没就绪，请稍后重试。"
-        }
+        context.prefix + "存储位置还没就绪，请稍后重试。"
     }
 
     /// Enable (appended to the end of the enabled list) / disable; disabling the last one is rejected by validation with a friendly notice.
@@ -277,7 +288,7 @@ final class LayoutManager: ObservableObject {
     }
 
     func remove(_ id: String) async {
-        await persist { reg in
+        await persist(context: .layoutRemoval) { reg in
             try reg.remove(id: id)
         }
     }
@@ -350,7 +361,7 @@ final class LayoutManager: ObservableObject {
 
     @discardableResult
     func removePage(_ id: String) async -> Bool {
-        await persist(context: .page) { try $0.removePage(id: id) }
+        await persist(context: .pageRemoval) { try $0.removePage(id: id) }
     }
 
     @discardableResult
@@ -388,36 +399,18 @@ final class LayoutManager: ObservableObject {
 
     // MARK: - Error messages
 
-    nonisolated static func friendly(_ error: Error, context: LayoutMessageContext = .layout) -> String {
+    /// LayoutKit messages are already written for people; the context only adds the lead-in.
+    /// Without a context the bare reason is returned, for callers that build their own sentence.
+    nonisolated static func friendly(_ error: Error, context: LayoutMessageContext? = nil) -> String {
+        let reason: String
         if let layoutError = error as? LayoutError {
-            switch layoutError {
-            case .lastEnabledLayout:
-                return "请至少保留一个启用的布局。请先启用其他布局，再停用或移除当前布局。"
-            case .duplicateID(let id):
-                return "已存在相同标识的键盘布局（\(id)），请替换或另存为副本。"
-            case .unknownID(let id):
-                return "找不到键盘布局：\(id)"
-            case .invalid(let reason):
-                // Page and pairing validation already speak about what is wrong, so the reason is
-                // the message under the matching alert title.
-                switch context {
-                case .page, .composition, .imported: return reason
-                case .layout: break
-                }
-                switch reason {
-                case "id and name are required": return "请填写名称后再保存。"
-                case "keys require label and positive finite width": return "请填写按键标题，并把宽度设为大于 0 的数字。"
-                case "rows must contain keys": return "请至少保留一行，每行至少保留一个按键。"
-                case "literal requires nonempty value": return "请填写按键要输入的文字。"
-                case "code requires one printable ASCII character": return "输入字母的按键需要一个英文字符，请修改后保存。"
-                case "longPress requires label": return "请填写长按项的标题。"
-                case "Rime code keys require a candidate area": return "输入字母的按键需要显示候选栏，请开启后保存。"
-                case "reading row requires a candidate area": return "拼音提示行需要显示候选栏，请开启后保存。"
-                default: return "键盘布局没有保存：\(reason)"
-                }
-            }
+            reason = layoutError.errorDescription ?? ""
+        } else if error is DecodingError {
+            reason = "文件内容不是可识别的键盘布局，请检查后重试。"
+        } else {
+            reason = error.localizedDescription
         }
-        return error.localizedDescription
+        return (context?.prefix ?? "") + reason
     }
 }
 

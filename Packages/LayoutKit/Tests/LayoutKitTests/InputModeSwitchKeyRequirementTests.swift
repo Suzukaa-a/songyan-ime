@@ -65,24 +65,24 @@ final class InputModeSwitchKeyRequirementTests: XCTestCase {
 
     // MARK: - Pages
 
-    func testLegacyPageStillCountsAndMaterialisedPageNeedsRealData() throws {
+    func testNativeControlsPageCountsAndMaterializedPageNeedsRealData() throws {
         XCTAssertTrue(KeyboardPagePresets.englishQwerty.hasInputModeSwitchKey)
         XCTAssertTrue(KeyboardPagePresets.numericAutomatic.hasInputModeSwitchKey)
 
-        var materialised = KeyboardPagePresets.englishQwerty.materialized()
-        XCTAssertTrue(materialised.hasInputModeSwitchKey)
-        XCTAssertNoThrow(try materialised.validateRequiredInputModeSwitchKey(true))
+        var materialized = KeyboardPagePresets.englishQwerty.materialized()
+        XCTAssertTrue(materialized.hasInputModeSwitchKey)
+        XCTAssertNoThrow(try materialized.validateRequiredInputModeSwitchKey(true))
 
-        var materialisedBottom = materialised.chrome?.bottom ?? []
-        materialisedBottom.removeAll { $0.action.type == .globe }
-        materialised.chrome?.bottom = materialisedBottom
-        XCTAssertFalse(materialised.hasInputModeSwitchKey)
-        XCTAssertThrowsError(try materialised.validateRequiredInputModeSwitchKey(true))
-        XCTAssertNoThrow(try materialised.validateRequiredInputModeSwitchKey(false))
+        var materializedBottom = materialized.chrome?.bottom ?? []
+        materializedBottom.removeAll { $0.action.type == .globe }
+        materialized.chrome?.bottom = materializedBottom
+        XCTAssertFalse(materialized.hasInputModeSwitchKey)
+        XCTAssertThrowsError(try materialized.validateRequiredInputModeSwitchKey(true))
+        XCTAssertNoThrow(try materialized.validateRequiredInputModeSwitchKey(false))
 
         // A real globe anywhere renderable counts again.
-        materialised.rows[0] = LayoutRow(keys: materialised.rows[0].keys + [globe])
-        XCTAssertTrue(materialised.hasInputModeSwitchKey)
+        materialized.rows[0] = LayoutRow(keys: materialized.rows[0].keys + [globe])
+        XCTAssertTrue(materialized.hasInputModeSwitchKey)
     }
 
     func testPageFakeGlyphOrLongPressGlobeDoesNotCount() throws {
@@ -98,17 +98,17 @@ final class InputModeSwitchKeyRequirementTests: XCTestCase {
     func testCategorizedPageOnlyCountsThePermanentFunctionArea() throws {
         XCTAssertTrue(
             KeyboardPagePresets.symbolsCategorized.hasInputModeSwitchKey,
-            "a legacy categorised page still draws the built-in globe")
+            "a categorized page on native controls draws the built-in globe")
 
         var page = KeyboardPagePresets.symbolsCategorized
         page.categories = [
             KeyboardPageCategory(id: "c", name: "常用", keys: [globe])
         ]
         page.rows = [LayoutRow(keys: [globe])]
-        let materialised = page.materialized()
-        XCTAssertTrue(materialised.hasInputModeSwitchKey, "the authored default footer carries the globe")
+        let materialized = page.materialized()
+        XCTAssertTrue(materialized.hasInputModeSwitchKey, "the authored default footer carries the globe")
 
-        var withoutFixedGlobe = materialised
+        var withoutFixedGlobe = materialized
         var fixedBottom = withoutFixedGlobe.chrome?.bottom ?? []
         fixedBottom.removeAll { $0.action.type == .globe }
         withoutFixedGlobe.chrome?.bottom = fixedBottom
@@ -120,7 +120,7 @@ final class InputModeSwitchKeyRequirementTests: XCTestCase {
         withoutFixedGlobe.rows = [LayoutRow(keys: [globe])]
         XCTAssertFalse(
             withoutFixedGlobe.hasInputModeSwitchKey,
-            "hidden legacy rows and category content never substitute for the permanent area")
+            "hidden rows and category content never substitute for the permanent area")
         XCTAssertThrowsError(try withoutFixedGlobe.validateRequiredInputModeSwitchKey(true))
 
         withoutFixedGlobe.categories?.append(
