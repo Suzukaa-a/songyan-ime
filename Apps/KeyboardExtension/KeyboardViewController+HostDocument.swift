@@ -191,10 +191,9 @@ extension KeyboardViewController {
         }
     }
 
-    /// On commit, replaces the already-echoed composition with the result and unmarks it: two host operations
-    /// with no "empty composition" frame in between (clearing the mark, unmarking, then inserting would make the field
-    /// flash a state without a composition). Used only when the host has echoed the current marked text, which
-    /// proves it supports marked text; other hosts still use insertText so text is never lost.
+    /// Commit through the native insertion path, replacing the entire owned marked range.
+    /// Re-marking the result and then unmarking lets some hosts restore the replacement-start
+    /// selection; insertText finalizes the replacement and its caret in one host operation.
     func commitOverEchoedMarked(_ text: String, document: UUID) -> Bool {
         guard markedDocument == document,
             let pendingMarked, lastEchoedMarked == pendingMarked,
@@ -208,9 +207,7 @@ extension KeyboardViewController {
         keyboardOnlyComposition = false
         session.reportCompositionPresentation(.idle)
         writeProxy {
-            textDocumentProxy.setMarkedText(
-                text, selectedRange: NSRange(location: (text as NSString).length, length: 0))
-            textDocumentProxy.unmarkText()
+            textDocumentProxy.insertText(text)
         }
         return true
     }

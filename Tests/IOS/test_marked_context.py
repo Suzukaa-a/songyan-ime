@@ -61,30 +61,49 @@ final class ScriptedProxy {
     var documentContextAfterInput: String?
     var selectedText: String?
     var mark: String?
+    var markSelection = NSRange(location: 0, length: 0)
+    var resetsCaretOnUnmark = false
     var setMarkedCalls = 0
     var insertCalls = 0
     var delayed = false
     var window: Int? = 80
-    var document: String { originalBefore + (mark ?? "") + originalAfter }
+    var document: String { originalBefore + (mark ?? selectedText ?? "") + originalAfter }
     init() { flush() }
     func flush() {
-        let before = originalBefore + (mark ?? "")
+        let marked = (mark ?? "") as NSString
+        let before = originalBefore + marked.substring(to: markSelection.location)
+        let after = marked.substring(from: NSMaxRange(markSelection)) + originalAfter
+        if mark != nil { selectedText = marked.substring(with: markSelection) }
         documentContextBeforeInput = window.map { String(before.suffix($0)) } ?? before
-        documentContextAfterInput = window.map { String(originalAfter.prefix($0)) } ?? originalAfter
+        documentContextAfterInput = window.map { String(after.prefix($0)) } ?? after
     }
     func setMarkedText(_ text: String, selectedRange: NSRange) {
         setMarkedCalls += 1
+        selectedText = nil
         mark = text
+        markSelection = selectedRange
         if !delayed { flush() }
     }
     func unmarkText() {
-        originalBefore += mark ?? ""
+        if let mark {
+            let marked = mark as NSString
+            // Model a host that restores the replacement start when composition ends.
+            let caret = resetsCaretOnUnmark ? 0 : NSMaxRange(markSelection)
+            originalBefore += marked.substring(to: caret)
+            originalAfter = marked.substring(from: caret) + originalAfter
+        }
         mark = nil
+        markSelection = NSRange(location: 0, length: 0)
+        selectedText = nil
         if !delayed { flush() }
     }
     func insertText(_ text: String) {
         insertCalls += 1
+        // Native insertion replaces the whole marked range, including an interior caret.
         originalBefore += text
+        mark = nil
+        markSelection = NSRange(location: 0, length: 0)
+        selectedText = nil
         if !delayed { flush() }
     }
 }
@@ -172,6 +191,43 @@ growing.updateMarked(nil)
 growing.updateMarked(MarkedComposition(text: "ni"))
 precondition(growing.pendingMarked?.text == "ni", "next composition can use inline display again")
 print("PASS long Unicode composition, delayed cancellation, whole single commit and subsequent input")
+
+// A prefilled selection is replaced once; the next composition must append even
+// when the host restores the replacement-start caret from unmarkText.
+for reset in [false, true] {
+    for commit in ["你好", "👩🏽‍💻e\u{301}", "ni hao"] {
+        for (head, tail) in [("", ""), ("左👈", "👉右")] {
+            let replacement = Subject()
+            let proxy = replacement.textDocumentProxy
+            proxy.originalBefore = head
+            proxy.originalAfter = tail
+            proxy.selectedText = "预填内容👋"
+            proxy.resetsCaretOnUnmark = reset
+            proxy.flush()
+            replacement.expectedContext = replacement.proxyContext
+            replacement.updateMarked(MarkedComposition(text: "ni hao"))
+            precondition(replacement.session.onDispatchCommit!(commit))
+            precondition(proxy.document == head + commit + tail && proxy.mark == nil)
+            replacement.updateMarked(MarkedComposition(text: "ma"))
+            precondition(replacement.session.onDispatchCommit!("吗"))
+            precondition(proxy.document == head + commit + "吗" + tail, "replacement must leave the caret after committed text")
+            precondition(proxy.documentContextBeforeInput == head + commit + "吗" && proxy.documentContextAfterInput == tail)
+        }
+    }
+}
+// Keep the insertion point inside an ordinary document and replace a marked
+// range whose own caret is in the middle (UTF-16, including emoji).
+let interior = Subject()
+let interiorProxy = interior.textDocumentProxy
+interiorProxy.originalBefore = "左👈"
+interiorProxy.originalAfter = "👉右"
+interiorProxy.flush()
+interior.expectedContext = interior.proxyContext
+interior.updateMarked(MarkedComposition(text: "👩🏽‍💻ni", selection: NSRange(location: 7, length: 0)))
+precondition(interior.session.onDispatchCommit!("你"))
+precondition(interiorProxy.document == "左👈你👉右" && interiorProxy.mark == nil)
+precondition(interiorProxy.documentContextBeforeInput == "左👈你" && interiorProxy.documentContextAfterInput == "👉右")
+print("PASS selected prefill replacement, subsequent append, equal commit, Unicode and interior composition caret")
 
 for change in 0..<4 {
     let external = Subject()
