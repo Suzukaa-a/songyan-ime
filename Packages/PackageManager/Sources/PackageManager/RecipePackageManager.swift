@@ -121,7 +121,7 @@ public actor RecipePackageManager {
     }
 
     public func status() throws -> RecipeStatus {
-        RecipeStatus(active: try load("active.json"))
+        RecipeStatus(active: try load(InstalledPackageLayout.activeMarker))
     }
 
     public func activeResourceURL() throws -> URL? {
@@ -133,11 +133,11 @@ public actor RecipePackageManager {
     }
 
     public func activeInstallation() throws -> ActiveRecipe? {
-        guard let active: InstalledRecipe = try load("active.json") else { return nil }
+        guard let active: InstalledRecipe = try load(InstalledPackageLayout.activeMarker) else { return nil }
         guard safePath(active.generation), !active.generation.contains("/") else {
             throw RecipeInstallError.invalidResource("active generation")
         }
-        let directory = root.appendingPathComponent("versions/\(active.generation)", isDirectory: true)
+        let directory = generationDirectory(active.generation)
         return ActiveRecipe(
             installation: active, resourceURL: directory.appendingPathComponent("resources"),
             userDataURL: directory.appendingPathComponent("user"))
@@ -189,7 +189,7 @@ public actor RecipePackageManager {
         // (leftovers of failed or superseded installs) can go.
         removeGenerations(except: active)
         let generation = "\(manifest.id)-\(manifest.revision)-\(UUID().uuidString)"
-        let directory = root.appendingPathComponent("versions/\(generation)", isDirectory: true)
+        let directory = generationDirectory(generation)
         let resources = directory.appendingPathComponent("resources", isDirectory: true)
         let user = directory.appendingPathComponent("user", isDirectory: true)
         do {
@@ -268,7 +268,7 @@ public actor RecipePackageManager {
                 id: manifest.id, revision: manifest.revision, generation: generation,
                 schemaID: entry, activatedAt: Date())
             // The commit point. Resources/user paths stay fixed, including Lua's lazily opened files.
-            try save(installed, "active.json")
+            try save(installed, InstalledPackageLayout.activeMarker)
             return installed
         } catch {
             // The previous generation stays active; the half-written new one is discarded.
@@ -277,8 +277,13 @@ public actor RecipePackageManager {
         }
     }
 
+    private func generationDirectory(_ generation: String) -> URL {
+        root.appendingPathComponent(InstalledPackageLayout.versionsDirectory, isDirectory: true)
+            .appendingPathComponent(generation, isDirectory: true)
+    }
+
     private func removeGenerations(except active: String?) {
-        let versions = root.appendingPathComponent("versions", isDirectory: true)
+        let versions = root.appendingPathComponent(InstalledPackageLayout.versionsDirectory, isDirectory: true)
         for directory in (try? fm.contentsOfDirectory(at: versions, includingPropertiesForKeys: nil)) ?? []
         where directory.lastPathComponent != active {
             try? fm.removeItem(at: directory)
@@ -292,11 +297,11 @@ public actor RecipePackageManager {
     }
 
     private func activeDirectory() throws -> URL? {
-        guard let active: InstalledRecipe = try load("active.json") else { return nil }
+        guard let active: InstalledRecipe = try load(InstalledPackageLayout.activeMarker) else { return nil }
         guard safePath(active.generation), !active.generation.contains("/") else {
             throw RecipeInstallError.invalidResource("active generation")
         }
-        return root.appendingPathComponent("versions/\(active.generation)", isDirectory: true)
+        return generationDirectory(active.generation)
     }
 
     private func load<T: Decodable>(_ name: String) throws -> T? {

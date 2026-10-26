@@ -14,7 +14,7 @@ enum CompactAdapterDeployment {
     private static let generatorVersionFileName = "keyboard-adapter-generator.txt"
 
     static func registeredRequests(build: URL) throws -> [PublishedKeyboard] {
-        let url = build.appendingPathComponent("keyboard-adapters.json")
+        let url = build.appendingPathComponent(KeyboardResourceSet.adapterRegistryFileName)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         let data = try Data(contentsOf: url)
         guard data.count < 1_000_000 else { throw RecipeInstallError.invalidResource("键盘适配配置文件大小超出限制") }
@@ -205,7 +205,7 @@ enum CompactAdapterDeployment {
         // The registry is authoritative for THIS generation: it contains exactly the
         // companions generated for requested combinations and nothing else.
         try JSONEncoder().encode(adapters).write(
-            to: build.appendingPathComponent("keyboard-adapters.json"), options: .atomic)
+            to: build.appendingPathComponent(KeyboardResourceSet.adapterRegistryFileName), options: .atomic)
         try Data(String(CompactSchemaAdapter.displayGeneratorVersion).utf8)
             .write(to: build.appendingPathComponent(generatorVersionFileName), options: .atomic)
         if let first = sources.first {

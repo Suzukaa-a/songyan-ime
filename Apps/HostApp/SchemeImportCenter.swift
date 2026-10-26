@@ -485,10 +485,12 @@ final class SchemeImportCenter: ObservableObject {
         guard declaration.id == id else { throw RecipeInstallError.invalidResource("安装身份不匹配") }
         let schemas = try JSONDecoder().decode(
             [KeyboardSchemaDescriptor].self,
-            from: Data(contentsOf: active.resourceURL.appendingPathComponent("keyboard-schemas.json")))
+            from: Data(contentsOf: active.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardSchemas)))
         // The enabled receipt is authoritative; missing source inventory never grants input capability.
         let sourceSchemas: [String]
-        if let data = try? Data(contentsOf: active.resourceURL.appendingPathComponent("keyboard-source-schemas.json")) {
+        if let data = try? Data(
+            contentsOf: active.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardSourceSchemas))
+        {
             sourceSchemas = (try? JSONDecoder().decode([String].self, from: data)) ?? []
         } else {
             sourceSchemas = []

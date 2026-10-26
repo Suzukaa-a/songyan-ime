@@ -366,7 +366,8 @@ extension SchemeImportCenter {
             }
             let descriptors = byID.values.sorted { $0.id < $1.id }
             try JSONEncoder().encode(descriptors).write(
-                to: deployment.resourceURL.appendingPathComponent("keyboard-schemas.json"), options: .atomic)
+                to: deployment.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardSchemas),
+                options: .atomic)
             // Source inventory (display only): schemes whose source is in the package/workspace but not enabled; never treated as usable.
             var sourceIDs = Set(enabled)
             for source in [deployment.resourceURL, deployment.userDataURL] {
@@ -377,7 +378,8 @@ extension SchemeImportCenter {
             }
             let inventory = sourceIDs.subtracting(byID.keys).sorted()
             try JSONEncoder().encode(inventory).write(
-                to: deployment.resourceURL.appendingPathComponent("keyboard-source-schemas.json"), options: .atomic)
+                to: deployment.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardSourceSchemas),
+                options: .atomic)
             if let packageName {
                 // Preserve the package's author-declared bindings across a regeneration,
                 // but only those whose schema is enabled in THIS generation. User

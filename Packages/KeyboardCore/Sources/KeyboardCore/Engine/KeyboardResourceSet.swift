@@ -163,8 +163,10 @@ public struct KeyboardResourceSet: Equatable, Sendable {
     public func keyboardChoices(for schemaID: String) -> [Combination] {
         availableCombinations.filter { $0.schemaID == sourceSchemaID(schemaID) }
     }
+    /// Registry of generated companions, written beside the compiled schemas in a build directory.
+    public static let adapterRegistryFileName = "keyboard-adapters.json"
     public static func readEncodingAdapters(build: URL) -> [EncodingAdapter] {
-        guard let data = try? Data(contentsOf: build.appendingPathComponent("keyboard-adapters.json")),
+        guard let data = try? Data(contentsOf: build.appendingPathComponent(adapterRegistryFileName)),
             data.count < 1_000_000
         else { return [] }
         return (try? JSONDecoder().decode([EncodingAdapter].self, from: data)) ?? []
