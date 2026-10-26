@@ -32,9 +32,8 @@ public struct KeyboardOneHandPlan: Equatable, Sendable {
 
 /// Decides when one-handed narrowing applies and the widths it produces.
 ///
-/// Only iPhone portrait panels of standard width narrow; landscape, iPad and
-/// unusual widths keep the full-width layout. The caller passes the idiom and
-/// size-class facts rather than inferring device class from the width.
+/// Only narrow, tall phone surfaces offer one-handed narrowing. Device idiom alone
+/// cannot distinguish a folded phone from its expanded or multitasking surface.
 public enum KeyboardOneHandLayoutPolicy {
     /// Narrowed content keeps this share of the panel width.
     public static let contentRatio: Double = 0.85
@@ -44,8 +43,15 @@ public enum KeyboardOneHandLayoutPolicy {
     public static let minimumGutterWidth: Double = 44
     /// Standard iPhone portrait widths start here.
     public static let minimumPanelWidth: Double = 375
-    /// Above this width the panel is a pad / floating / regular-width surface.
+    /// Keep narrowing within phone-sized surfaces, even before size classes update.
     public static let maximumPanelWidth: Double = 600
+
+    public static func isAvailable(
+        panelWidth: Double, isPhone: Bool, compactHeight: Bool, regularWidth: Bool
+    ) -> Bool {
+        isPhone && !compactHeight && !regularWidth
+            && panelWidth >= minimumPanelWidth && panelWidth <= maximumPanelWidth
+    }
 
     public static func plan(
         mode: KeyboardOneHandMode,

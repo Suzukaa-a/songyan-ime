@@ -4,17 +4,74 @@ import Foundation
 public struct LayoutAction: Codable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable {
         case code, literal, space, backspace, enter, globe, modeSwitch
+        /// Page-level controls. The host dispatches them itself; they never become an engine
+        /// key action, so no engine case is added for a new kind.
+        case shift, pageSwitch, languageSwitch, symbolLock, clearInput
+    }
+
+    /// The only page a `.pageSwitch` key may open.
+    public enum PageTarget: String, Codable, CaseIterable, Sendable {
+        case letters, numeric, symbols
+    }
+
+    /// Explicit behavior of an authored language key. No value keeps the page-following default.
+    public enum LanguageSwitchBehavior: String, Codable, CaseIterable, Sendable {
+        /// Switch only the panel's symbol language; the page does not change.
+        case symbols
+        /// Return to the main letter keyboard, keeping the Chinese/English input state.
+        case letters
     }
 
     public let type: Kind
     public let value: String?
+    /// ASCII counterpart of a bilingual literal (Chinese is `value`, ASCII is this). Nil keeps
+    /// the literal fixed; only `.literal` may carry it.
+    public let asciiValue: String?
 
-    public init(_ type: Kind, value: String? = nil) {
+    public init(_ type: Kind, value: String? = nil, asciiValue: String? = nil) {
         self.type = type
         self.value = value
+        self.asciiValue = asciiValue
+    }
+
+    /// The page a `.pageSwitch` key opens, or nil for every other kind.
+    public var pageSwitchTarget: PageTarget? {
+        guard type == .pageSwitch, let value else { return nil }
+        return PageTarget(rawValue: value)
+    }
+
+    public static func pageSwitch(_ target: PageTarget) -> LayoutAction {
+        LayoutAction(.pageSwitch, value: target.rawValue)
+    }
+
+    /// The value a literal key shows and types for the current punctuation state. A nil pair is
+    /// fixed text; a bilingual pair resolves without rebuilding any authored face metadata.
+    public func literalValue(usesASCIIPunctuation: Bool) -> String? {
+        guard type == .literal else { return nil }
+        if usesASCIIPunctuation, let asciiValue { return asciiValue }
+        return value
+    }
+
+    /// Replaces only the ASCII counterpart, keeping the kind and the Chinese value.
+    public func settingAsciiValue(_ asciiValue: String?) -> LayoutAction {
+        LayoutAction(type, value: value, asciiValue: asciiValue)
+    }
+
+    /// The explicit behavior authored on a language key, or nil when the key follows the page.
+    public var languageSwitchBehavior: LanguageSwitchBehavior? {
+        guard type == .languageSwitch, let value else { return nil }
+        return LanguageSwitchBehavior(rawValue: value)
+    }
+
+    /// Builds a language key with an explicit behavior; nil keeps the page-following default.
+    public static func languageSwitch(_ behavior: LanguageSwitchBehavior? = nil) -> LayoutAction {
+        LayoutAction(.languageSwitch, value: behavior?.rawValue)
     }
 
     public func validate() throws {
+        guard type == .literal || asciiValue == nil else {
+            throw LayoutError.invalid("只有文字键可以同时填写英文符号，请重新选择。")
+        }
         switch type {
         case .code:
             // The current engine interface accepts one logical ASCII key at a time.
@@ -27,10 +84,23 @@ public struct LayoutAction: Codable, Equatable, Sendable {
             guard let value, !value.isEmpty else {
                 throw LayoutError.invalid("literal requires nonempty value")
             }
+            if let asciiValue, asciiValue.isEmpty {
+                throw LayoutError.invalid("英文符号不能为空，请重新填写。")
+            }
         case .modeSwitch:
             guard value == nil || value == "nextLayout" else {
                 throw LayoutError.invalid("modeSwitch only supports nextLayout")
             }
+        case .pageSwitch:
+            guard let value, PageTarget(rawValue: value) != nil else {
+                throw LayoutError.invalid("翻页键只能选择字母、数字或符号页，请重新选择。")
+            }
+        case .languageSwitch:
+            guard value == nil || LanguageSwitchBehavior(rawValue: value!) != nil else {
+                throw LayoutError.invalid("中英键的行为无法识别，请重新选择。")
+            }
+        case .shift, .symbolLock, .clearInput:
+            guard value == nil else { throw LayoutError.invalid("这个功能键不能带值，请重新选择。") }
         case .space, .backspace, .enter, .globe:
             guard value == nil else { throw LayoutError.invalid("\(type.rawValue) takes no value") }
         }
@@ -46,24 +116,76 @@ public struct LayoutOption: Codable, Equatable, Sendable {
     }
 }
 
+/// How a key face derives its title. Nil keeps the old class semantics, so an existing catalog
+/// decodes and renders exactly as before.
+public enum LayoutKeyTitleMode: String, Codable, Sendable {
+    /// The host draws the control's live native face (Return title/state, Shift icon, language,
+    /// lock, page target, space, delete). The stored label is the editor/accessibility fallback.
+    case automatic
+    /// The author's stored label is shown on every control, whatever the live state says.
+    case custom
+}
+
 public struct LayoutKey: Codable, Equatable, Sendable {
     public let label: String
     public let secondaryLabel: String?
-    /// Positive relative weight within its row; omitted means 1.
+    /// Positive relative weight. In a key row or the footer it is a relative width; in a leading
+    /// or trailing rail it is a relative vertical span. Omitted means 1.
     public let width: Double?
     public let action: LayoutAction
     public let longPress: [LayoutOption]?
+    /// Nil keeps the legacy class semantics; see `LayoutKeyTitleMode`.
+    public let titleMode: LayoutKeyTitleMode?
     public var widthWeight: Double { width ?? 1 }
 
     public init(
         label: String, secondaryLabel: String? = nil, width: Double? = nil,
-        action: LayoutAction, longPress: [LayoutOption]? = nil
+        action: LayoutAction, longPress: [LayoutOption]? = nil,
+        titleMode: LayoutKeyTitleMode? = nil
     ) {
         self.label = label
         self.secondaryLabel = secondaryLabel
         self.width = width
         self.action = action
         self.longPress = longPress
+        self.titleMode = titleMode
+    }
+
+    /// Field-preserving edits: editors must not rebuild a key and silently drop `titleMode`.
+    public func title(_ label: String) -> LayoutKey {
+        LayoutKey(
+            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
+            longPress: longPress, titleMode: .custom)
+    }
+
+    public func settingTitleMode(_ mode: LayoutKeyTitleMode?) -> LayoutKey {
+        LayoutKey(
+            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
+            longPress: longPress, titleMode: mode)
+    }
+
+    public func settingSecondaryLabel(_ label: String?) -> LayoutKey {
+        LayoutKey(
+            label: self.label, secondaryLabel: label, width: width, action: action,
+            longPress: longPress, titleMode: titleMode)
+    }
+
+    public func settingWidth(_ width: Double?) -> LayoutKey {
+        LayoutKey(
+            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
+            longPress: longPress, titleMode: titleMode)
+    }
+
+    public func settingAction(_ action: LayoutAction) -> LayoutKey {
+        LayoutKey(
+            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
+            longPress: longPress, titleMode: titleMode)
+    }
+
+    public func settingLongPress(_ options: [LayoutOption]?) -> LayoutKey {
+        LayoutKey(
+            label: label, secondaryLabel: secondaryLabel, width: width, action: action,
+            longPress: options, titleMode: titleMode)
     }
 }
 
@@ -119,6 +241,7 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
     public let auxiliaryAreas: [LayoutAuxiliaryArea]?
     /// Nil keeps existing imported layouts compatible; their key structure supplies the default.
     public let candidateArea: LayoutCandidateArea?
+    public let split: LayoutSplitConfiguration?
     public let note: String?
     /// Seconds until the alternate picker opens. Release commits one selected alternate only.
     public let longPressDelay: Double?
@@ -139,7 +262,8 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
     public init(
         id: String, name: String, input: LayoutInput, rows: [LayoutRow],
         auxiliaryAreas: [LayoutAuxiliaryArea]? = nil, note: String? = nil,
-        longPressDelay: Double? = nil, candidateArea: LayoutCandidateArea? = nil
+        longPressDelay: Double? = nil, candidateArea: LayoutCandidateArea? = nil,
+        split: LayoutSplitConfiguration? = nil
     ) {
         self.id = id
         self.name = name
@@ -147,6 +271,7 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
         self.rows = rows
         self.auxiliaryAreas = auxiliaryAreas
         self.candidateArea = candidateArea
+        self.split = split
         self.note = note
         self.longPressDelay = longPressDelay
     }
@@ -174,6 +299,7 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
 
     public func validate() throws {
         try LayoutResourceBudget.validate(self)
+        try split?.validate(rowKeyCounts: rows.map { $0.keys.count })
         guard effectiveLongPressDelay.isFinite, effectiveLongPressDelay > 0 else {
             throw LayoutError.invalid("longPressDelay must be positive finite seconds")
         }
@@ -227,18 +353,23 @@ public enum LayoutKeyPath: Hashable, Sendable {
 }
 
 public extension LayoutDefinition {
+    func supportsComposition(inputMethodID: String, layout: LayoutInput.Builtin) -> Bool {
+        (input.schemaID == nil || input.schemaID == inputMethodID)
+            && (input.builtinLayout == nil || input.builtinLayout == layout)
+    }
+
     func copy(name: String? = nil) -> LayoutDefinition {
         LayoutDefinition(
             id: UUID().uuidString.lowercased(), name: name ?? self.name + " 副本",
             input: input, rows: rows, auxiliaryAreas: auxiliaryAreas,
-            note: note, longPressDelay: longPressDelay, candidateArea: candidateArea)
+            note: note, longPressDelay: longPressDelay, candidateArea: candidateArea, split: split)
     }
 
     func renamed(_ name: String) -> LayoutDefinition {
         LayoutDefinition(
             id: id, name: name, input: input, rows: rows,
             auxiliaryAreas: auxiliaryAreas, note: note, longPressDelay: longPressDelay,
-            candidateArea: candidateArea)
+            candidateArea: candidateArea, split: split)
     }
 
     func key(at path: LayoutKeyPath) -> LayoutKey? {
@@ -274,14 +405,20 @@ public extension LayoutDefinition {
         return LayoutDefinition(
             id: id, name: name, input: input, rows: rows,
             auxiliaryAreas: areas, note: note, longPressDelay: longPressDelay,
-            candidateArea: candidateArea)
+            candidateArea: candidateArea, split: split)
     }
 
     func settingCandidateArea(_ area: LayoutCandidateArea) -> LayoutDefinition {
         LayoutDefinition(
             id: id, name: name, input: input, rows: rows,
             auxiliaryAreas: auxiliaryAreas, note: note, longPressDelay: longPressDelay,
-            candidateArea: area)
+            candidateArea: area, split: split)
+    }
+
+    func settingSplit(_ split: LayoutSplitConfiguration?) -> LayoutDefinition {
+        LayoutDefinition(
+            id: id, name: name, input: input, rows: rows, auxiliaryAreas: auxiliaryAreas,
+            note: note, longPressDelay: longPressDelay, candidateArea: candidateArea, split: split)
     }
 }
 

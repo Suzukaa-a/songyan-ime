@@ -46,6 +46,8 @@ struct KeyAreaRenderToken: Equatable {
     let shuangpinHintLabels: [String: String]
     let shuangpinHintRevision: UInt64
     let activeDefinition: LayoutDefinition?
+    let pageDefinition: KeyboardPageDefinition?
+    let split: LayoutSplitConfiguration?
     let layout: KeyboardLayoutKind
     let selectedSchemaID: String
     let inputMode: InputMode
@@ -53,6 +55,9 @@ struct KeyAreaRenderToken: Equatable {
     let shiftState: ShiftState
     let isComposing: Bool
     let usesASCIIPunctuation: Bool
+    /// Panel-local symbol language after override/page-default/controller resolution; the language
+    /// key, symbol pages and paired literal faces redraw from it.
+    let symbolMarks: KeyboardNumericMarks
     let returnKeyTitle: String
     let isReturnKeyEnabled: Bool
     let schemaAlphabet: String
@@ -64,6 +69,8 @@ struct KeyAreaRenderToken: Equatable {
     let hasSystemKeyboardSwitch: Bool
     let allowsCursorMovement: Bool
     let prefersCategorySymbolPage: Bool
+    /// Authored symbol-lock keys redraw their selected state; the token is what lets the gate see it.
+    let symbolPageLocked: Bool
 }
 
 /// `.equatable()` gate: while the token is unchanged SwiftUI skips recomputing `content`, and subviews'
@@ -77,6 +84,17 @@ struct KeyAreaRenderGate<Content: View>: View, Equatable {
     var body: some View { content() }
 }
 
+/// A native inert control keeps gap routing from turning the split into a key.
+struct KeyboardSplitGap: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIControl {
+        let view = UIControl()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.001)
+        view.isAccessibilityElement = false
+        return view
+    }
+    func updateUIView(_ uiView: UIControl, context: Context) {}
+}
+
 struct WeightedKeyRow: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let caps: [KeyCap]
@@ -85,15 +103,24 @@ struct WeightedKeyRow: View {
     var isEnabled: (KeyCap) -> Bool = { _ in true }
     var showsKeyPreview = false
     var visualRole: String? = nil
+    var split: LayoutSplitConfiguration? = nil
+    var rowIndex = 0
+    var fixedKeyWidth: CGFloat? = nil
+    var splitGap: CGFloat? = nil
     let onTap: (KeyCap) -> Void
 
     var body: some View {
         GeometryReader { geometry in
             let spacing: CGFloat = 4
-            let available = max(geometry.size.width - spacing * CGFloat(max(caps.count - 1, 0)), 0)
+            let gap = splitGap ?? CGFloat(split?.gap(width: Double(geometry.size.width), keyCount: caps.count) ?? 0)
+            let boundary = split?.breakIndex(row: rowIndex, keyCount: caps.count)
+            let available = max(geometry.size.width - spacing * CGFloat(max(caps.count - 1, 0)) - gap, 0)
             let total = max(caps.reduce(CGFloat.zero) { $0 + CGFloat($1.width) } + edgeUnits * 2, 1)
             HStack(spacing: spacing) {
-                ForEach(caps) { cap in
+                ForEach(Array(caps.enumerated()), id: \.element.id) { index, cap in
+                    if index == boundary, gap > 0 {
+                        KeyboardSplitGap().frame(width: gap - spacing, height: keyHeight)
+                    }
                     AlternateCharacterKey(
                         cap: cap, alternates: alternates(cap),
                         showsKeyPreview: showsKeyPreview,
@@ -101,10 +128,13 @@ struct WeightedKeyRow: View {
                     )
                     .disabled(!isEnabled(cap))
                     .opacity(isEnabled(cap) ? 1 : 0.45)
-                    .frame(width: available * CGFloat(cap.width) / total, height: keyHeight)
+                    .frame(width: fixedKeyWidth ?? (available * CGFloat(cap.width) / total), height: keyHeight)
                 }
             }
-            .padding(.horizontal, available * edgeUnits / total)
+            .padding(
+                .horizontal,
+                fixedKeyWidth.map { max(0, (available - $0 * CGFloat(caps.count)) / 2) }
+                    ?? (available * edgeUnits / total))
         }
         .frame(height: keyHeight)
     }

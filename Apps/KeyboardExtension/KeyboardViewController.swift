@@ -332,6 +332,10 @@ class KeyboardViewController: UIInputViewController {
             },
             openHostApp: { [weak self] url, completion in
                 HostAppLink.open(url, from: self, completion: completion)
+            },
+            dismissKeyboard: { [weak self] in
+                guard let self, Self.activeController === self else { return }
+                self.dismissKeyboard()
             })
         let hosting = UIHostingController(rootView: host)
         hosting.sizingOptions = []  // the input view owns external height, not phase content
@@ -717,6 +721,9 @@ class KeyboardViewController: UIInputViewController {
     func syncInputModeSwitchKey() {
         guard !hostDocumentAttachPending, Self.activeController === self else { return }
         let needed = needsInputModeSwitchKey
+        // The app validates new/imported layouts against this real requirement; the write is once
+        // per process on a background queue, never on the key or first-frame path.
+        KeyboardSystemRequirements.recordNeedsInputModeSwitchKey(needed)
         if route.needsInputModeSwitchKey != needed { route.needsInputModeSwitchKey = needed }
     }
 

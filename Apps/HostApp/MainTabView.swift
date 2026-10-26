@@ -161,7 +161,7 @@ struct MainTabView: View {
         }
     }
 
-    private static let keyboardSwitchHint = "长按「ABC/中文」键可切换"
+    private static let keyboardSwitchHint = UserTerminology.tryUsesCurrentScheme
 
     /// Number of installed sources (same data set as the input scheme page): **not** called the scheme count.
     private var installationSummary: String {

@@ -17,7 +17,9 @@ struct LayoutManagementView: View {
     var body: some View {
         List {
             storageSection
+            Section { NavigationLink("页面库") { KeyboardPageManagementView() } }
             enabledSection
+            pairedSection
             disabledSection
             builtinSection
         }
@@ -47,7 +49,7 @@ struct LayoutManagementView: View {
             if case .success(let urls) = result, let url = urls.first {
                 Task {
                     do { importedDraft = try await manager.readImport(url) } catch is CancellationError {} catch {
-                        importError = LayoutManager.friendly(error)
+                        importError = LayoutManager.friendly(error, context: .imported)
                     }
                 }
             } else if case .failure(let error) = result {
@@ -118,15 +120,18 @@ struct LayoutManagementView: View {
 
     // MARK: - Enabled
 
+    private var pairedLayoutIDs: Set<String> { Set(manager.registry.compositions.values.map(\.mainLayoutID)) }
+
     private var enabledSection: some View {
-        Section {
+        let paired = pairedLayoutIDs
+        return Section {
             if manager.registry.enabledLayouts.isEmpty {
-                Text("请至少保留一个已启用的键盘布局。")
+                Text("启用列表需至少保留一个布局。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             ForEach(manager.registry.enabledLayouts) { layout in
-                row(for: layout, enabled: true)
+                row(for: layout, enabled: true, isPaired: paired.contains(layout.id))
             }
             .onMove { source, destination in
                 Task { await manager.moveEnabled(from: source, to: destination) }
@@ -137,18 +142,33 @@ struct LayoutManagementView: View {
                 pendingRemoval = offsets.compactMap { current.indices.contains($0) ? current[$0] : nil }
             }
         } header: {
-            Text("已启用")
+            Text("启用列表")
         }
     }
 
     // MARK: - Disabled / addable
 
+    @ViewBuilder private var pairedSection: some View {
+        let paired = pairedLayoutIDs
+        let layouts = manager.registry.layouts.filter {
+            paired.contains($0.id) && !manager.registry.enabledIDs.contains($0.id)
+        }
+        if !layouts.isEmpty {
+            Section("页面搭配中的布局") {
+                ForEach(layouts) { layout in row(for: layout, enabled: false, isPaired: true) }
+            }
+        }
+    }
+
     @ViewBuilder private var disabledSection: some View {
-        let disabled = manager.registry.layouts.filter { !manager.registry.enabledIDs.contains($0.id) }
+        let paired = pairedLayoutIDs
+        let disabled = manager.registry.layouts.filter {
+            !manager.registry.enabledIDs.contains($0.id) && !paired.contains($0.id)
+        }
         if !disabled.isEmpty {
-            Section("已停用") {
+            Section("其它布局") {
                 ForEach(disabled) { layout in
-                    row(for: layout, enabled: false)
+                    row(for: layout, enabled: false, isPaired: false)
                 }
             }
         }
@@ -187,7 +207,7 @@ struct LayoutManagementView: View {
 
     // MARK: - Row
 
-    private func row(for layout: LayoutDefinition, enabled: Bool) -> some View {
+    private func row(for layout: LayoutDefinition, enabled: Bool, isPaired: Bool) -> some View {
         // A layout bound to an input method does not currently take part in keyboard switching: no ineffective "enable" switch is shown (an enabled one can still be disabled).
         let canEnable = enabled || layout.input.schemaID == nil
         return HStack(spacing: 12) {
@@ -197,7 +217,7 @@ struct LayoutManagementView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(layout.name).font(.body)
-                        Text(rowSubtitle(layout))
+                        Text(rowSubtitle(layout, isPaired: isPaired))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -205,24 +225,29 @@ struct LayoutManagementView: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isPaired ? "用于页面搭配" : "")
             // The switch sits outside the navigation link so tap and VoiceOver can operate it independently.
-            Toggle(
-                isOn: Binding(
-                    get: { enabled },
-                    set: { on in Task { await manager.setEnabled(layout.id, on: on) } }
-                )
-            ) { Text(layout.name) }
-            .labelsHidden()
-            .disabled(!canEnable)
-            .accessibilityLabel("启用「\(layout.name)」")
+            if isPaired && !enabled {
+                Text("页面搭配").font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
+            } else {
+                Toggle(
+                    isOn: Binding(
+                        get: { enabled },
+                        set: { on in Task { await manager.setEnabled(layout.id, on: on) } }
+                    )
+                ) { Text(layout.name) }
+                .labelsHidden()
+                .disabled(!canEnable)
+                .accessibilityLabel("「\(layout.name)」在启用列表中")
+            }
         }
         .padding(.vertical, 2)
     }
 
-    private func rowSubtitle(_ layout: LayoutDefinition) -> String {
+    private func rowSubtitle(_ layout: LayoutDefinition, isPaired: Bool) -> String {
         let source = isBuiltin(layout) ? "内置" : "自定义"
         let keyForm = keyFormDescription(layout)
-        let mapping = layout.input.schemaID == nil ? "" : " · 暂不可用"
+        let mapping = layout.input.schemaID == nil || isPaired ? "" : " · 需搭配使用"
         return "\(source) · \(keyForm)\(mapping)"
     }
 
@@ -259,6 +284,7 @@ struct LayoutDetailView: View {
     let layoutID: String
 
     @State private var confirmingRemoval = false
+    @State private var confirmingPresetRestore = false
 
     @State private var exportDocument: LayoutJSONDocument?
     @State private var exporting = false
@@ -272,6 +298,8 @@ struct LayoutDetailView: View {
     private var isEnabled: Bool {
         manager.registry.enabledIDs.contains(layoutID)
     }
+
+    private var isPaired: Bool { manager.registry.compositions.values.contains { $0.mainLayoutID == layoutID } }
 
     var body: some View {
         List {
@@ -291,6 +319,9 @@ struct LayoutDetailView: View {
                 Section {
                     Button("编辑键位与副键") { editingDraft = layout }
                     Button("复制为新布局并编辑") { editingDraft = layout.copy() }
+                    if let preset = BuiltinLayouts.all.first(where: { $0.id == layout.id }), preset != layout {
+                        Button("恢复预设") { confirmingPresetRestore = true }
+                    }
                     Button {
                         guard let data = manager.exportData(for: layout.id) else { return }
                         exportDocument = LayoutJSONDocument(data: data)
@@ -304,17 +335,21 @@ struct LayoutDetailView: View {
 
                 Section {
                     if isEnabled {
-                        Button("停用此布局") { Task { await manager.setEnabled(layout.id, on: false) } }
+                        Button("移出启用列表") { Task { await manager.setEnabled(layout.id, on: false) } }
                             .foregroundStyle(.orange)
-                    } else {
-                        Button("启用此布局") { Task { await manager.setEnabled(layout.id, on: true) } }
-                            .disabled(layout.input.schemaID != nil)
+                    } else if layout.input.schemaID == nil {
+                        Button("加入启用列表") { Task { await manager.setEnabled(layout.id, on: true) } }
+                    }
+                    if isPaired {
+                        NavigationLink("查看页面搭配") { UserKeyboardManagementView() }
+                    } else if layout.input.schemaID != nil {
+                        NavigationLink("选择键盘") { UserKeyboardManagementView() }
                     }
                     Button("移除布局", role: .destructive) { confirmingRemoval = true }
                 } header: {
                     Text("状态")
                 } footer: {
-                    Text("请至少保留一个已启用的键盘布局。")
+                    Text("启用列表需至少保留一个布局。")
                 }
             } else {
                 Text("布局不存在或已被移除。").font(.footnote).foregroundStyle(.secondary)
@@ -334,6 +369,15 @@ struct LayoutDetailView: View {
             }
         } message: {
             Text("内置布局可重新添加；自定义布局移除后需重新导入。")
+        }
+        .confirmationDialog("恢复预设？", isPresented: $confirmingPresetRestore, titleVisibility: .visible) {
+            Button("恢复预设", role: .destructive) {
+                if let preset = BuiltinLayouts.all.first(where: { $0.id == layoutID }) {
+                    Task { _ = await manager.saveDraft(preset) }
+                }
+            }
+        } message: {
+            Text("会替换这套布局的编辑内容。")
         }
         .sheet(item: $editingDraft) { draft in
             NavigationStack { LayoutEditorView(layout: draft) }
@@ -370,7 +414,7 @@ struct LayoutDetailView: View {
     }
 
     private func inputText(_ layout: LayoutDefinition) -> String {
-        if let schema = layout.input.schemaID { return developerOptions ? "指定输入方式 \(schema)" : "暂不可用" }
+        if let schema = layout.input.schemaID { return developerOptions ? "输入方式（\(schema)）" : "指定输入方式" }
         if let kind = KeyboardLayoutKind(rawValue: layout.input.builtinLayout?.rawValue ?? "") {
             return UserTerminology.layoutName(kind)
         }

@@ -14,6 +14,7 @@ public struct KeyboardPanelHost: View {
     @ObservedObject var session: KeyboardPadSession
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var appearanceSnapshot = AppearanceSnapshot()
     @State private var shuangpinHints: ShuangpinHintSnapshot?
     @State private var shuangpinHintRevision: UInt64 = 0
@@ -53,6 +54,8 @@ public struct KeyboardPanelHost: View {
     /// Injected by the extension: opens the host app (the extension has no application object of
     /// its own). The trial area in the app leaves it nil.
     private let openHostApp: ((URL, @escaping @MainActor (Bool) -> Void) -> Void)?
+    /// Extension-only real dismissal for the wide-screen header entry; nil in the app trial.
+    private let dismissKeyboard: (() -> Void)?
     private let onAppearanceChange: ((KeyboardAppearance) -> Void)?
     private let systemTraitKnown: Bool
     /// Optional reporting for embedded hosts; the extension adopts its own native budget.
@@ -116,9 +119,12 @@ public struct KeyboardPanelHost: View {
     /// Key rows never exceed the standard key height; the rest of the shared shell
     /// goes to the candidate area (or stays blank above a page without one).
     private var layoutFit: KeyboardPanelFit { panelFit(shellHeight: layoutShellHeight) }
-    /// One-handed mode only applies to portrait phone panels.
-    private var isPhonePortrait: Bool {
-        UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass != .compact
+    private func allowsOneHand(panelWidth: CGFloat) -> Bool {
+        KeyboardOneHandLayoutPolicy.isAvailable(
+            panelWidth: Double(panelWidth),
+            isPhone: UIDevice.current.userInterfaceIdiom == .phone,
+            compactHeight: verticalSizeClass == .compact,
+            regularWidth: horizontalSizeClass == .regular)
     }
 
     /// The one write path for one-handed mode from the keyboard (settings row and gutter).
@@ -177,7 +183,8 @@ public struct KeyboardPanelHost: View {
         layoutSourceSettled: Bool? = nil,
         presentedHeight: CGFloat? = nil,
         presentationBudget: KeyboardPanelPresentationBudget? = nil,
-        openHostApp: ((URL, @escaping @MainActor (Bool) -> Void) -> Void)? = nil
+        openHostApp: ((URL, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
+        dismissKeyboard: (() -> Void)? = nil
     ) {
         self.session = session
         self.onRestoreBuiltin = onRestoreBuiltin
@@ -190,6 +197,7 @@ public struct KeyboardPanelHost: View {
         self.statusMessage = statusMessage
         self.onStatusDetails = onStatusDetails
         self.openHostApp = openHostApp
+        self.dismissKeyboard = dismissKeyboard
         self.onAppearanceChange = onAppearanceChange
         self.systemTraitKnown = systemTraitKnown
         self.hostBindingTick = hostBindingTick
@@ -363,14 +371,19 @@ public struct KeyboardPanelHost: View {
         // Plan from the laid-out panel size, not the screen: embedded trial areas are narrower.
         GeometryReader { proxy in
             self.readyContent(controller, panelSize: proxy.size)
+                .onChange(of: proxy.size) { _, _ in
+                    // A resize moves keys away from any point retained by an active touch.
+                    KeyboardRoutedTouch.clear()
+                }
         }
     }
 
     private func readyContent(_ controller: KeyboardController, panelSize: CGSize) -> some View {
+        let oneHandAvailable = allowsOneHand(panelWidth: panelSize.width)
         let plan = KeyboardOneHandLayoutPolicy.plan(
             mode: oneHandMode,
             panelWidth: Double(panelSize.width),
-            isPhonePortrait: isPhonePortrait)
+            isPhonePortrait: oneHandAvailable)
         return FixedPhaseHeight(height: layoutShellHeight) {
             KeyboardPanelView(
                 controller: controller, onSelectLayout: session.selectLayout,
@@ -399,7 +412,7 @@ public struct KeyboardPanelHost: View {
                     Group {
                         KeyboardToolsSection(title: "输入") {
                             InlineCompositionToggle(session: session)
-                            if isPhonePortrait {
+                            if oneHandAvailable {
                                 KeyboardToolsSeparator()
                                 OneHandModeRow(mode: oneHandMode) { setOneHandMode($0) }
                             }
@@ -414,6 +427,7 @@ public struct KeyboardPanelHost: View {
                 },
                 pasteLiteral: { session.insertExternalLiteral($0) },
                 openHostApp: openHostApp,
+                dismissKeyboard: dismissKeyboard,
                 candidateBar: appearanceSnapshot.document.candidateBar,
                 hostBindingTick: hostBindingTick,
                 shuangpinHints: shuangpinHints, shuangpinHintRevision: shuangpinHintRevision,

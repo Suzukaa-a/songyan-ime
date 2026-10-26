@@ -9,9 +9,16 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         /// Keys, never positions: the bundled 9-key's direct 「符号」 key, and the
         /// symbol page's 锁定 toggle (in the utility position).
         case symbolPage, symbolLock
+        /// A semantic key, never a physical slot: the 123 the row-shaped #+= page's left
+        /// switch is "return to letters" (preserving the input language), not a language toggle.
+        case returnToLetters
     }
     public enum LanguageAction: Equatable, Sendable {
-        case toggleLanguage, returnToLetters
+        case toggleLanguage
+        /// Switch only the panel's symbol language and keep the current page (123 / row-shaped #+=).
+        case toggleSymbols
+        /// Return to the main letter keyboard without changing the Chinese/English input state.
+        case returnToLetters
     }
     public enum Utility: Equatable, Sendable {
         case punctuation(String)
@@ -68,38 +75,62 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// Slot identities and count stay unchanged across all pages and languages
     /// **for one surface**. Only an actual system-keyboard availability change may
     /// add/remove globe, and only the bundled T9 (which moves Return into its own
-    /// trailing column) may drop `enter`. The utility position holds punctuation, 0 on
-    /// the 9-key 123 page, 中/英 on the 9-key letters and 锁定 on every symbol page.
+    /// trailing column) may drop `enter`. The utility position opens symbols on
+    /// letter pages, types 0 on the phone digit pad and locks the categorised symbol page.
+    ///
+    /// The globe is the leftmost, lowest-frequency control; every other slot keeps its
+    /// relative order after it. A surface without a system-keyboard switch has no globe
+    /// slot, and the freed width goes to space/Return.
     public var slots: [Slot] {
-        Slot.allCases.filter {
-            $0 != .symbolPage && $0 != .symbolLock && ($0 != .globe || hasGlobe)
-                && ($0 != .enter || includesBottomEnter)
+        [.globe, .page, .language, .space, .utility, .enter].filter {
+            ($0 != .globe || hasGlobe) && ($0 != .enter || includesBottomEnter)
         }
     }
 
-    /// Slots are *positions* (width and view identity stay put); only the first
-    /// two exchange their keys. On 123 / #+= the return-to-letters key takes the
-    /// leading position — where 「123」 was tapped to get here — and the page key
-    /// moves one to the right, so the same spot leads in and back out, as on the
-    /// system keyboard.
+    /// Slots are *positions* (width and view identity stay put); on 123 / #+= the
+    /// page and language keys exchange so the return-to-letters key takes the page
+    /// position and the page key moves one to the right, while the globe keeps the
+    /// leading position it has on every page.
     ///
-    /// The bundled 9-key keeps 123 and the language key where every other layout
-    /// has them, and puts 符号 in the right-hand position (123 | 中/英 | 空格 | 符号),
-    /// so the symbol page is one tap away without moving the familiar keys; a long
-    /// press on 符号 types 0, which the letter page has no other key for.
+    /// Every letter page — the bundled 9-key included — reaches the symbol page
+    /// from the utility slot, where 26/14/18 used to keep 「，」/「。」, so the page
+    /// is one tap away on every layout. Numeric and symbol pages keep their own
+    /// utility actions (punctuation, 0 on the 9-key digit page, 锁定 on a
+    /// categorised symbol page).
     ///
     /// The categorised symbol page carries 锁定 in the utility position: its grid
     /// already types every mark, and the lock decides whether the page stays open
     /// after a symbol (Sogou and iFlytek return to letters unless locked). The
     /// row-shaped #+= page keeps a punctuation key there, like 123.
     public func key(at slot: Slot) -> Slot {
-        if page == .symbols && usesCategorySymbolPage && slot == .utility { return .symbolLock }
-        if isBundledPhonePad && page == .letters && slot == .utility { return .symbolPage }
-        guard page != .letters else { return slot }
-        switch slot {
-        case .page: return .language
-        case .language: return .page
-        default: return slot
+        switch page {
+        case .letters:
+            return slot == .utility ? .symbolPage : slot
+        case .numeric:
+            // 123: the left switch returns to letters (keeping the language), the language key
+            // switches the symbol branch in place, and the utility position is the #+= switch.
+            // The bundled 9-key digit pad keeps its 0 in the utility position.
+            switch slot {
+            case .page: return .returnToLetters
+            case .utility: return isBundledPhonePad ? .utility : .page
+            default: return slot
+            }
+        case .symbols:
+            if usesCategorySymbolPage {
+                // Categorised grid: the page position returns (keeping the language), the
+                // language position opens 123, and the utility position is the lock.
+                switch slot {
+                case .page: return .language
+                case .language: return .page
+                case .utility: return .symbolLock
+                default: return slot
+                }
+            }
+            switch slot {
+            case .page: return .returnToLetters
+            case .utility: return .page
+            default: return slot
+            }
         }
     }
 
@@ -110,27 +141,55 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public var pageTarget: Page { page == .numeric ? .symbols : .numeric }
     public var pageTitle: String {
         guard pageTarget == .symbols else { return "123" }
-        return isBundledPhonePad ? Self.symbolPageTitle : "#+="
+        return Self.symbolPageTitle
     }
     public static let symbolPageTitle = "符号"
 
-    public var languageAction: LanguageAction { page == .letters ? .toggleLanguage : .returnToLetters }
-    public var languageTitle: String {
-        if page == .letters { return isEnglishMode ? "中文" : "ABC" }
-        if isBundledPhonePad { return "返回" }
-        return isEnglishMode ? "ABC" : "中文"
+    /// The page-following default: letters toggle the input language; 123 (the 9-key digit pad
+    /// included) and the row-shaped #+= page switch the symbol language in place; the categorised
+    /// symbol grid returns to the main letter keyboard.
+    public var languageAction: LanguageAction { languageAction(for: nil) }
+
+    /// What the language key does. Nil follows the page; an authored behavior overrides the page
+    /// rule, including the categorised page's return default.
+    public func languageAction(for behavior: LayoutAction.LanguageSwitchBehavior?) -> LanguageAction {
+        switch behavior {
+        case .symbols: return .toggleSymbols
+        case .letters: return .returnToLetters
+        case nil:
+            switch page {
+            case .letters: return .toggleLanguage
+            case .numeric: return .toggleSymbols
+            case .symbols: return usesCategorySymbolPage ? .returnToLetters : .toggleSymbols
+            }
+        }
     }
-    public var languageAccessibilityLabel: String {
-        if page == .letters { return isEnglishMode ? "切换到中文" : "切换到英文" }
-        return isEnglishMode ? "返回英文字母页" : "返回中文字母页"
+
+    public var languageTitle: String { languageTitle(for: nil) }
+    public func languageTitle(for behavior: LayoutAction.LanguageSwitchBehavior?) -> String {
+        switch languageAction(for: behavior) {
+        // The auto face names the target language, not the current one.
+        case .toggleLanguage: return isEnglishMode ? "中文" : "英文"
+        case .toggleSymbols: return usesASCIIPunctuation ? "中文" : "英文"
+        case .returnToLetters: return "返回"
+        }
+    }
+
+    public var languageAccessibilityLabel: String { languageAccessibilityLabel(for: nil) }
+    public func languageAccessibilityLabel(for behavior: LayoutAction.LanguageSwitchBehavior?) -> String {
+        switch languageAction(for: behavior) {
+        case .toggleLanguage: return isEnglishMode ? "切换到中文" : "切换到英文"
+        case .toggleSymbols: return usesASCIIPunctuation ? "切换到中文符号" : "切换到英文符号"
+        case .returnToLetters: return "返回主键盘"
+        }
     }
     public var utility: Utility {
-        // The phone keypad already has a direct comma in its first key and
-        // quick-punctuation rail. On 26/14 the same bottom punctuation slot
-        // makes comma a one-tap action; the period remains a long-press choice.
-        // This keeps the number of control slots (and hit geometry) stable.
+        // Letter pages resolve this position to symbolPage in key(at:).
+        // Numeric and symbol pages retain their punctuation or digit utility.
         if isPhoneLayout && page == .numeric { return .digit("0") }
-        let ascii = isEnglishMode || usesASCIIPunctuation
+        // Only the effective symbol branch decides the mark: an English input language with an
+        // explicit Chinese symbol state must keep Chinese punctuation.
+        let ascii = usesASCIIPunctuation
         // The 123 and row-shaped #+= pages already hold comma and period, so the
         // slot carries a common mark their rows lack instead of repeating them.
         if page == .numeric { return .punctuation(ascii ? "#" : "……") }
@@ -143,8 +202,8 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public var utilityAlternates: [String] {
         guard case .punctuation(let text) = utility else { return [] }
         switch text {
-        case "……": return page == .numeric ? ["——", "…"] : ["…"]
-        case "#": return ["%", "*", "+", "="]
+        case "……": return page == .numeric ? ["——"] : []
+        case "#": return ["*", "="]
         case "@": return []
         case ".", ",": return [text == "," ? "." : ",", "?", "!", "'", "\""]
         default: return [text == "，" ? "。" : "，", "？", "！", "、", "…"]
@@ -153,9 +212,10 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
 
     /// One budget for every builtin page. Fractions apply to *content* width after gaps.
     /// At 382pt content (390pt phone minus panel insets) with globe:
-    /// 57/57/44/88.8/44/71.2pt, plus five 4pt gaps.
-    /// Space yields to the two left switches first; Return never falls below 60pt
-    /// on a supported >=320pt keyboard. Extremely small previews scale as a whole.
+    /// 44/44/44/114.8/44/71.2pt, plus five 4pt gaps. The two switches keep the
+    /// 44pt target and the width they no longer take goes to space, the most-hit key.
+    /// Return never falls below 60pt on a supported >=320pt keyboard; extremely small
+    /// previews scale as a whole.
     public func metrics(width: Double) -> Metrics {
         if let phoneColumns, !hasGlobe, !includesBottomEnter {
             return Metrics(width: width, columns: phoneColumns, includesUtility: true)
@@ -188,10 +248,17 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             spacing = 4 * scale
             let content = max(0, width - Double(count - 1) * spacing)
             let extra = max(0, content - minimumContent * scale)
-            // The base budget is 50 + 50 + [44] + 44 + 44 + 60.
-            // Modest growth goes to switches/Return; the rest goes to space.
-            page = 50 * scale + min(12, extra * 0.10)
-            language = page
+            if hasGlobe {
+                // The globe already takes a slot; keeping both switches at the 44pt target
+                // hands their old base + growth to space instead of widening the switches.
+                page = 44 * scale
+                language = page
+            } else {
+                // The base budget is 50 + 50 + [44] + 44 + 44 + 60.
+                // Modest growth goes to switches/Return; the rest goes to space.
+                page = 50 * scale + min(12, extra * 0.10)
+                language = page
+            }
             globe = hasGlobe ? 44 * scale : 0
             utility = includesUtility ? 44 * scale : 0
             enter = includesEnter ? 60 * scale + min(20, extra * 0.16) : 0
@@ -244,6 +311,8 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             case .enter: return enter
             case .symbolPage: return page
             case .symbolLock: return utility
+            // Semantic slot only; it occupies the physical page position.
+            case .returnToLetters: return page
             }
         }
     }

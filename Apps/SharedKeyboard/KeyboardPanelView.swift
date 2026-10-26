@@ -3,6 +3,7 @@ import Combine
 import KeyboardCore
 import LayoutKit
 import SwiftUI
+import UIKit
 
 private struct KeyboardPanelHostLifetimeKey: EnvironmentKey {
     static var defaultValue: KeyboardPanelHostLifetime? { nil }
@@ -63,6 +64,8 @@ public struct KeyboardPanelView: View {
     private let pasteLiteral: (@MainActor (String) -> Bool)?
     /// Injected by the extension; nil in the app's own trial area (there the app is already open).
     let openHostApp: ((URL, @escaping @MainActor (Bool) -> Void) -> Void)?
+    /// Extension-only real dismissal for the wide-screen header button. Nil in the app trial.
+    let dismissKeyboard: (() -> Void)?
     @State private var quickPasteError: String?
     @State private var quickPasteSlot = QuickPasteSlotLease()
     /// Candidate-area presentation config (the third user-customizable layer: the candidate area beyond key layout and skin).
@@ -91,6 +94,10 @@ public struct KeyboardPanelView: View {
     /// Reports eligibility facts (physical definition content) to the host, not heights.
     let onReadingRowReport: ((CandidateReadingRowReport) -> Void)?
     @State var page: KeyboardPage = .letters
+    /// Panel-local symbol language chosen by a language/symbol key. It overrides the selected
+    /// page's default and the controller punctuation state for this keyboard session only; the
+    /// engine input mode and the current composition are never touched.
+    @State var symbolMarksOverride: KeyboardNumericMarks?
     /// The symbol page's open category; every visit starts on 常用.
     @State var phoneSymbolCategoryID = SymbolPageTable.commonCategoryID
     /// 锁定 on the symbol page: stay there after a symbol. Session-only, never stored.
@@ -130,6 +137,13 @@ public struct KeyboardPanelView: View {
     var heldReadingRowContent: CandidateReadingRowContent? { choiceHold.row }
 
     @State var definitionMemo = DefinitionResolutionMemo()
+    /// The real key-area width, recorded by the root GeometryReader before the panel body builds.
+    @State var widthBox = KeyboardPanelWidthBox()
+    /// Per-physical wide-screen dock, read at presentation/layout changes (never per key).
+    @State private var contentDock: KeyboardContentDock
+    /// Stable owner for the wide content-frame registration; a replaced panel must not
+    /// clear a newer region.
+    @State private var wideContentFrameOwner = WideContentFrameOwner()
 
     /// Observation coordinator for definition changes (pure value): distinguishes "the panel's own explicit selection/reconciliation" from
     /// "external registry content replacement". The explicit path registers the expected (from, to) before acting; the observation callback
@@ -148,6 +162,7 @@ public struct KeyboardPanelView: View {
         asyncInsertionContext: (@MainActor () -> AnyHashable?)? = nil,
         pasteLiteral: (@MainActor (String) -> Bool)? = nil,
         openHostApp: ((URL, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
+        dismissKeyboard: (() -> Void)? = nil,
         candidateBar candidateBarDefinition: CandidateBarDefinition = .systemDefault,
         hostBindingTick: Int = 0,
         shuangpinHints: ShuangpinHintSnapshot? = nil, shuangpinHintRevision: UInt64 = 0,
@@ -186,13 +201,38 @@ public struct KeyboardPanelView: View {
         self.asyncInsertionContext = asyncInsertionContext
         self.pasteLiteral = pasteLiteral
         self.openHostApp = openHostApp
+        self.dismissKeyboard = dismissKeyboard
         self.candidateBarDefinition = candidateBarDefinition
+        _contentDock = State(
+            initialValue: KeyboardContentDockPreferences.dock(for: controller.layout))
     }
 
     public var body: some View {
         GeometryReader { geometry in
-            panelBody
-                .frame(width: geometry.size.width, alignment: .topLeading)
+            let rawWidth = geometry.size.width
+            let isWideSurface = rawWidth > KeyboardWideContentPolicy.minimumActivePanelWidth
+            let widePlan = KeyboardWideContentPolicy.plan(
+                panelWidth: Double(rawWidth),
+                maximumContentWidth: wideMaximumContentWidth(rawWidth: Double(rawWidth)),
+                dock: contentDock)
+            // A definition without a candidate area has no header to host the dismiss entry.
+            // Wide-only fallback: reserve a real 44pt right rail outside the keys. Standard
+            // pages with a header keep their full content width and use the header entry.
+            let needsHeaderlessToolRail =
+                isWideSurface && layoutPlan.headerHeight == 0 && dismissKeyboard != nil
+            let availableWidth =
+                needsHeaderlessToolRail ? max(0, rawWidth - 44) : rawWidth
+            let baseContentWidth = widePlan.active ? CGFloat(widePlan.contentWidth) : availableWidth
+            let contentWidth =
+                needsHeaderlessToolRail ? min(baseContentWidth, availableWidth) : baseContentWidth
+            let contentIsDocked = widePlan.active || needsHeaderlessToolRail
+            let wideSignature = WideContentSignature(
+                rawWidth: Double(rawWidth), contentWidth: CGFloat(contentWidth),
+                isWideSurface: isWideSurface, active: contentIsDocked,
+                headerlessToolRail: needsHeaderlessToolRail, dock: contentDock)
+            let _ = widthBox.record(contentWidth: contentWidth - 8, mainSplitWidth: rawWidth - 8)
+            let panel = panelBody(isWide: isWideSurface)
+                .frame(width: contentWidth, alignment: .topLeading)
                 .disabled(showsUtilitiesMenu || showsSymbolLibrary)
                 .accessibilityHidden(showsUtilitiesMenu || showsSymbolLibrary)
                 // Hidden rather than painted over, so the covering panels can sit on the
@@ -212,12 +252,12 @@ public struct KeyboardPanelView: View {
                         // A new controller identity (session reconnect) rebuilds the model wholesale, so no stale onInsert callback survives.
                         SymbolLibraryPanel(controller: controller) { showsSymbolLibrary = false }
                             .id(ObjectIdentifier(controller))
-                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .frame(width: contentWidth, height: geometry.size.height)
                             .background(Color.black.opacity(0.001))
                             .clipped()
                     } else if showsUtilitiesMenu {
                         utilitiesPanel
-                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .frame(width: contentWidth, height: geometry.size.height)
                             .background(Color.black.opacity(0.001))
                             .clipped()
                     }
@@ -233,7 +273,101 @@ public struct KeyboardPanelView: View {
                 // Apple contract forbids. A user-authored skin keeps painting its own
                 // authored surface (see `KeyboardAppearance.panelBackground` / `drawsOwnSurface`).
                 .background(appearance.panelBackground.ignoresSafeArea(edges: .bottom))
+                // The blank side margins of a docked keyboard are not part of the key
+                // surface: touches there must not route to an edge key.
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear {
+                                registerWideContentFrame(
+                                    proxy.frame(in: .global), active: contentIsDocked)
+                            }
+                            .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                registerWideContentFrame(frame, active: contentIsDocked)
+                            }
+                    }
+                }
+                .onChange(of: wideSignature) { _, _ in
+                    // A real frame/position change moves every key under any retained touch.
+                    keyAreaGeneration &+= 1
+                    choiceHold.rail = nil
+                    choiceHold.row = nil
+                    KeyboardRoutedTouch.clear()
+                }
+            if needsHeaderlessToolRail {
+                panel
+                    .frame(width: availableWidth, alignment: wideDockAlignment)
+                    .frame(width: rawWidth, alignment: .topLeading)
+                    .overlay(alignment: .trailing) { headerlessWideToolRail }
+            } else {
+                panel.frame(width: rawWidth, alignment: wideDockAlignment)
+            }
         }
+    }
+
+    /// The cap this physical layout uses on a wide surface. The user's main split is a
+    /// width-independent fact resolved from the same active definition the panel draws:
+    /// when it really splits at the pre-rail width, keep the full surface instead of
+    /// silently cancelling the opt-in. Page splits never change this host-level width.
+    private func wideMaximumContentWidth(rawWidth: Double) -> Double? {
+        guard rawWidth > KeyboardWideContentPolicy.minimumActivePanelWidth else { return nil }
+        if let split = activeDefinition?.split, split.isActive(width: rawWidth - 8) { return nil }
+        switch controller.layout {
+        case .phone9: return KeyboardWideContentPolicy.phoneNineMaximumContentWidth
+        case .merged14, .merged18: return KeyboardWideContentPolicy.mergedMaximumContentWidth
+        case .qwerty26: return nil
+        }
+    }
+
+    private var wideDockAlignment: Alignment {
+        switch contentDock {
+        case .left: return .topLeading
+        case .center: return .top
+        case .right: return .topTrailing
+        }
+    }
+
+    /// Headerless pages have no band to host the dismiss entry. The fallback is a real
+    /// 44pt strip outside the key content, so it never covers the first key row or changes
+    /// the footer; those rare pages lose the same width from their usable key area.
+    /// Geometry reports a real frame in screen coordinates; FeedbackInputView compares a
+    /// converted window point against it before it routes a blank-edge touch to a key.
+    /// The lifecycle teardown is a named method so the long panel-body modifier chain does
+    /// not carry this closure through type checking; behavior is unchanged.
+    private func finishPanelLifecycle() {
+        if let panelHostLifetime {
+            panelHostLifetime.cancelSharedSelection { controller.cancelRailSelection() }
+        } else {
+            // App-owned panels do not share an extension process session.
+            controller.cancelRailSelection()
+        }
+        KeyboardRoutedTouch.registerWideContentFrame(
+            owner: wideContentFrameOwner, frame: nil)
+        feedback.end(token: feedbackLifecycleToken)
+    }
+
+    private func registerWideContentFrame(_ frame: CGRect, active: Bool) {
+        KeyboardRoutedTouch.registerWideContentFrame(
+            owner: wideContentFrameOwner, frame: active ? frame : nil)
+    }
+
+    private var headerlessWideToolRail: some View {
+        VStack(spacing: 0) {
+            if let dismissKeyboard {
+                Button(action: dismissKeyboard) {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                        .font(appearance.font(appearance.controlIconSize))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(KeyboardPressStyle())
+                .contentShape(Rectangle())
+                .accessibilityLabel("收起键盘")
+                .accessibilityIdentifier("keyboard.wideDismiss")
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(width: 44)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     /// With a separate reading row above, the word row's content sits a little
@@ -341,7 +475,10 @@ public struct KeyboardPanelView: View {
                 .makeCollapsed(context)
         }
     }
-    var mainRowCount: Int { usesConfiguredLayout && !usesStandardQwerty ? max(1, definitionMainRows.count) : 3 }
+    var mainRowCount: Int {
+        if let pageDefinition { return max(1, pageDefinition.rows.count) }
+        return usesConfiguredLayout && !usesStandardQwerty ? max(1, definitionMainRows.count) : 3
+    }
     var keyHeight: CGFloat {
         keyHeightOverride ?? (verticalSizeClass == .compact ? 44 : 54)
     }
@@ -503,8 +640,9 @@ public struct KeyboardPanelView: View {
             isCovered: showsUtilitiesMenu || showsSymbolLibrary)
     }
 
-    private var panelBody: some View {
+    private func panelSurface(isWide: Bool) -> some View {
         let plan = layoutPlan
+        let showsWideDismiss = isWide && dismissKeyboard != nil
         quickPasteSlot.observe(
             identity: ObjectIdentifier(controller),
             changes:
@@ -524,6 +662,7 @@ public struct KeyboardPanelView: View {
             }
             if plan.headerHeight > 0 {
                 compositionArea
+                    .padding(.trailing, showsWideDismiss ? 44 : 0)
                     .overlay(alignment: .trailing) {
                         if idle, plan.headerHeight >= 44 {
                             if let error = quickPasteError {
@@ -540,6 +679,7 @@ public struct KeyboardPanelView: View {
                                 }
                                 .foregroundStyle(Color(uiColor: appearance.text(on: "panel")))
                                 .padding(.leading, 8)
+                                .padding(.trailing, showsWideDismiss ? 44 : 0)
                                 .frame(height: plan.headerHeight)
                             } else if let asyncInsertionContext {
                                 QuickPasteView(
@@ -575,14 +715,41 @@ public struct KeyboardPanelView: View {
                                 )
                                 .id("\(ObjectIdentifier(controller))-\(hostBindingTick)")
                                 .frame(width: 44, height: plan.headerHeight)
-                                .padding(.trailing, 12)
+                                .padding(.trailing, showsWideDismiss ? 56 : 12)
                             }
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if showsWideDismiss, let dismissKeyboard {
+                            Button(action: dismissKeyboard) {
+                                Image(systemName: "keyboard.chevron.compact.down")
+                                    .font(appearance.font(appearance.controlIconSize))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                            .buttonStyle(KeyboardPressStyle())
+                            .frame(width: 44, height: min(44, CGFloat(plan.headerHeight)))
+                            .contentShape(Rectangle())
+                            .accessibilityLabel("收起键盘")
+                            .accessibilityIdentifier("keyboard.wideDismiss")
                         }
                     }
                     .frame(height: CGFloat(plan.headerHeight), alignment: .bottom)
             }
             VStack(spacing: 4) {
-                if usesPhoneDefinition && page == .numeric {
+                if let pageDefinition, pageDefinition.chrome != nil {
+                    // Authored page: rows, rails and footer all come from data, drawn by the same
+                    // shell the preview uses. The gate takes the live return/clear-input state.
+                    KeyAreaRenderGate(
+                        token: keyAreaRenderToken(
+                            phone: nil, readsComposition: Self.pageReadsComposition(pageDefinition))
+                    ) {
+                        authoredChromePage(pageDefinition)
+                    }
+                    .equatable()
+                    .frame(
+                        height: mainAreaHeight + KeyboardPanelGeometry.controlSpacing + keyHeight,
+                        alignment: .top)
+                } else if pageDefinition == nil && usesPhoneDefinition && page == .numeric {
                     phoneSymbolKeypad
                 } else if showsCategorySymbolPage {
                     phoneCategorySymbolKeypad
@@ -603,7 +770,10 @@ public struct KeyboardPanelView: View {
                         }
                     }
                     .frame(height: mainAreaHeight, alignment: .top)
-                    if usesConfiguredLayout && !usesStandardQwerty && !usesBundledMergedPad && !usesStandardT9 {
+                    if usesConfiguredLayout && !usesStandardT9 && !definitionFacts.isBundledControlRowPolicy {
+                        // Author layout bar: the declared control row is rendered with its actions,
+                        // order, widths and long-press menus; shortcut injections are de-duplicated
+                        // against entries the author already declared.
                         KeyAreaRenderGate(token: keyAreaRenderToken) { layoutUtilityBar }.equatable()
                     } else {
                         KeyAreaRenderGate(token: keyAreaRenderToken) { controlRow }.equatable()
@@ -646,79 +816,169 @@ public struct KeyboardPanelView: View {
         // fixed fonts, and this surface is height-bounded by the panel budget, so an
         // accessibility size can never resize the key area.
         .dynamicTypeSize(.small ... .accessibility3)
-        .onChange(of: controller.snapshot.isComposing) {
-            if !controller.snapshot.isComposing {
-                showsAllCandidates = false
-                choiceHold.rail = nil
-                choiceHold.row = nil
-            }
-        }
-        .onChange(of: settledT9RailChoices) { _, settled in
-            if let settled { choiceHold.rail = settled }
-        }
-        .onChange(of: settledReadingRowContent) { _, settled in
-            if let settled { choiceHold.row = settled }
-        }
-        .onChange(of: controller.layout) { showsAllCandidates = false }
-        .onChange(of: controller.successfulChange) { consumeLayoutChange() }
-        .onChange(of: controller.snapshot.candidates.isEmpty) {
-            if controller.snapshot.candidates.isEmpty { showsAllCandidates = false }
-        }
-        .onChange(of: page) {
-            controller.resetPunctuationCycle()
-            showsAllCandidates = false
-            typedOnSymbolPage = false
-            // Decided once per visit: committing the composition with the first symbol
-            // must not resize every key row under the finger.
-            symbolPageKeepsCandidates = page != .letters && controller.snapshot.isComposing
-        }
-        .onChange(of: controller.keyboardType) { syncHostPage() }
-        .onAppear { syncHostPage() }
-        .onAppear { prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage }
-        .onChange(of: hostBindingTick) {
-            prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage
-        }
-        .onChange(of: quickPasteIdleInput) { _, input in
-            if !input.allowsPaste { quickPasteError = nil }
-        }
-        .onDisappear { quickPasteSlot.updateEligibility(false) }
-        .onAppear { reconcileDefinition() }
-        .onAppear { injectCompactSpellingCapability() }
-        // Reading-row eligibility report (fact): the host grants/revokes height from it and records it as a cold-start hint.
-        .onAppear { onReadingRowReport?(readingRowReport) }
-        .onChange(of: readingRowReport) { onReadingRowReport?(readingRowReport) }
-        // Definition/physical-structure change: observe **content** (LayoutDefinition is Equatable). An in-place
-        // registry update under the same id must also go through the transaction, rather than flipping a Bool and leaving a stale lock usable across definitions.
-        .onChange(of: activeDefinition) { old, new in
-            keyAreaGeneration &+= 1
-            choiceHold.rail = nil
-            choiceHold.row = nil
-            handleActiveDefinitionObservation(from: old, to: new)
-        }
-        .onChange(of: layoutRegistry) { reconcileDefinition() }
-        .onChange(of: selectedLayoutID) {
-            reconcileDefinition()
-        }
-        .onAppear {
-            // Feedback lifecycle (token-paired): on appear, refresh shared preferences and warm up lightly
-            // (process capabilities are already declared by the host); disappear ends with this session's token;
-            // when the controller/view is replaced, a late disappear from the old view does not release the new view's warm-up.
-            // The key path does no UserDefaults/lock I/O; composing the effect-token comparison and calling feedback
-            // still have a cost, so zero overhead is not claimed.
-            feedback.refreshPreferences()
-            feedbackLifecycleToken = feedback.prepare()
-        }
-        .onDisappear {
-            if let panelHostLifetime {
-                panelHostLifetime.cancelSharedSelection { controller.cancelRailSelection() }
-            } else {
-                // App-owned panels do not share an extension process session.
-                controller.cancelRailSelection()
-            }
-            feedback.end(token: feedbackLifecycleToken)
-        }
     }
 
+    /// The named modifier group keeps the SwiftUI type-checker from re-solving the
+    /// whole panel surface and every lifecycle modifier as one expression. Behavior and
+    /// modifier order are unchanged.
+    private func panelBody(isWide: Bool) -> some View {
+        panelLifecycleModifiers(panelSurface(isWide: isWide))
+    }
+
+    private func panelLifecycleModifiers<Content: View>(_ content: Content) -> some View {
+        let controllerEvents = observeControllerChanges(content)
+        let inputEvents = observeInputContext(controllerEvents)
+        let pageEvents = observePageChanges(inputEvents)
+        let definitionEvents = observeDefinitionChanges(pageEvents)
+        return observeFeedbackLifecycle(definitionEvents)
+    }
+
+    private func observeControllerChanges<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: controller.snapshot.isComposing) {
+                if !controller.snapshot.isComposing {
+                    showsAllCandidates = false
+                    choiceHold.rail = nil
+                    choiceHold.row = nil
+                }
+            }
+            .onChange(of: settledT9RailChoices) { _, settled in
+                if let settled { choiceHold.rail = settled }
+            }
+            .onChange(of: settledReadingRowContent) { _, settled in
+                if let settled { choiceHold.row = settled }
+            }
+            .onChange(of: controller.layout) {
+                showsAllCandidates = false
+                clearSymbolMarksOverride()
+                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .keyboardContentDockChanged)) { _ in
+                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+            }
+    }
+
+    private func observeInputContext<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: controller.selectedSchemaID) { clearSymbolMarksOverride() }
+            .onChange(of: controller.inputMode) { clearSymbolMarksOverride() }
+            // Observe the raw engine flags, not only the OR-composed usesASCIIPunctuation: English/URL
+            // hosts can change isAsciiPunct while the composed value is already true.
+            .onChange(of: controller.snapshot.isAsciiPunct) { clearSymbolMarksOverride() }
+            .onChange(of: controller.snapshot.isAsciiMode) { clearSymbolMarksOverride() }
+            // A same-schema/same-kind switch to another custom physical definition may not report
+            // successfulChange; the real definition content and pairing values are the source of truth.
+            .onChange(of: selectedComposition) { clearSymbolMarksOverride() }
+            .onChange(of: controller.successfulChange) {
+                consumeLayoutChange()
+                clearSymbolMarksOverride()
+            }
+            .onChange(of: controller.snapshot.candidates.isEmpty) {
+                if controller.snapshot.candidates.isEmpty { showsAllCandidates = false }
+            }
+            .onChange(of: authoredPageMissingInputModeSwitchFallback) { _, missing in
+                if missing { showAuthoredPageNeedsGlobeHint() }
+            }
+    }
+
+    private func observePageChanges<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: page) {
+                controller.resetPunctuationCycle()
+                showsAllCandidates = false
+                typedOnSymbolPage = false
+                if page == .letters { clearSymbolMarksOverride() }
+                if authoredPageMissingInputModeSwitchFallback { showAuthoredPageNeedsGlobeHint() }
+                // Decided once per visit: committing the composition with the first symbol
+                // must not resize every key row under the finger.
+                symbolPageKeepsCandidates = page != .letters && controller.snapshot.isComposing
+            }
+            .onChange(of: controller.keyboardType) { syncHostPage() }
+            .onAppear { syncHostPage() }
+            .onAppear {
+                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+            }
+            .onAppear { prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage }
+            .onChange(of: hostBindingTick) {
+                prefersCategorySymbolPage = KeyboardSymbolPagePreferences.usesCategoryPage
+                contentDock = KeyboardContentDockPreferences.dock(for: controller.layout)
+                clearSymbolMarksOverride()
+            }
+            .onChange(of: quickPasteIdleInput) { _, input in
+                if !input.allowsPaste { quickPasteError = nil }
+            }
+            .onDisappear { quickPasteSlot.updateEligibility(false) }
+    }
+
+    private func observeDefinitionChanges<Content: View>(_ content: Content) -> some View {
+        content
+            .onAppear { reconcileDefinition() }
+            .onAppear { injectCompactSpellingCapability() }
+            // Reading-row eligibility report (fact): the host grants/revokes height from it and records it as a cold-start hint.
+            .onAppear { onReadingRowReport?(readingRowReport) }
+            .onChange(of: readingRowReport) { onReadingRowReport?(readingRowReport) }
+            // Definition/physical-structure change: observe **content** (LayoutDefinition is Equatable). An in-place
+            // registry update under the same id must also go through the transaction, rather than flipping a Bool and leaving a stale lock usable across definitions.
+            .onChange(of: activeDefinition) { old, new in
+                keyAreaGeneration &+= 1
+                choiceHold.rail = nil
+                choiceHold.row = nil
+                clearSymbolMarksOverride()
+                handleActiveDefinitionObservation(from: old, to: new)
+            }
+            .onChange(of: layoutRegistry) { reconcileDefinition() }
+            .onChange(of: selectedLayoutID) {
+                reconcileDefinition()
+            }
+    }
+
+    private func observeFeedbackLifecycle<Content: View>(_ content: Content) -> some View {
+        content
+            .onAppear {
+                // Feedback lifecycle (token-paired): on appear, refresh shared preferences and warm up lightly
+                // (process capabilities are already declared by the host); disappear ends with this session's token;
+                // when the controller/view is replaced, a late disappear from the old view does not release the new view's warm-up.
+                // The key path does no UserDefaults/lock I/O; composing the effect-token comparison and calling feedback
+                // still have a cost, so zero overhead is not claimed.
+                feedback.refreshPreferences()
+                feedbackLifecycleToken = feedback.prepare()
+            }
+            .onDisappear(perform: finishPanelLifecycle)
+    }
+
+}
+
+/// A real-frame change (width cap, dock, rotation) must cancel keys and recorded routes
+/// even before the next touch; the signature stays Equatable so only a real move triggers it.
+private struct WideContentSignature: Equatable {
+    let rawWidth: Double
+    let contentWidth: CGFloat
+    let isWideSurface: Bool
+    let active: Bool
+    let headerlessToolRail: Bool
+    let dock: KeyboardContentDock
+}
+
+/// Stable identity for the wide content-frame registration. SwiftUI recreates the panel
+/// value, but a replaced panel must not clear the region registered by a newer one.
+private final class WideContentFrameOwner {}
+
+/// Non-observed width snapshot for split activation. The whole keyboard width decides a split
+/// once; reading it through a reference keeps that value out of SwiftUI's invalidation set, while
+/// every key-area geometry still sees the already-settled split.
+final class KeyboardPanelWidthBox {
+    private(set) var contentWidth: Double = 0
+    private(set) var mainSplitWidth: Double = 0
+
+    @discardableResult
+    func record(contentWidth: CGFloat, mainSplitWidth: CGFloat) -> Bool {
+        let next = Double(contentWidth)
+        let nextMainSplit = Double(mainSplitWidth)
+        guard next != self.contentWidth || nextMainSplit != self.mainSplitWidth else { return false }
+        self.contentWidth = next
+        self.mainSplitWidth = nextMainSplit
+        return true
+    }
 }
 
 /// Non-observed storage for `KeyboardPanelView.choiceHold`.

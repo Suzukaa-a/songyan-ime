@@ -21,27 +21,33 @@ extension KeyboardPanelView {
 
     /// The bundled phone shell passes its columns so the bottom keys line up
     /// under the rail and digit columns above them.
-    func phoneControlRow(_ metrics: PhoneKeypadMetrics) -> some View {
+    func phoneControlRow(_ metrics: PhoneKeypadMetrics, splitOverride: LayoutSplitConfiguration? = nil) -> some View {
         controlRow(
             columns: usesFixedEditingRail
-                ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil)
+                ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil, splitOverride: splitOverride)
     }
 
     /// The bundled 9-key, and every layout's categorised symbol page except an
     /// imported phone keypad's (which keeps its declared rails), draw the fixed
     /// ⌫ / 重输 / ⏎ column and the phone bottom row (first key under the rail, wide space).
     var usesFixedEditingRail: Bool {
-        isBuiltinPhonePad || (showsCategorySymbolPage && !usesPhoneDefinition)
+        showsCategorySymbolPage
+            ? (!usesPhoneDefinition || isBuiltinPhonePad)
+            : (isBuiltinPhonePad && pageDefinition == nil)
     }
 
     /// #+= opens the categorised grid on a phone keypad (its 123 page is a digit
     /// pad, with no rows for a second page to share) or when the user chose it;
     /// otherwise it is the row-shaped page that shares the 123 page's geometry.
     var showsCategorySymbolPage: Bool {
-        page == .symbols && (usesPhoneDefinition || prefersCategorySymbolPage)
+        page == .symbols
+            && (pageDefinition?.symbolPresentation == .categorized
+                || (pageDefinition == nil && (usesPhoneDefinition || prefersCategorySymbolPage)))
     }
 
-    func controlRow(columns: KeyboardControlPolicy.PhoneColumns?) -> some View {
+    func controlRow(columns: KeyboardControlPolicy.PhoneColumns?, splitOverride: LayoutSplitConfiguration? = nil)
+        -> some View
+    {
         ControlRow(
             policy: controlPolicy,
             returnTitle: controller.returnKeyTitle,
@@ -59,6 +65,8 @@ extension KeyboardPanelView {
             },
             onKey: { handleKey($0) },
             phoneColumns: columns,
+            split: splitOverride ?? activeSplit,
+            splitRowIndex: pageDefinition?.rows.count ?? definitionMainRows.count,
             symbolPageLocked: symbolPageLocked,
             onToggleSymbolLock: {
                 emitKeyFeedback()
@@ -85,7 +93,7 @@ extension KeyboardPanelView {
     ///
     /// It stays separate from the short press of "ABC/中文" (CN/EN toggle only); it offers no input-method or 26/14/9 layout choice,
     /// and every layout (including author-defined/imported keyboards) reaches it through the same language-key long press.
-    private var moreToolsCapID: String { "keyboard-more-tools" }
+    var moreToolsCapID: String { "keyboard-more-tools" }
 
     private var utilitiesKey: some View {
         Button {
@@ -99,48 +107,66 @@ extension KeyboardPanelView {
     }
 
     var modeSwitchKey: some View {
-        AlternateCharacterKey(
+        let action = controlPolicy.languageAction(for: nil)
+        return AlternateCharacterKey(
             cap: KeyCap(
-                id: "input-mode", title: controlPolicy.languageTitle,
-                subtitle: page == .letters ? nil : "返回", action: .cycleLayout),
+                id: "input-mode", title: controlPolicy.languageTitle(for: nil),
+                subtitle: nil, action: .cycleLayout),
             alternates: userKeyboardAlternates,
             layoutPicker: true
         ) { cap in
             if cap.id == "input-mode" {
-                // Short press: CN/EN toggle (or return from the number page to letters). The CN/EN toggle gives feedback after it takes effect;
-                // returning to letters is a pure UI action with feedback on touch. **Never** switch layout/keyboard here.
-                if controlPolicy.languageAction == .toggleLanguage {
+                // Short press follows the page: letters toggle the real input language; 123 and
+                // the row-shaped #+= page only flip the panel symbol branch and stay put; the
+                // categorised grid returns to the main letter keyboard. None of these writes the
+                // engine input mode except the existing real-language toggle.
+                switch action {
+                case .toggleLanguage:
                     keyFeedbackAfterEffect { controller.toggleInputMode() }
-                } else {
+                case .toggleSymbols:
                     emitKeyFeedback()
-                }
-                page = .letters
-                showsAllCandidates = false
-            } else if cap.id == moreToolsCapID {
-                // "More tools...": opens the utilities panel, separate from the candidate bar. The last item of the long-press menu,
-                // not a permanent candidate-bar button.
-                emitKeyFeedback()
-                showsUtilitiesMenu = true
-            } else if let keyboard = controller.userKeyboardChoices.first(where: {
-                Self.userKeyboardCapID($0) == cap.id
-            }) {
-                // The long-press switcher only switches among published user keyboards; selecting one switches input method + layout jointly.
-                var changed = false
-                selectionFeedbackAfterEffect { changed = controller.selectUserKeyboard(keyboard) }
-                if changed {
-                    onReadingRowReport?(readingRowReport)
+                    togglePanelSymbolMarks()
+                case .returnToLetters:
+                    emitKeyFeedback()
                     page = .letters
                     showsAllCandidates = false
                 }
+            } else {
+                handleLanguageMenuCap(cap)
             }
         }
-        .accessibilityLabel(controlPolicy.languageAccessibilityLabel)
+        .accessibilityLabel(controlPolicy.languageAccessibilityLabel(for: nil))
+    }
+
+    /// The language key's long-press menu (user keyboards, then More tools). It backs both the
+    /// legacy control row and an authored languageSwitch key that declares no long press.
+    func handleLanguageMenuCap(_ cap: KeyCap) {
+        if cap.id == moreToolsCapID {
+            // "More tools...": opens the utilities panel, separate from the candidate bar. The last item of the long-press menu,
+            // not a permanent candidate-bar button.
+            emitKeyFeedback()
+            showsUtilitiesMenu = true
+            return
+        }
+        guard
+            let keyboard = controller.userKeyboardChoices.first(where: {
+                Self.userKeyboardCapID($0) == cap.id
+            })
+        else { return }
+        // The long-press switcher only switches among published user keyboards; selecting one switches input method + layout jointly.
+        var changed = false
+        selectionFeedbackAfterEffect { changed = controller.selectUserKeyboard(keyboard) }
+        if changed {
+            onReadingRowReport?(readingRowReport)
+            page = .letters
+            showsAllCandidates = false
+        }
     }
 
     /// The long-press list = those **published** keyboards whose resources are currently runnable (in publish order), with a
     /// "More tools" item appended; no 26/14/9 layouts and no input-method choice. With an empty list the
     /// "More tools" item is still offered so the tools panel stays reachable (no tappable dead item is built).
-    private var userKeyboardAlternates: [KeyCap] {
+    var userKeyboardAlternates: [KeyCap] {
         var caps = controller.userKeyboardChoices.map { keyboard in
             KeyCap(
                 id: Self.userKeyboardCapID(keyboard), title: keyboard.title,
@@ -155,7 +181,7 @@ extension KeyboardPanelView {
         return caps
     }
 
-    private static func userKeyboardCapID(_ keyboard: UserKeyboard) -> String {
+    static func userKeyboardCapID(_ keyboard: UserKeyboard) -> String {
         "user-keyboard:\(keyboard.id)"
     }
 
@@ -163,14 +189,15 @@ extension KeyboardPanelView {
         keyboard.isCurrent(schemaID: controller.selectedSchemaID, layout: controller.layout)
     }
 
-    private var controlPolicy: KeyboardControlPolicy {
+    var controlPolicy: KeyboardControlPolicy {
         // Imported phone *letter* pages keep their declared bottom controls;
         // 123 and #+= are the shared symbol pages with the ordinary controls.
         // The phone treatment belongs to the *visible* physical shell. An
-        // English QWERTY letter page keeps its direct comma and bottom Return
+        // English QWERTY letter page uses the shared symbol entry and bottom Return
         // even when the selected Chinese definition happens to be a phone pad.
         let phoneShellVisible =
-            usesStandardT9 || (usesPhoneDefinition && page != .letters) || showsCategorySymbolPage
+            usesStandardT9 || (pageDefinition == nil && usesPhoneDefinition && page != .letters)
+            || showsCategorySymbolPage
         let trailingHasReturn =
             !usesFixedEditingRail && phoneShellVisible
             && t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter }
@@ -178,8 +205,8 @@ extension KeyboardPanelView {
             page: page, isEnglishMode: controller.isEnglishMode,
             hasGlobe: systemKeyboardSwitch != nil,
             isPhoneLayout: phoneShellVisible,
-            usesASCIIPunctuation: controller.usesASCIIPunctuation,
+            usesASCIIPunctuation: effectiveUsesASCIIPunctuation,
             includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn),
-            usesCategorySymbolPage: usesPhoneDefinition || prefersCategorySymbolPage)
+            usesCategorySymbolPage: showsCategorySymbolPage)
     }
 }

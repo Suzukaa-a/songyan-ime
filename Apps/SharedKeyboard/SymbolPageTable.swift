@@ -26,34 +26,17 @@ enum SymbolPageTable {
 
     /// Decimal, question and exclamation are direct; remaining symbols belong to
     /// the first button's long-press menu, with no vertical punctuation scrolling.
+    /// The full decimal/question/exclamation + 123-row rail order owned by LayoutKit, so the
+    /// built-in 9-key digit page and an authored keypad page consume the same canonical list.
     static func phoneNumericRail(ascii: Bool) -> [KeyCap] {
-        let priority = ascii ? [".", "?", "!"] : [".", "？", "！"]
-        let rows = numericRows(ascii: ascii)
-        let rest = (rows.last?.caps ?? []) + (rows.count > 1 ? rows[1].caps : [])
-        var seen = Set<String>()
-        return (literals("phone", priority) + rest).filter { seen.insert($0.title).inserted }
+        literals("phone", BuiltinLayouts.phoneNumericRailValues(ascii: ascii))
     }
 
-    /// The system keyboards' 123 pages, with no mark on two keys: the English
-    /// one (`$`, and five wide keys on the third row) and Simplified Pinyin's
-    /// (full-width colon/semicolon/brackets, Chinese quotes, and a half-width
-    /// "." for decimals, URLs and version numbers). The bottom row's
-    /// punctuation slot adds the one common mark these rows lack (see
-    /// `KeyboardControlPolicy.utility`).
+    /// The 123 row. Takes its marks from `BuiltinLayouts`, the same source the
+    /// editable page presets read, so the built-in path and an authored copy can
+    /// never drift apart.
     static func numericRows(ascii: Bool) -> [KeyboardRow] {
-        [
-            KeyboardRow(id: "num-1", caps: literals("n1", "1234567890")),
-            KeyboardRow(
-                id: "num-2",
-                caps: literals(
-                    "n2",
-                    ascii
-                        ? "-/:;()$&@\"".map(String.init)
-                        : ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"])),
-            KeyboardRow(
-                id: "num-3",
-                caps: literals("n3", sentenceMarks(ascii: ascii))),
-        ]
+        rows(BuiltinLayouts.numericPageRows(ascii: ascii), prefix: "num", capPrefix: "n")
     }
 
     /// A phone (digit pad) definition's symbol page, organised like mainstream 9-key
@@ -66,8 +49,33 @@ enum SymbolPageTable {
         let id: String
         let title: String
         let caps: [KeyCap]
+        var authoredKeys: [LayoutKey]? = nil
+        var preferredColumns: Int? = nil
+        var split: LayoutSplitConfiguration? = nil
         /// Kaomoji and other multi-glyph entries need two wide columns instead of four.
-        var columns: Int { caps.contains { $0.title.count > 3 } ? 2 : 4 }
+        var columns: Int { preferredColumns ?? (caps.contains { $0.title.count > 3 } ? 2 : 4) }
+        var keys: [LayoutKey] {
+            authoredKeys ?? caps.map { LayoutKey(label: $0.title, action: .init(.literal, value: $0.title)) }
+        }
+    }
+
+    static func authoredCategories(
+        _ categories: [KeyboardPageCategory], recents: [String], showsGlobe: Bool = true
+    ) -> [PhoneSymbolCategory] {
+        categories.map { category in
+            let source =
+                category.source == .recent
+                ? recents.map { LayoutKey(label: $0, action: .init(.literal, value: $0)) } : category.keys
+            let keys = source.filter { showsGlobe || $0.action.type != .globe }
+            let caps = keys.enumerated().map { index, key in
+                KeyCap(
+                    id: "category-\(category.id)-\(index)", title: key.label,
+                    action: .literal(key.action.value ?? key.label))
+            }
+            return PhoneSymbolCategory(
+                id: category.id, title: category.name, caps: caps, authoredKeys: keys,
+                preferredColumns: category.columns, split: category.split)
+        }
     }
 
     /// A themed set from the symbol library, in the library's order.
@@ -142,32 +150,20 @@ enum SymbolPageTable {
         return [common] + recent + widths + themed
     }
 
-    /// The row-shaped #+= page of the 26/14/18-key layouts, the default: the
-    /// system keyboards' second page, sharing the 123 page's geometry and its
-    /// sentence-mark row, so only the top two rows change between the pages.
-    /// The categorised page must still cover every mark here.
+    /// The row-shaped #+= page shares the 123 page's ten-column geometry: the
+    /// third row holds nine direct marks and Delete closes the tenth column, so
+    /// its caps are exactly as wide as the rows above. The categorised page also
+    /// exposes every mark in these rows.
     static func symbolRows(ascii: Bool) -> [KeyboardRow] {
-        [
-            KeyboardRow(
-                id: "sym-1",
-                caps: literals(
-                    "s1",
-                    ascii
-                        ? "[]{}#%^*+=".map(String.init)
-                        : ["【", "】", "{", "}", "#", "%", "^", "*", "+", "="])),
-            KeyboardRow(
-                id: "sym-2",
-                caps: literals(
-                    "s2",
-                    ascii
-                        ? "_\\|~<>€£¥•".map(String.init)
-                        : ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"])),
-            KeyboardRow(id: "sym-3", caps: literals("s3", sentenceMarks(ascii: ascii))),
-        ]
+        rows(BuiltinLayouts.symbolPageRows(ascii: ascii), prefix: "sym", capPrefix: "s")
     }
 
-    private static func sentenceMarks(ascii: Bool) -> [String] {
-        ascii ? [".", ",", "?", "!", "'"] : ["。", "，", "、", "？", "！", "."]
+    /// One `KeyboardRow` per canonical character row; the prefix keeps the caps'
+    /// SwiftUI identity stable and distinct between the two pages.
+    private static func rows(_ values: [[String]], prefix: String, capPrefix: String) -> [KeyboardRow] {
+        values.enumerated().map { index, row in
+            KeyboardRow(id: "\(prefix)-\(index + 1)", caps: literals("\(capPrefix)\(index + 1)", row))
+        }
     }
 
     /// The id is the row prefix + the character itself: stable and repeatably renderable (SwiftUI identity does not change per access).
@@ -179,5 +175,27 @@ enum SymbolPageTable {
         chars.enumerated().map { index, char in
             KeyCap(id: "lit-\(prefix)-\(index)-\(char)", title: char, action: .literal(char))
         }
+    }
+}
+
+extension LayoutAction {
+    /// A literal with an explicit Chinese/ASCII pair; it resolves before any legacy single-letter
+    /// heuristics (an English page may pair arbitrary text, not only punctuation).
+    var isPairedLiteral: Bool { type == .literal && asciiValue != nil }
+}
+
+extension LayoutKey {
+    /// The visible/typed literal for the effective symbol branch. Nil for non-literals; custom
+    /// faces keep their stored label and only the action value resolves.
+    func resolvedLiteralValue(usesASCIIPunctuation: Bool) -> String? {
+        action.literalValue(usesASCIIPunctuation: usesASCIIPunctuation)
+    }
+
+    /// Automatic literal faces resolve the branch; custom/legacy faces keep the authored label.
+    func literalFaceTitle(usesASCIIPunctuation: Bool) -> String {
+        guard titleMode == .automatic,
+            let value = resolvedLiteralValue(usesASCIIPunctuation: usesASCIIPunctuation)
+        else { return label }
+        return value
     }
 }

@@ -55,6 +55,9 @@ struct InputOptionsView: View {
     private var oneHandValue = KeyboardOneHandMode.off.rawValue
     @AppStorage(KeyboardSymbolPagePreferences.categoryPageKey, store: KeyboardSymbolPagePreferences.defaults)
     private var categorySymbolPage = false
+    /// Per-physical wide-screen dock. Read once per visit, written through the same shared
+    /// preference path the keyboard reads at presentation, never from a per-key disk read.
+    @State private var wideDockValues: [String: KeyboardContentDock] = [:]
     @StateObject private var typoCorrection = TypoCorrectionCenter.shared
     @StateObject private var prediction = PredictionCenter.shared
     @State private var importingPrediction = false
@@ -64,6 +67,7 @@ struct InputOptionsView: View {
         List {
             inlineCompositionSection
             keyboardHeightSection
+            wideDockSection
             if UIDevice.current.userInterfaceIdiom == .phone { oneHandSection }
             Section {
                 NavigationLink("双拼提示") { ShuangpinHintManagementView() }
@@ -81,6 +85,7 @@ struct InputOptionsView: View {
         .navigationTitle("输入选项")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            reloadWideDocks()
             await reload()
             await typoCorrection.refresh()
             await prediction.refresh()
@@ -155,6 +160,41 @@ struct InputOptionsView: View {
             Text("宽松").tag(KeyboardHeightPreset.comfortable)
         }
         .accessibilityIdentifier("inputOptions.keyboardHeight")
+    }
+
+    private static let wideDockLayouts: [KeyboardLayoutKind] = [.phone9, .merged14, .merged18]
+
+    private var wideDockSection: some View {
+        Section {
+            ForEach(Self.wideDockLayouts, id: \.rawValue) { layout in
+                Picker(
+                    "\(layout.shortTitle)键盘",
+                    selection: Binding(
+                        get: { (wideDockValues[layout.rawValue] ?? .center).rawValue },
+                        set: { value in
+                            let dock = KeyboardContentDock.resolve(value)
+                            wideDockValues[layout.rawValue] = dock
+                            KeyboardContentDockPreferences.set(dock, for: layout)
+                        }
+                    )
+                ) {
+                    Text("靠左").tag(KeyboardContentDock.left.rawValue)
+                    Text("居中").tag(KeyboardContentDock.center.rawValue)
+                    Text("靠右").tag(KeyboardContentDock.right.rawValue)
+                }
+                .accessibilityIdentifier("inputOptions.wideDock.\(layout.rawValue)")
+            }
+        } header: {
+            Text("大屏键盘位置")
+        } footer: {
+            Text("键盘未拆分时，宽屏上不拉伸。9、14、18 键可分别靠左、居中或靠右，下次打开键盘时生效。")
+        }
+    }
+
+    private func reloadWideDocks() {
+        for layout in Self.wideDockLayouts {
+            wideDockValues[layout.rawValue] = KeyboardContentDockPreferences.dock(for: layout)
+        }
     }
 
     // MARK: - Input display (shares one switch with the keyboard; shared definition)

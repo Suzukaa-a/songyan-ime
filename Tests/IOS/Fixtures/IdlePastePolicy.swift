@@ -78,6 +78,8 @@ private final class IdleEngine: EngineBackend {
     var showsSymbolLibrary = false
     var page: KeyboardControlPolicy.Page = .letters
     var selectedDefinition: LayoutDefinition? = BuiltinLayouts.phone9
+    var pageDefinition: KeyboardPageDefinition?
+    var activeSplit: LayoutSplitConfiguration? { selectedDefinition?.split }
     private var definitionFacts: DefinitionResolutionMemo.Facts {
         DefinitionResolutionMemo.Facts(usable: BuiltinLayouts.all, active: selectedDefinition)
     }

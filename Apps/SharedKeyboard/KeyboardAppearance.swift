@@ -39,6 +39,26 @@ public enum KeyboardSymbolPagePreferences {
     }
 }
 
+/// Where a width-capped wide-screen keyboard sits. One value per physical layout, so a
+/// 9-key phone pad can hug the left while a 14-key pad stays centred. Unknown or missing
+/// values resolve to centre; the keyboard re-reads them per presentation, never per key.
+public enum KeyboardContentDockPreferences {
+    private static let keyPrefix = "keyboard.wideContentDock.v1."
+    public static var defaults: UserDefaults { KeyboardRecipeStore.sharedDefaults() ?? .standard }
+
+    public static func key(for layout: KeyboardLayoutKind) -> String { keyPrefix + layout.rawValue }
+
+    public static func dock(for layout: KeyboardLayoutKind) -> KeyboardContentDock {
+        KeyboardContentDock.resolve(
+            SharedPreferences.object(forKey: key(for: layout), in: defaults) as? String)
+    }
+
+    public static func set(_ dock: KeyboardContentDock, for layout: KeyboardLayoutKind) {
+        SharedPreferences.set(dock.rawValue, forKey: key(for: layout), in: defaults)
+        NotificationCenter.default.post(name: .keyboardContentDockChanged, object: layout)
+    }
+}
+
 extension Notification.Name {
     /// The single appearance-change notification: skin, candidate-area layout and display mode share one
     /// appearance identity, so there is one change channel.
@@ -53,6 +73,10 @@ extension Notification.Name {
     /// Delivered only **in this process**: it is a host lifecycle event, not a cross-process data change.
     /// The host typing area does not send it (its panel is destroyed with the view).
     static let keyboardPanelHostWillDisappear = Notification.Name("keyboard.panelHostWillDisappear")
+
+    /// A wide-screen dock preference changed in the host app while its own panel is visible.
+    /// The extension cannot receive this cross-process write; it re-reads on the next presentation.
+    static let keyboardContentDockChanged = Notification.Name("keyboard.wideContentDock.changed")
 }
 
 /// The selected definition's facts one presentation's shell height is budgeted for.
@@ -536,6 +560,36 @@ enum KeyboardRoutedTouch {
     /// Whether a window-coordinate point falls into the live restore gutter.
     static func pointIsInOneHandGutter(_ windowPoint: CGPoint) -> Bool {
         oneHandGutterExposed && oneHandGutterWindowFrame?.contains(windowPoint) == true
+    }
+
+    // MARK: Wide content blank exclusion
+
+    /// The real content frame of a docked wide keyboard, so the blank margins beside it
+    /// never route to the nearest key. The frame is owned by the reporter view: a replacing
+    /// panel (rotation, dock change) must not have its region cleared by the old owner.
+    private static weak var wideContentOwner: AnyObject?
+    private static var wideContentWindowFrame: CGRect?
+
+    static func registerWideContentFrame(owner: AnyObject, frame: CGRect?) {
+        guard let frame else {
+            guard wideContentOwner === owner else { return }
+            wideContentOwner = nil
+            wideContentWindowFrame = nil
+            clear()
+            return
+        }
+        guard frame.width > 0, frame.height > 0 else { return }
+        if wideContentOwner !== owner || wideContentWindowFrame != frame {
+            wideContentOwner = owner
+            wideContentWindowFrame = frame
+            // Keys moved under a recorded window point; the route cannot survive.
+            clear()
+        }
+    }
+
+    static func pointIsOutsideWideContent(_ windowPoint: CGPoint) -> Bool {
+        guard let frame = wideContentWindowFrame else { return false }
+        return !frame.contains(windowPoint)
     }
 
     static func accepts(_ view: UIView, _ point: CGPoint) -> Bool {

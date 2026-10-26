@@ -123,7 +123,16 @@ extension KeyboardViewController {
     /// definition selected now (a layout switched during the last presentation was
     /// only re-fitted inside that one's shell). Kept until the keyboard is dismissed.
     func endPresentationGeometry() {
-        (viewIfLoaded as? KeyboardPanelInputView)?.endPresentation()
+        guard let input = viewIfLoaded as? KeyboardPanelInputView else { return }
+        input.endPresentation()
+        guard Self.activeController === self else { return }
+        // UIKit can measure the reused input view before the next viewWillAppear.
+        // Prepare that budget now so it cannot cache the outgoing layout's height.
+        let budget = KeyboardInitialPresentation.load().presentationBudget(
+            compact: traitCollection.verticalSizeClass == .compact)
+        let height = CGFloat(budget.shellHeight)
+        input.setPanelHeight(height)
+        preferredContentSize.height = height
     }
 
     func adoptPresentationShell() {

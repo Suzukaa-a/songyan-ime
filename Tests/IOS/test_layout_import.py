@@ -4,6 +4,9 @@ import unittest
 
 from swift_probe import CORE, ROOT, compile_swift, run, scratch_directory, section
 
+# LayoutManager now reads the machine's keyboard-switch requirement through this shared helper.
+REQUIREMENTS_STUB = ROOT / "Tests/IOS/Fixtures/KeyboardSystemRequirementsProbe.swift"
+
 CHECKS = r'''
 @MainActor enum SecurityScopeProbe {
     static var active = 0
@@ -127,7 +130,10 @@ class LayoutImportTests(unittest.TestCase):
         with scratch_directory("layout-import") as directory:
             generated = directory / "LayoutImportProbe.swift"
             generated.write_text("import SwiftUI\n" + manager + "\n" + queue + "\n" + outcome + "\n" + CHECKS)
-            binary = compile_swift(directory, [generated, CORE / "Support/LatestWinsReadGate.swift", *sources], library=True)
+            binary = compile_swift(
+                directory,
+                [generated, REQUIREMENTS_STUB, CORE / "Support/LatestWinsReadGate.swift", *sources],
+                library=True)
             runtime = directory / "runtime"
             runtime.mkdir()
             print(run([str(binary), str(runtime)]), end="")

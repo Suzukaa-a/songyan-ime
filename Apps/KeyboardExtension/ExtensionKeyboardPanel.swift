@@ -73,6 +73,7 @@ struct ExtensionKeyboardPanel: View {
     let onAppearanceChange: (KeyboardAppearance) -> Void
     /// Opens the host app; the extension itself has no application object to send a URL to.
     let openHostApp: (URL, @escaping @MainActor (Bool) -> Void) -> Void
+    let dismissKeyboard: () -> Void
     @State private var showsRouteDetails = false
 
     var body: some View {
@@ -90,7 +91,8 @@ struct ExtensionKeyboardPanel: View {
             layoutSourceSettled: route.layoutReadSettled,
             presentedHeight: presentation.presentedHeight,
             presentationBudget: presentation.budget,
-            openHostApp: openHostApp
+            openHostApp: openHostApp,
+            dismissKeyboard: dismissKeyboard
         )
         .environment(\.colorScheme, route.systemColorScheme)
         .environment(\.keyboardPanelHostLifetime, panelHostLifetime)
@@ -109,6 +111,9 @@ struct ExtensionKeyboardPanel: View {
     /// settings do not show a set of incomprehensible, useless reload/rollback buttons.
     @ViewBuilder
     private var routeTools: some View {
+        KeyboardToolsSection(title: "键盘") {
+            KeyboardToolsRow(icon: "keyboard.chevron.compact.down", title: "收起键盘", action: dismissKeyboard)
+        }
         if noticeSummary != nil {
             KeyboardToolsSection(title: "遇到问题") {
                 KeyboardToolsRow(icon: "arrow.uturn.backward", title: "使用已选的输入方案") {

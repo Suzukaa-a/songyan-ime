@@ -3,6 +3,9 @@ import Foundation
 import KeyboardCore
 import LayoutKit
 
+/// What a failed write belongs to, so its message names the right thing.
+enum LayoutMessageContext { case layout, page, composition, imported }
+
 /// DIY layout management (single-writer coordinator on the host app side).
 ///
 /// Uses LayoutKit's LayoutStore + LayoutRegistry:
@@ -38,6 +41,9 @@ final class LayoutManager: ObservableObject {
     /// MainActor FIFO write slot: prevents interleaving between two awaits from losing updates.
     private var writeInFlight = false
     private var writeWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Whether `registry` came from a successful disk read. While false it may be the built-in
+    /// fallback, which must never be written over the user's catalog.
+    private var baselineIsReadFromDisk = false
 
     /// Init is purely in-memory: no FileManager or disk calls.
     /// Starts from the built-in layouts with an unresolved directory, then resolves it and loads the registry on the background queue.
@@ -89,6 +95,8 @@ final class LayoutManager: ObservableObject {
         store = outcome.store
         registry = outcome.registry
         lastError = outcome.error
+        // A failed read applied the fallback; a write must not build on it.
+        baselineIsReadFromDisk = outcome.error == nil
     }
 
     /// First load (or when a store is needed before a write): resolve the directory (with read/write probe), build the store, read;
@@ -162,8 +170,18 @@ final class LayoutManager: ObservableObject {
         }
     }
 
+    /// Every write is computed from a registry that was actually read from disk. A catalog that
+    /// cannot be read fails the write instead of being replaced with the built-in fallback, so a
+    /// damaged catalog keeps its bytes and the next save merges into it once it reads again.
+    /// - Parameter requiredInputModeSwitchKeyValidation: runs inside the write slot against the
+    ///   baseline actually being written (and the machine flag read on the configuration queue), so
+    ///   the save keeps its FIFO order and never validates against a stale registry.
     @discardableResult
-    private func persist(_ mutate: (inout LayoutRegistry) throws -> Void) async -> Bool {
+    private func persist(
+        context: LayoutMessageContext = .layout,
+        requiredInputModeSwitchKeyValidation: ((LayoutRegistry, Bool) throws -> Void)? = nil,
+        _ mutate: (inout LayoutRegistry) throws -> Void
+    ) async -> Bool {
         await acquireWriteSlot()
         defer { releaseWriteSlot() }
         // A queued write must retire reads only once it owns the slot; a reload
@@ -178,12 +196,30 @@ final class LayoutManager: ObservableObject {
             store = outcome.store
             registry = outcome.registry
             lastError = outcome.error
+            baselineIsReadFromDisk = outcome.error == nil
         }
         guard let store else {
-            lastError = "布局存储位置尚未就绪，请稍后重试。"
+            lastError = Self.storageNotReadyMessage(context)
             return false
         }
+        // The cached registry may be the built-in fallback (an earlier read failed), so read the
+        // real baseline before mutating. A write must never persist the fallback over the user's
+        // catalog, and a failed read here leaves the file untouched for a later retry to merge.
+        if !baselineIsReadFromDisk {
+            do {
+                registry = try await HostConfigIOQueue.async { try store.load() }
+                baselineIsReadFromDisk = true
+                lastError = nil
+            } catch {
+                lastError = Self.friendly(error, context: context)
+                return false
+            }
+        }
         do {
+            if let requiredInputModeSwitchKeyValidation {
+                let required = await Self.readRequiresInputModeSwitchKey()
+                try requiredInputModeSwitchKeyValidation(registry, required)
+            }
             var updated = registry
             try mutate(&updated)
             // No change, no write (avoids a pointless atomic write).
@@ -200,8 +236,17 @@ final class LayoutManager: ObservableObject {
             lastError = nil
             return true
         } catch {
-            lastError = Self.friendly(error)
+            lastError = Self.friendly(error, context: context)
             return false
+        }
+    }
+
+    private nonisolated static func storageNotReadyMessage(_ context: LayoutMessageContext) -> String {
+        switch context {
+        case .layout: return "布局存储位置尚未就绪，请稍后重试。"
+        case .page: return "页面没有保存：存储位置还没就绪，请稍后重试。"
+        case .composition: return "搭配没有保存：存储位置还没就绪，请稍后重试。"
+        case .imported: return "布局没有导入：存储位置还没就绪，请稍后重试。"
         }
     }
 
@@ -259,14 +304,30 @@ final class LayoutManager: ObservableObject {
             if accessing { url.stopAccessingSecurityScopedResource() }
             isImporting = false
         }
-        let draft = try await HostConfigIOQueue.async { try LayoutDefinition.read(from: url) }
+        let draft = try await HostConfigIOQueue.async {
+            let draft = try LayoutDefinition.read(from: url)
+            try draft.validateRequiredInputModeSwitchKey(
+                KeyboardSystemRequirements.requiresKeyboardSwitchEntry())
+            return draft
+        }
         try Task.checkCancellation()
         return draft
     }
 
+    // MARK: - Input-mode switch key
+
+    /// Whether this machine needs a globe key in authored data. The extension records the real value
+    /// when it attaches; before that the answer is "yes" (a keyboard with no way back to another
+    /// input method is worse than an extra requirement). Read on the configuration queue.
+    private nonisolated static func readRequiresInputModeSwitchKey() async -> Bool {
+        (try? await HostConfigIOQueue.async { KeyboardSystemRequirements.requiresKeyboardSwitchEntry() }) ?? true
+    }
+
     @discardableResult
     func saveDraft(_ draft: LayoutDefinition, asCopy: Bool = false) async -> Bool {
-        await persist { reg in
+        await persist(requiredInputModeSwitchKeyValidation: { _, required in
+            try draft.validateRequiredInputModeSwitchKey(required)
+        }) { reg in
             if asCopy {
                 try reg.copy(draft)
             } else if reg.layout(id: draft.id) != nil {
@@ -277,6 +338,48 @@ final class LayoutManager: ObservableObject {
         }
     }
 
+    @discardableResult
+    func savePage(_ page: KeyboardPageDefinition) async -> Bool {
+        await persist(
+            context: .page,
+            requiredInputModeSwitchKeyValidation: { _, required in
+                try page.validateRequiredInputModeSwitchKey(required)
+            }
+        ) { try $0.savePage(page) }
+    }
+
+    @discardableResult
+    func removePage(_ id: String) async -> Bool {
+        await persist(context: .page) { try $0.removePage(id: id) }
+    }
+
+    @discardableResult
+    func saveComposition(_ composition: KeyboardComposition, for keyboardID: String) async -> Bool {
+        // Pairing an old page saved on a machine without the requirement must not strand this one:
+        // validate the pages the pairing will really use from the registry being written.
+        await persist(
+            context: .composition,
+            requiredInputModeSwitchKeyValidation: { latest, required in
+                guard required else { return }
+                for kind in KeyboardPageKind.allCases {
+                    guard let page = latest.page(id: composition.pageID(for: kind)) else { continue }
+                    try page.validateRequiredInputModeSwitchKey(true)
+                }
+            }
+        ) { registry in
+            try registry.setComposition(composition, for: keyboardID)
+        }
+    }
+
+    /// Drops page pairings left behind by deleted input methods. The caller decides which
+    /// input methods have no provider left. A failed save keeps the previous catalog and
+    /// returns false, so this never reports success for a change that was not persisted;
+    /// the next successful call recomputes the same result from the current installs.
+    @discardableResult
+    func pruneCompositions(where isObsoleteInputMethod: (String) -> Bool) async -> Bool {
+        await persist { $0.pruneCompositions(where: isObsoleteInputMethod) }
+    }
+
     /// Exports a single layout as JSON (to be edited externally and re-imported). Pure in-memory encoding, no disk access.
     func exportData(for id: String) -> Data? {
         guard let layout = registry.layout(id: id) else { return nil }
@@ -285,7 +388,7 @@ final class LayoutManager: ObservableObject {
 
     // MARK: - Error messages
 
-    nonisolated static func friendly(_ error: Error) -> String {
+    nonisolated static func friendly(_ error: Error, context: LayoutMessageContext = .layout) -> String {
         if let layoutError = error as? LayoutError {
             switch layoutError {
             case .lastEnabledLayout:
@@ -295,7 +398,23 @@ final class LayoutManager: ObservableObject {
             case .unknownID(let id):
                 return "找不到键盘布局：\(id)"
             case .invalid(let reason):
-                return "键盘布局文件无效：\(reason)"
+                // Page and pairing validation already speak about what is wrong, so the reason is
+                // the message under the matching alert title.
+                switch context {
+                case .page, .composition, .imported: return reason
+                case .layout: break
+                }
+                switch reason {
+                case "id and name are required": return "请填写名称后再保存。"
+                case "keys require label and positive finite width": return "请填写按键标题，并把宽度设为大于 0 的数字。"
+                case "rows must contain keys": return "请至少保留一行，每行至少保留一个按键。"
+                case "literal requires nonempty value": return "请填写按键要输入的文字。"
+                case "code requires one printable ASCII character": return "输入字母的按键需要一个英文字符，请修改后保存。"
+                case "longPress requires label": return "请填写长按项的标题。"
+                case "Rime code keys require a candidate area": return "输入字母的按键需要显示候选栏，请开启后保存。"
+                case "reading row requires a candidate area": return "拼音提示行需要显示候选栏，请开启后保存。"
+                default: return "键盘布局没有保存：\(reason)"
+                }
             }
         }
         return error.localizedDescription

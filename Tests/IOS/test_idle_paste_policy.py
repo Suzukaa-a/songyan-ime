@@ -29,9 +29,9 @@ def panel_fragments(source, memo):
         # The memo closes its file.
         "/* PRODUCTION_DEFINITION_MEMO */": memo[memo.index("final class DefinitionResolutionMemo {"):],
         "/* PRODUCTION_DEFINITION_CHROME */": section(source, "    var usesConfiguredLayout:",
-                                                      "    /// Exact match of a bundled merged letter layout"),
+                                                      "    var usesBundledMergedPad:"),
         "/* PRODUCTION_IDLE_GETTER */": section(source, "    private var quickPasteIdleInput:",
-                                                "    private var panelBody:"),
+                                                "    private func panelSurface("),
         "/* PRODUCTION_SYMBOL_ERROR_GETTER */": section(source, "    var t9QuickSymbolsError:",
                                                         "    // MARK: Key feedback"),
         "/* PRODUCTION_RENDER_OBSERVATION */": section(source, "        quickPasteSlot.observe(",

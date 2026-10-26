@@ -54,7 +54,7 @@ extension KeyboardPanelView {
             for: .init(
                 controller: ObjectIdentifier(controller),
                 registry: layoutRegistry,
-                preferredID: localLayoutID ?? selectedLayoutID,
+                preferredID: preferredDefinitionID,
                 inputsRevision: controller.definitionInputsRevision)
         ) {
             resolveDefinitions()
@@ -72,13 +72,18 @@ extension KeyboardPanelView {
         let isSupported = { (definition: LayoutDefinition) in
             supports(definition, combinations: lazyCombinations)
         }
-        let usable = layoutRegistry?.usableLayouts(where: isSupported) ?? BuiltinLayouts.all.filter(isSupported)
+        var usable = layoutRegistry?.usableLayouts(where: isSupported) ?? BuiltinLayouts.all.filter(isSupported)
+        if let id = selectedComposition?.mainLayoutID, let selected = layoutRegistry?.layout(id: id),
+            isSupported(selected), !usable.contains(where: { $0.id == id })
+        {
+            usable.append(selected)
+        }
         let selectable = usable.filter { definition in
             guard let bound = definition.input.schemaID else { return true }
             let source = controller.session.resourceSet?.sourceSchemaID(bound) ?? bound
             return source == controller.selectedSchemaID
         }
-        if let selected = selectable.first(where: { $0.id == (localLayoutID ?? selectedLayoutID) }),
+        if let selected = selectable.first(where: { $0.id == preferredDefinitionID }),
             resolvedKind(selected) == controller.layout
         {
             return (usable, selected)
@@ -224,7 +229,7 @@ extension KeyboardPanelView {
     func reconcileDefinition() {
         let definitions = usableDefinitions
         let preferred = definitions.first { definition in
-            guard definition.id == (localLayoutID ?? selectedLayoutID),
+            guard definition.id == preferredDefinitionID,
                 let kind = resolvedKind(definition)
             else { return false }
             // All lifecycle updates (including delayed defaults/registry loads)
@@ -272,7 +277,9 @@ extension KeyboardPanelView {
             auxiliaryColumn(.leading)
             VStack(spacing: 4) {
                 ForEach(Array(definitionMainRows.enumerated()), id: \.offset) { index, row in
-                    definitionRow(row, id: "row-\(index)", inset: definitionInset(row, index: index))
+                    definitionRow(
+                        row, id: "row-\(index)", inset: definitionInset(row, index: index),
+                        split: activeSplit, rowIndex: index)
                 }
             }
             auxiliaryColumn(.trailing)
@@ -305,7 +312,17 @@ final class DefinitionResolutionMemo {
         let active: LayoutDefinition?
         let isBundled: Bool
         let isBuiltinPhonePad: Bool
+        /// Known bundled phone9 primary-gesture semantics, independent of the visual shell. Only
+        /// first-key cycling / digit up-flick / declared alternates may read it; it must never gate
+        /// the injected control row or rails.
+        let isKnownPhone9Primary: Bool
+        /// Structural main-shell identity for the bundled 26-key (letters + synthesized Shift/Delete).
+        let isBundledQwertyMainShell: Bool
+        /// Structural main-shell identity for the bundled 14/18-key merged pads (geometry + synthesized separator/Delete).
         let isBundledMergedPad: Bool
+        /// The bundled footer policy draws its own control row; true only while the declared control
+        /// row is still the preset (any footer edit falls back to the author row).
+        let isBundledControlRowPolicy: Bool
         let isPhone: Bool
         let needsEngineSpelling: Bool
         let readingRowEligible: Bool
@@ -317,15 +334,50 @@ final class DefinitionResolutionMemo {
         init(usable: [LayoutDefinition], active: LayoutDefinition?) {
             self.usable = usable
             self.active = active
-            let isBundled = active.map { BuiltinLayouts.all.contains($0) } ?? false
+            let bundled = active.flatMap { definition in
+                BuiltinLayouts.all.first {
+                    $0.input.builtinLayout == definition.input.builtinLayout
+                        && $0.rows == definition.rows && $0.auxiliaryAreas == definition.auxiliaryAreas
+                }
+            }
+            let isBundled = bundled != nil
             self.isBundled = isBundled
-            isBuiltinPhonePad = active == BuiltinLayouts.phone9
-            isBundledMergedPad = active == BuiltinLayouts.merged14 || active == BuiltinLayouts.merged18
+            // Shell/chrome identity stays narrow: only the rendered main-row long-press menus may
+            // differ, because injecting the fixed control row/rails would otherwise cover up authored
+            // edits there. Primary gestures are a separate, shell-free predicate.
+            isBuiltinPhonePad = active.map(BuiltinLayouts.matchesPhone9VisualShell) == true
+            isKnownPhone9Primary = active.map(BuiltinLayouts.matchesPhone9PrimarySemantics) == true
+            // The 26/14/18 shells are structural: main-row long-press, label and title edits keep
+            // the native columns/Shift/Delete/separator geometry, while the footer identity below
+            // stays separate so an edited control row is rendered instead of covered up.
+            isBundledQwertyMainShell = active.map(BuiltinLayouts.matchesQwerty26MainShell) == true
+            switch active?.input.builtinLayout {
+            case .some(.merged14):
+                isBundledMergedPad = active.map(BuiltinLayouts.matchesMerged14MainShell) == true
+                isBundledControlRowPolicy =
+                    active.map(BuiltinLayouts.matchesMerged14ControlRowPolicy) == true
+            case .some(.merged18):
+                isBundledMergedPad = active.map(BuiltinLayouts.matchesMerged18MainShell) == true
+                isBundledControlRowPolicy =
+                    active.map(BuiltinLayouts.matchesMerged18ControlRowPolicy) == true
+            case .some(.qwerty26):
+                isBundledMergedPad = false
+                isBundledControlRowPolicy =
+                    active.map(BuiltinLayouts.matchesQwerty26ControlRowPolicy) == true
+            default:
+                isBundledMergedPad = false
+                isBundledControlRowPolicy = false
+            }
             isPhone = active.map(PhoneKeypadStructure.matches) == true
             needsEngineSpelling = CandidateReadingRowPolicy.needsEngineSpelling(active)
             readingRowEligible = CandidateReadingRowPolicy.isEligible(active)
             candidateAreaRequired = active?.effectiveCandidateArea.candidates ?? true
-            let controlRow = Self.controlRow(of: active, isBundled: isBundled)
+            // The bundled-style control row filter belongs to the visible bundled shell, not only to
+            // the strict content identity: a long-press-only copy renders the same shell. When the
+            // footer falls back to the author row the declaration must stay unfiltered.
+            let controlRow = Self.controlRow(
+                of: active,
+                isBundled: isBundled || isBuiltinPhonePad || isBundledControlRowPolicy)
             self.controlRow = controlRow
             let rows = active?.rows ?? []
             mainRows = controlRow == nil ? rows : Array(rows.dropLast())

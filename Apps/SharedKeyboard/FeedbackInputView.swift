@@ -59,6 +59,12 @@ public final class FeedbackInputView: KeyboardPanelInputView {
                 if hit is SkinnedButton || hit is AlternateCharacterKey.CharacterButton { return self }
                 return hit
             }
+            // A docked wide keyboard owns only its real content frame. The blank side margins
+            // must not become the nearest edge key; tools inside the frame still hit normally.
+            // The reporter uses screen coordinates, so convert the window point once.
+            if KeyboardRoutedTouch.pointIsOutsideWideContent(window.convert(windowPoint, to: nil)) {
+                return hit
+            }
         }
         guard !(hit is UIControl), self.point(inside: point, with: event) else { return hit }
         // Inside a scroll view (the 9-key reading rail, a candidate strip) empty space

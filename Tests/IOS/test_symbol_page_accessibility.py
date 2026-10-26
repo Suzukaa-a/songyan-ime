@@ -51,17 +51,17 @@ for ascii in [false, true] {
     let numericValues = literalValues(numeric.flatMap(\.caps))
     precondition(numericValues.contains("."), "decimal separator must survive both modes")
     precondition(numericValues.filter { $0.count == 1 && $0.first!.isNumber } == "1234567890".map(String.init))
-    // The system keyboards' 123 pages: English (`$`, five wide keys on row 3) and Simplified Pinyin.
+    // The third row fills nine equal character columns beside Delete.
     let expectedNumeric: [[String]] = ascii
-        ? ["1234567890".map(String.init), "-/:;()$&@\"".map(String.init), [".", ",", "?", "!", "'"]]
+        ? ["1234567890".map(String.init), "-/:;()$&@\"".map(String.init), [".", ",", "?", "!", "'", "[", "]", "%", "+"]]
         : ["1234567890".map(String.init), ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"],
-           ["。", "，", "、", "？", "！", "."]]
+           ["。", "，", "、", "？", "！", ".", "…", "「", "」"]]
     precondition(numeric.map { literalValues($0.caps) } == expectedNumeric, "123 rows (ascii=\(ascii))")
-    // The row-shaped #+= page (the default) is the system keyboards' second page and keeps the sentence row.
+    // Each symbol page exposes nine sentence marks without repeating its other rows.
     let expectedSymbols: [[String]] = ascii
-        ? ["[]{}#%^*+=".map(String.init), "_\\|~<>€£¥•".map(String.init), expectedNumeric[2]]
+        ? ["[]{}#%^*+=".map(String.init), "_\\|~<>€£¥•".map(String.init), [".", ",", "?", "!", "'", "\"", ":", ";", "/"]]
         : [["【", "】", "{", "}", "#", "%", "^", "*", "+", "="], ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"],
-           expectedNumeric[2]]
+           ["。", "，", "、", "？", "！", ".", "：", "；", "…"]]
     precondition(symbols.map { literalValues($0.caps) } == expectedSymbols, "#+= rows (ascii=\(ascii))")
     for (page, rows) in [(KeyboardControlPolicy.Page.numeric, numeric), (.symbols, symbols)] {
         let values = literalValues(rows.flatMap(\.caps))

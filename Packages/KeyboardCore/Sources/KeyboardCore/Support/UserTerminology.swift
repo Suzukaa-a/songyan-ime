@@ -172,7 +172,7 @@ public enum UserTerminology: Sendable {
 
     /// Management page footnote: what the toggles and "Use" do, and how they relate to the in-keyboard switch list.
     public static let userKeyboardFootnote =
-        "勾选后点「保存」加入键盘，长按「ABC/中文」键可切换；轻点「\(startUsing)」立即换用。"
+        "勾选后点「保存」加入键盘，长按中英键可切换；轻点「\(startUsing)」立即换用。"
 
     /// Saving in progress.
     public static let userKeyboardSaving = "正在保存键盘…"
@@ -226,7 +226,7 @@ public enum UserTerminology: Sendable {
 
     /// General explanation on the trial page: what is typed and how to change keyboards.
     public static let tryUsesCurrentScheme =
-        "长按「ABC/中文」键可切换键盘。"
+        "长按中英键切换键盘。"
 
     /// Source detail only knows the published selection. `howToUse` is an imperative phrase
     /// without a trailing period (see `tryHowToUseViaUserKeyboard` etc.).

@@ -15,6 +15,9 @@ struct UserKeyboardManagementView: View {
     @State private var hasEditedSelection = false
     @State private var confirmingDiscard = false
     @State private var isSaving = false
+    @State private var inputMethodID = ""
+    @State private var configuringKeyboard: UserKeyboard?
+    @ObservedObject private var layoutManager = LayoutManager.shared
 
     init(
         center: UserKeyboardCenter? = nil, source: UserKeyboardSource = .active,
@@ -28,15 +31,25 @@ struct UserKeyboardManagementView: View {
         List {
             statusSection
             if case .ready = center.phase {
-                ForEach(groups, id: \.id) { group in
-                    Section(group.name) {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 144), spacing: 12)], spacing: 12) {
-                            ForEach(group.items) { item in
-                                keyboardCard(item, inputMethod: group.name)
-                            }
+                if !groups.isEmpty {
+                    Section {
+                        Picker(UserTerminology.inputMethod, selection: $inputMethodID) {
+                            ForEach(groups, id: \.id) { group in Text(group.name).tag(group.id) }
+                        }
+                        .disabled(isBusy)
+                    }
+                }
+                if let group = groups.first(where: { $0.id == inputMethodID }) {
+                    Section("键盘布局") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
+                            ForEach(group.items) { item in keyboardCard(item, inputMethod: group.name) }
                         }
                         .padding(.vertical, 6)
                     }
+                }
+                Section {
+                    NavigationLink("页面库") { KeyboardPageManagementView() }
+                    NavigationLink("自定义键盘布局") { LayoutManagementView() }
                 }
                 if groups.isEmpty {
                     Section { Text(UserTerminology.userKeyboardEmptyHint).foregroundStyle(.secondary) }
@@ -56,6 +69,14 @@ struct UserKeyboardManagementView: View {
         }
         .navigationTitle(UserTerminology.userKeyboard)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(
+            isPresented: Binding(
+                get: { configuringKeyboard != nil },
+                set: { if !$0 { configuringKeyboard = nil } }
+            )
+        ) {
+            if let configuringKeyboard { KeyboardCompositionView(keyboard: configuringKeyboard) }
+        }
         // With unsaved changes, going back directly (discarding the draft) is not allowed: becomes "Cancel" with a second confirmation.
         .navigationBarBackButtonHidden(hasChanges || isSaving || center.busyKeyboardID != nil)
         .interactiveDismissDisabled(isSaving || center.busyKeyboardID != nil)
@@ -236,8 +257,8 @@ struct UserKeyboardManagementView: View {
                 binding(for: item.id).wrappedValue.toggle()
             } label: {
                 VStack(alignment: .leading, spacing: 10) {
-                    UserKeyboardMiniature(layout: item.layout)
-                        .frame(height: 86)
+                    UserKeyboardMiniature(definition: mainLayout(for: item))
+                        .frame(height: 64)
                         .accessibilityHidden(true)
                     HStack(alignment: .firstTextBaseline) {
                         Text(UserTerminology.layoutName(item.layout))
@@ -274,6 +295,16 @@ struct UserKeyboardManagementView: View {
                     .accessibilityIdentifier("userKeyboard.use." + item.id)
                     .accessibilityLabel("\(UserTerminology.startUsing)\(name)")
             }
+            Button {
+                configuringKeyboard = item.keyboard
+            } label: {
+                Label("页面搭配", systemImage: "square.stack.3d.up")
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .font(.subheadline)
+            .accessibilityIdentifier("userKeyboard.pages." + item.id)
+            .disabled(isBusy)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -286,6 +317,12 @@ struct UserKeyboardManagementView: View {
                 .strokeBorder(
                     selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: selected ? 2 : 1)
         )
+    }
+
+    private func mainLayout(for item: Item) -> LayoutDefinition {
+        let composition = layoutManager.registry.composition(for: item.id, defaultMainLayoutID: item.layout.rawValue)
+        return layoutManager.registry.layout(id: composition.mainLayoutID)
+            ?? BuiltinLayouts.all.first { $0.id == item.layout.rawValue } ?? BuiltinLayouts.qwerty26
     }
 
     private func binding(for id: String) -> Binding<Bool> {
@@ -306,6 +343,10 @@ struct UserKeyboardManagementView: View {
         baselineIDs = ids
         hasEditedSelection = false
         initialized = true
+        if !groups.contains(where: { $0.id == inputMethodID }) {
+            inputMethodID =
+                items.first(where: { $0.id == center.currentKeyboardID })?.inputMethodID ?? groups.first?.id ?? ""
+        }
     }
 
     @MainActor
@@ -335,11 +376,10 @@ struct UserKeyboardManagementView: View {
 
 /// Draws the shipped key positions and labels instead of a generic keyboard icon.
 private struct UserKeyboardMiniature: View {
-    let layout: KeyboardLayoutKind
+    let definition: LayoutDefinition
 
     var body: some View {
         Canvas { context, size in
-            guard let definition = BuiltinLayouts.all.first(where: { $0.id == layout.rawValue }) else { return }
             let rows = definition.rows
             let gap: CGFloat = 2
             let height = (size.height - gap * CGFloat(max(rows.count - 1, 0))) / CGFloat(max(rows.count, 1))

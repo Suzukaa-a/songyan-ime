@@ -10,56 +10,57 @@ extension KeyboardPanelView {
     /// Main key row of the letters / 123 / #+= pages (123 and #+= are both direct literal keys).
     @ViewBuilder
     private var keyRows: some View {
-        switch page {
-        case .letters:
-            if usesStandardQwerty {
-                standardQwertyKeypad
-            } else if usesBundledMergedPad {
-                mergedKeypad
-            } else if usesConfiguredLayout {
-                configuredKeypad
-            } else {
-                // Renderer input stays at KeyboardRow/KeyCap; LayoutKit can supply these rows.
-                ForEach(Array(letterRows.enumerated()), id: \.element.id) { index, row in
-                    WeightedKeyRow(caps: row.caps, edgeUnits: letterRowInset(index), alternates: alternates) { cap in
-                        handleKey(cap.action)
-                    }
-                }
-            }
-        case .numeric, .symbols:
-            // The shared 26/14 page keeps exactly the same symbols and geometry.
-            // Every literal symbol is a character key and keeps the character
-            // surface, like the letters it replaces; only real controls (Delete,
-            // the page key, CN/EN, Return) carry the control/accent tone. A key
-            // with a long-press list shows its first entry in the corner, as the
-            // letters do; the lists are kept short so the rows stay calm. These
-            // caps are as narrow as 26-key letters,
-            // so they reuse the same panel-local key preview: the finger-covered
-            // glyph is confirmed above the key while its hit rectangle, action
-            // and slide-off cancel stay exactly those of the key itself. The full
-            // #+= symbol page is shared even for a phone letter definition;
-            // compressing it into 3x3 hides too many direct-access symbols.
-            ForEach(Array(symbolRows.enumerated()), id: \.element.id) { index, row in
-                if index == 2 {
-                    GeometryReader { geometry in
-                        HStack(spacing: 4) {
-                            WeightedKeyRow(
-                                caps: row.caps, alternates: alternates, showsKeyPreview: true
-                            ) {
-                                handleKey($0.action)
-                            }
-                            .frame(width: max(0, geometry.size.width - sharedDeleteWidth(for: geometry.size.width) - 4))
-                            RepeatingDeleteKey { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) }
-                                .frame(width: sharedDeleteWidth(for: geometry.size.width), height: keyHeight)
+        if let pageDefinition {
+            authoredPage(pageDefinition)
+        } else {
+            switch page {
+            case .letters:
+                if usesStandardQwerty {
+                    standardQwertyKeypad
+                } else if usesBundledMergedPad {
+                    mergedKeypad
+                } else if usesConfiguredLayout {
+                    configuredKeypad
+                } else {
+                    // Renderer input stays at KeyboardRow/KeyCap; LayoutKit can supply these rows.
+                    ForEach(Array(letterRows.enumerated()), id: \.element.id) { index, row in
+                        WeightedKeyRow(caps: row.caps, edgeUnits: letterRowInset(index), alternates: alternates) {
+                            cap in
+                            handleKey(cap.action)
                         }
                     }
-                    .frame(height: keyHeight)
-                } else {
-                    WeightedKeyRow(
-                        caps: row.caps, alternates: alternates, showsKeyPreview: true
-                    ) {
-                        handleKey($0.action)
-                    }
+                }
+            case .numeric, .symbols:
+                // The shared 26/14 page keeps exactly the same symbols and geometry.
+                // Every literal symbol is a character key and keeps the character
+                // surface, like the letters it replaces; only real controls (Delete,
+                // the page key, CN/EN, Return) carry the control/accent tone. A key
+                // with a long-press list shows its first entry in the corner, as the
+                // letters do; the lists are kept short so the rows stay calm. These
+                // caps are as narrow as 26-key letters,
+                // so they reuse the same panel-local key preview: the finger-covered
+                // glyph is confirmed above the key while its hit rectangle, action
+                // and slide-off cancel stay exactly those of the key itself. The full
+                // #+= symbol page is shared even for a phone letter definition;
+                // compressing it into 3x3 hides too many direct-access symbols.
+                ForEach(Array(symbolRows.enumerated()), id: \.element.id) { index, row in
+                    GeometryReader { geometry in
+                        let metrics = StandardKeyRowGeometry(width: Double(geometry.size.width), split: activeSplit)
+                        HStack(spacing: 4) {
+                            WeightedKeyRow(
+                                caps: row.caps, alternates: alternates, showsKeyPreview: true,
+                                split: activeSplit, rowIndex: index,
+                                fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap)
+                            ) { handleKey($0.action) }
+                            .frame(
+                                width: index == 2
+                                    ? max(0, geometry.size.width - CGFloat(metrics.keyWidth) - 4) : geometry.size.width)
+                            if index == 2 {
+                                RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) }
+                                    .frame(width: CGFloat(metrics.keyWidth), height: keyHeight)
+                            }
+                        }
+                    }.frame(height: keyHeight)
                 }
             }
         }
@@ -82,12 +83,23 @@ extension KeyboardPanelView {
     /// the merged pad's separator, the bundled 9-key first key. Plain letter rows do not,
     /// so starting or ending a word does not rebuild every letter key.
     private var keyRowsReadComposition: Bool {
+        if let pageDefinition {
+            return Self.pageReadsComposition(pageDefinition)
+        }
         guard page == .letters, !controller.isEnglishMode else { return false }
         if usesBundledMergedPad || isBuiltinPhonePad || usesStandardT9 { return true }
         let auxiliary = (activeDefinition?.auxiliaryAreas ?? []).flatMap(\.keys)
         return (definitionMainRows.flatMap(\.keys) + auxiliary).contains {
-            $0.action.type == .enter || $0.action == LayoutAction(.code, value: "'")
+            $0.action.type == .enter || $0.action.type == .clearInput
+                || $0.action == LayoutAction(.code, value: "'")
         }
+    }
+
+    /// The M2 return dependency covers every authored region: a top-level enter keeps drawing the
+    /// live title/enabled state, and a clear-input key keeps its live enabled state. Categories are
+    /// included because their authored keys are top-level page content too.
+    static func pageReadsComposition(_ page: KeyboardPageDefinition) -> Bool {
+        page.allKeys.contains { $0.action.type == .enter || $0.action.type == .clearInput }
     }
 
     var keyAreaRenderToken: KeyAreaRenderToken { keyAreaRenderToken(phone: nil) }
@@ -113,13 +125,16 @@ extension KeyboardPanelView {
             shuangpinHintLabels: shuangpinHints?.activePreset?.hints ?? [:],
             shuangpinHintRevision: shuangpinHintRevision,
             activeDefinition: activeDefinition,
+            pageDefinition: pageDefinition,
+            split: activeSplit,
             layout: controller.layout,
             selectedSchemaID: controller.selectedSchemaID,
             inputMode: controller.inputMode,
             isEnglishMode: controller.isEnglishMode,
             shiftState: controller.shiftState,
             isComposing: readsComposition && controller.snapshot.isComposing,
-            usesASCIIPunctuation: controller.usesASCIIPunctuation,
+            usesASCIIPunctuation: effectiveUsesASCIIPunctuation,
+            symbolMarks: effectiveSymbolMarks,
             returnKeyTitle: readsComposition ? controller.returnKeyTitle : "",
             isReturnKeyEnabled: readsComposition && controller.isReturnKeyEnabled,
             schemaAlphabet: controller.activeSchemaAlphabet,
@@ -130,10 +145,11 @@ extension KeyboardPanelView {
             hasKeyAlternates: keyAlternates != nil,
             hasSystemKeyboardSwitch: systemKeyboardSwitch != nil,
             allowsCursorMovement: allowsCursorMovement,
-            prefersCategorySymbolPage: prefersCategorySymbolPage)
+            prefersCategorySymbolPage: prefersCategorySymbolPage,
+            symbolPageLocked: symbolPageLocked)
     }
 
-    var usesConfiguredLayout: Bool { page == .letters && !controller.isEnglishMode }
+    var usesConfiguredLayout: Bool { page == .letters && !controller.isEnglishMode && pageDefinition == nil }
 
     /// The one phone-keypad shell serves the bundled T9 **and** any imported
     /// definition with the same three-by-three digit structure, so both get the
@@ -146,13 +162,18 @@ extension KeyboardPanelView {
 
     var usesPhoneDefinition: Bool { definitionFacts.isPhone }
 
-    /// Content equality with the bundled T9 gates the bundled-only chrome (the
-    /// quick-symbol rail, the fixed Delete + separator rail).
+    /// Narrow visual-shell identity for the bundled T9: gates the injected quick-symbol rail,
+    /// the fixed Delete + separator rail and the fixed control row. Only rendered main-row
+    /// long-press menus may differ from the preset.
     var isBuiltinPhonePad: Bool { definitionFacts.isBuiltinPhonePad }
 
-    /// Exact match of a bundled merged letter layout (14-key, 18-key; content-level Equatable, so DIY
-    /// key edits and same-id imports do not match): the shared merged pad + bottom row via ControlRow,
-    /// instead of sizing controls by JSON weights.
+    /// The known bundled phone9 primary gestures (first-key cycle, digit up-flick, declared
+    /// alternates) without any shell assumption. Never use it to gate injected chrome.
+    var isKnownPhone9Primary: Bool { definitionFacts.isKnownPhone9Primary }
+
+    /// Structural main-shell identity of a bundled merged letter layout (14-key, 18-key): the
+    /// shared merged pad + synthesized separator/Delete, while main-row faces/long-press menus are
+    /// rendered from the definition. DIY/imported shapes without the builtin metadata do not match.
     var usesBundledMergedPad: Bool { usesConfiguredLayout && definitionFacts.isBundledMergedPad }
 
     /// Whether the current **physical definition** proves support for compact spelling (composition disambiguation + read-only reading browse).
@@ -176,58 +197,59 @@ extension KeyboardPanelView {
     /// The 123 rows, or the row-shaped #+= page's (the categorised page has no rows).
     var symbolRows: [KeyboardRow] {
         page == .symbols
-            ? SymbolPageTable.symbolRows(ascii: controller.usesASCIIPunctuation)
-            : SymbolPageTable.numericRows(ascii: controller.usesASCIIPunctuation)
+            ? SymbolPageTable.symbolRows(ascii: effectiveUsesASCIIPunctuation)
+            : SymbolPageTable.numericRows(ascii: effectiveUsesASCIIPunctuation)
     }
 
     /// Only the untouched bundled 26-key definitions receive the standard system-key shell.
     var usesStandardQwerty: Bool {
-        controller.isEnglishMode || (isBundledDefinition && activeDefinition?.id == BuiltinLayouts.qwerty26.id)
+        // English always uses the built-in English shell; Chinese keeps it for the known 26-key
+        // structure even after metadata edits (labels/LP), not only for the strict content identity.
+        controller.isEnglishMode || definitionFacts.isBundledQwertyMainShell
     }
 
     private var standardQwertyKeypad: some View {
-        ForEach(0..<3, id: \.self) { index in
-            if index == 2 {
-                GeometryReader { geometry in
-                    let sideWidth = sharedDeleteWidth(for: geometry.size.width)
-                    HStack(spacing: 4) {
-                        ShiftKey(
-                            state: controller.shiftState, isEnglishMode: controller.isEnglishMode,
-                            tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
-                            doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } }
-                        )
-                        .frame(width: sideWidth, height: keyHeight)
-                        standardQwertyRow(index)
-                        RepeatingDeleteKey { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) }
-                            .frame(width: sideWidth, height: keyHeight)
+        GeometryReader { geometry in
+            let metrics = StandardKeyRowGeometry(width: Double(geometry.size.width), split: activeSplit)
+            VStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    if index == 2 {
+                        HStack(spacing: 4) {
+                            ShiftKey(
+                                state: controller.shiftState, isEnglishMode: controller.isEnglishMode,
+                                tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
+                                doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } }
+                            ).frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
+                            standardQwertyRow(index, metrics: metrics)
+                            RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) }
+                                .frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
+                        }
+                    } else {
+                        standardQwertyRow(index, metrics: metrics)
                     }
                 }
-                .frame(height: keyHeight)
-            } else {
-                standardQwertyRow(index)
             }
-        }
+        }.frame(height: keyHeight * 3 + 8)
     }
 
-    /// The visible cap and the UIKit hit rectangle use one width in 26-key,
-    /// merged-14, and 123/# +=. Keep Delete wider than the merged-14 M cap
-    /// even at narrow phone widths; the symbol page must not shrink it back.
+    /// Merged letter groups retain their wider editing controls.
     func sharedDeleteWidth(for width: CGFloat) -> CGFloat {
         max(56, (width - 32) / 10 * 1.8)
     }
 
     @ViewBuilder
-    private func standardQwertyRow(_ index: Int) -> some View {
+    private func standardQwertyRow(_ index: Int, metrics: StandardKeyRowGeometry) -> some View {
         if controller.isEnglishMode {
             WeightedKeyRow(
-                caps: controller.englishLetterRows[index].caps,
-                edgeUnits: index == 1 ? 0.5 : 0, alternates: alternates,
-                showsKeyPreview: true
-            ) {
-                handleKey($0.action)
-            }
+                caps: controller.englishLetterRows[index].caps, alternates: alternates,
+                showsKeyPreview: true, split: activeSplit, rowIndex: index,
+                fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap)
+            ) { handleKey($0.action) }
         } else if definitionMainRows.indices.contains(index) {
-            definitionRow(definitionMainRows[index], id: "row-\(index)", inset: index == 1 ? 0.5 : 0)
+            definitionRow(
+                definitionMainRows[index], id: "row-\(index)",
+                split: activeSplit, rowIndex: index, fixedKeyWidth: CGFloat(metrics.keyWidth),
+                splitGap: CGFloat(metrics.gap))
         }
     }
 

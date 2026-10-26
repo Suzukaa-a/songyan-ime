@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2A2902328E0C51CE3950B287 /* KeyboardRowsEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE4CFD1E2CDBCF323B9A7FA /* KeyboardRowsEditor.swift */; };
+		D2145277F77256AEBB36B400 /* KeyboardPageEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF399D5C03710EA6A3FC4E3C /* KeyboardPageEditorView.swift */; };
+		EDBB7F062B2E9F2B1F63EC93 /* KeyboardPageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375CAB1BE2039787E0D69687 /* KeyboardPageManagementView.swift */; };
+		DBFB4531E5E67758C75AC512 /* KeyboardCompositionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12EC6896AEEF4E587E6AFCF0 /* KeyboardCompositionView.swift */; };
+		FA5E0794B5B5D55B9F2FB996 /* KeyboardPanelView+Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F1E220ADD55F43C194A7DB /* KeyboardPanelView+Pages.swift */; };
+		3DA54DDAC3DDE85658093749 /* KeyboardPanelView+Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F1E220ADD55F43C194A7DB /* KeyboardPanelView+Pages.swift */; };
         FZ2610160000000000000003 /* FuzzyPinyinCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FZ2610160000000000000001; };
         FZ2610160000000000000004 /* FuzzyPinyinSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FZ2610160000000000000002; };
         KF2610160000000000000002 /* KeyFeedback in Resources */ = {isa = PBXBuildFile; fileRef = KF2610160000000000000001; };
@@ -208,6 +214,16 @@
 		LT2600000000000000000003 /* KeyboardLearningTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT2600000000000000000001 /* KeyboardLearningTransfer.swift */; };
 		LT2600000000000000000004 /* KeyboardLearningTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT2600000000000000000001 /* KeyboardLearningTransfer.swift */; };
 		LT2600000000000000000005 /* LearningBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT2600000000000000000002 /* LearningBackupView.swift */; };
+		19179132AAFC7BCBC845A7D4 /* KeyboardPageDraftFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACBDB4B3BC97D723910E638; };
+		A36B7C93CB4B8A1AD5416E26 /* KeyboardCategoryEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F4F8BE770A497DAD09C992; };
+		E86B7BD677D90088862894BA /* KeyboardPagePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ED57238B2F26995B8E277A6; };
+		27D30BD3088608D42A2B2171 /* KeyboardPagePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ED57238B2F26995B8E277A6; };
+		FF2F2F1EF91DB4F01ED7EC9C /* KeyboardAuthoredPageChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5114CB229011A3DDF49037D; };
+		391B1EDD75FDFFAADA2A9D69 /* KeyboardAuthoredPageChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5114CB229011A3DDF49037D; };
+		A0DCAEA0DC9706E19CF7DDCA /* KeyboardAuthoredPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC31C39A89A7272F4308B91; };
+		BB8D82E84373D9E08762BBD7 /* KeyboardAuthoredPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC31C39A89A7272F4308B91; };
+		91447F0DFACEDA6EA76F3DA5 /* KeyboardSystemRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A992B99E56ED8915138994; };
+		5CBED1F7984DA89294D01903 /* KeyboardSystemRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A992B99E56ED8915138994; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -235,6 +251,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7EE4CFD1E2CDBCF323B9A7FA /* KeyboardRowsEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardRowsEditor.swift"; sourceTree = "<group>"; };
+		CF399D5C03710EA6A3FC4E3C /* KeyboardPageEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPageEditorView.swift"; sourceTree = "<group>"; };
+		375CAB1BE2039787E0D69687 /* KeyboardPageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPageManagementView.swift"; sourceTree = "<group>"; };
+		12EC6896AEEF4E587E6AFCF0 /* KeyboardCompositionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardCompositionView.swift"; sourceTree = "<group>"; };
+		E5F1E220ADD55F43C194A7DB /* KeyboardPanelView+Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPanelView+Pages.swift"; sourceTree = "<group>"; };
         FZ2610160000000000000001 /* FuzzyPinyinCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuzzyPinyinCenter.swift; sourceTree = "<group>"; };
         FZ2610160000000000000002 /* FuzzyPinyinSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuzzyPinyinSettingsView.swift; sourceTree = "<group>"; };
         KF2610160000000000000001 /* KeyFeedback */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Resources/KeyFeedback"; sourceTree = "<group>"; };
@@ -365,6 +386,12 @@
 		PRIVE0XT0000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		LT2600000000000000000001 /* KeyboardLearningTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLearningTransfer.swift; sourceTree = "<group>"; };
 		LT2600000000000000000002 /* LearningBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningBackupView.swift; sourceTree = "<group>"; };
+		3ACBDB4B3BC97D723910E638 /* KeyboardPageDraftFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPageDraftFactory.swift"; sourceTree = "<group>"; };
+		E1F4F8BE770A497DAD09C992 /* KeyboardCategoryEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardCategoryEditorView.swift"; sourceTree = "<group>"; };
+		8ED57238B2F26995B8E277A6 /* KeyboardPagePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPagePreviewView.swift"; sourceTree = "<group>"; };
+		D5114CB229011A3DDF49037D /* KeyboardAuthoredPageChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardAuthoredPageChrome.swift"; sourceTree = "<group>"; };
+		DAC31C39A89A7272F4308B91 /* KeyboardAuthoredPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardAuthoredPageView.swift"; sourceTree = "<group>"; };
+		B1A992B99E56ED8915138994 /* KeyboardSystemRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardSystemRequirements.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -481,6 +508,12 @@
                 E90000000000000000000004 /* SkinManagementView.swift */,
                 E90000000000000000000005 /* SkinEditorView.swift */,
                 E90000000000000000000006 /* LayoutEditorView.swift */,
+                7EE4CFD1E2CDBCF323B9A7FA /* KeyboardRowsEditor.swift */,
+                CF399D5C03710EA6A3FC4E3C /* KeyboardPageEditorView.swift */,
+                375CAB1BE2039787E0D69687 /* KeyboardPageManagementView.swift */,
+                12EC6896AEEF4E587E6AFCF0 /* KeyboardCompositionView.swift */,
+                3ACBDB4B3BC97D723910E638 /* KeyboardPageDraftFactory.swift */,
+                E1F4F8BE770A497DAD09C992 /* KeyboardCategoryEditorView.swift */,
                 F10000000000000000000104 /* CandidateBarManagementView.swift */,
                 AB0000000000000000000003 /* AppearanceManager.swift */,
                 PRIVH0ST0000000000000001 /* PrivacyInfo.xcprivacy */,
@@ -521,6 +554,11 @@
 				57E8E871F6FB45FCBB26745D /* LocalQuickContentModel.swift */,
 				9305233E190F4B2CA5663EFE /* KeyboardPanelView+Utilities.swift */,
 				CFE75737435B4739898F0BD5 /* KeyboardPanelView+KeyRows.swift */,
+				E5F1E220ADD55F43C194A7DB /* KeyboardPanelView+Pages.swift */,
+                8ED57238B2F26995B8E277A6 /* KeyboardPagePreviewView.swift */,
+                D5114CB229011A3DDF49037D /* KeyboardAuthoredPageChrome.swift */,
+                DAC31C39A89A7272F4308B91 /* KeyboardAuthoredPageView.swift */,
+                B1A992B99E56ED8915138994 /* KeyboardSystemRequirements.swift */,
 				D76BB4A4436B4354A0ACFF71 /* KeyboardPanelView+LayoutDefinitions.swift */,
 				5B5606AABC354C05ABE7F544 /* KeyboardPanelView+NineKey.swift */,
 				C9BEB1AF49D74136BD6E5EDD /* KeyboardPanelView+DefinitionKeys.swift */,
@@ -768,6 +806,17 @@
                 E90000000000000000000104 /* SkinManagementView.swift in Sources */,
                 E90000000000000000000105 /* SkinEditorView.swift in Sources */,
                 E90000000000000000000106 /* LayoutEditorView.swift in Sources */,
+                2A2902328E0C51CE3950B287 /* KeyboardRowsEditor.swift in Sources */,
+                D2145277F77256AEBB36B400 /* KeyboardPageEditorView.swift in Sources */,
+                EDBB7F062B2E9F2B1F63EC93 /* KeyboardPageManagementView.swift in Sources */,
+                DBFB4531E5E67758C75AC512 /* KeyboardCompositionView.swift in Sources */,
+                19179132AAFC7BCBC845A7D4 /* KeyboardPageDraftFactory.swift in Sources */,
+                A36B7C93CB4B8A1AD5416E26 /* KeyboardCategoryEditorView.swift in Sources */,
+                FA5E0794B5B5D55B9F2FB996 /* KeyboardPanelView+Pages.swift in Sources */,
+                E86B7BD677D90088862894BA /* KeyboardPagePreviewView.swift in Sources */,
+                FF2F2F1EF91DB4F01ED7EC9C /* KeyboardAuthoredPageChrome.swift in Sources */,
+                A0DCAEA0DC9706E19CF7DDCA /* KeyboardAuthoredPageView.swift in Sources */,
+                91447F0DFACEDA6EA76F3DA5 /* KeyboardSystemRequirements.swift in Sources */,
                 E90000000000000000000107 /* OptionStore.swift in Sources */,
                 E90000000000000000000108 /* KeyboardOptionsView.swift in Sources */,
                 CA1100000000000000000002 /* KeyboardToolsStyle.swift in Sources */,
@@ -865,6 +914,11 @@
 				9B40AEA4925F47509A9EEC29 /* LocalQuickContentModel.swift in Sources */,
 				BAA2DE65E7AC490984B04A91 /* KeyboardPanelView+Utilities.swift in Sources */,
 				EFA4B5606CF141C59415308A /* KeyboardPanelView+KeyRows.swift in Sources */,
+				3DA54DDAC3DDE85658093749 /* KeyboardPanelView+Pages.swift in Sources */,
+                27D30BD3088608D42A2B2171 /* KeyboardPagePreviewView.swift in Sources */,
+                391B1EDD75FDFFAADA2A9D69 /* KeyboardAuthoredPageChrome.swift in Sources */,
+                BB8D82E84373D9E08762BBD7 /* KeyboardAuthoredPageView.swift in Sources */,
+                5CBED1F7984DA89294D01903 /* KeyboardSystemRequirements.swift in Sources */,
 				16EAF81A1BB1479A99F6F2D7 /* KeyboardPanelView+LayoutDefinitions.swift in Sources */,
 				3AEA4DE4CE474BEDB573F26C /* KeyboardPanelView+NineKey.swift in Sources */,
 				F57B5114D90D454C9CDD3866 /* KeyboardPanelView+DefinitionKeys.swift in Sources */,

@@ -58,6 +58,7 @@ public enum LayoutIdentityEncoder {
         let auxiliaryAreas: [LayoutAuxiliaryArea]?
         let candidateArea: LayoutCandidateArea?
         let longPressDelay: Double?
+        let split: LayoutSplitConfiguration?
     }
 
     /// The only identity entry point. `encode` is injectable; a throw yields `.unproven(id:)`,
@@ -80,7 +81,7 @@ public enum LayoutIdentityEncoder {
             rows: definition.rows,
             auxiliaryAreas: definition.auxiliaryAreas,
             candidateArea: definition.candidateArea,
-            longPressDelay: definition.longPressDelay)
+            longPressDelay: definition.longPressDelay, split: definition.split)
         let data = try encoder.encode(canonical)
         return String(decoding: data, as: UTF8.self)
     }

@@ -40,6 +40,66 @@ final class OneHandLayoutPolicyTests: XCTestCase {
         }
     }
 
+    func testAvailabilityFollowsSurfaceRatherThanPhoneIdiom() {
+        XCTAssertTrue(
+            KeyboardOneHandLayoutPolicy.isAvailable(
+                panelWidth: 402, isPhone: true, compactHeight: false, regularWidth: false))
+        XCTAssertFalse(
+            KeyboardOneHandLayoutPolicy.isAvailable(
+                panelWidth: 402, isPhone: true, compactHeight: false, regularWidth: true))
+        XCTAssertFalse(
+            KeyboardOneHandLayoutPolicy.isAvailable(
+                panelWidth: 402, isPhone: true, compactHeight: true, regularWidth: false))
+        for width in [320.0, 402, 744, 1024] {
+            XCTAssertFalse(
+                KeyboardOneHandLayoutPolicy.isAvailable(
+                    panelWidth: width, isPhone: false, compactHeight: false, regularWidth: false))
+        }
+    }
+
+    func testDuoOuterSurfaceSupportsOneHandAtMeasuredWidth() {
+        let available = KeyboardOneHandLayoutPolicy.isAvailable(
+            panelWidth: 466, isPhone: true, compactHeight: false, regularWidth: false)
+        XCTAssertTrue(available)
+        for mode in [KeyboardOneHandMode.left, .right] {
+            let plan = KeyboardOneHandLayoutPolicy.plan(
+                mode: mode, panelWidth: 466, isPhonePortrait: available)
+            XCTAssertTrue(plan.active)
+            XCTAssertEqual(plan.contentWidth, 396)
+            XCTAssertEqual(plan.gutterWidth, 70)
+            XCTAssertEqual(plan.gutterOnLeft, mode == .right)
+        }
+    }
+
+    func testRegularWidthPhoneSurfaceAlwaysStaysFullWidth() {
+        for width in [320.0, 375, 402, 450, 466, 550, 600, 744, 1024] {
+            let available = KeyboardOneHandLayoutPolicy.isAvailable(
+                panelWidth: width, isPhone: true, compactHeight: false, regularWidth: true)
+            XCTAssertFalse(available)
+            for mode in [KeyboardOneHandMode.left, .right] {
+                let plan = KeyboardOneHandLayoutPolicy.plan(
+                    mode: mode, panelWidth: width, isPhonePortrait: available)
+                XCTAssertEqual(plan, .inactive(panelWidth: width))
+            }
+        }
+    }
+
+    func testFoldingAndResizingRecomputesWithoutChangingSavedMode() {
+        for width in [402.0, 744, 1024, 600.1, 402] {
+            let available = KeyboardOneHandLayoutPolicy.isAvailable(
+                panelWidth: width, isPhone: true, compactHeight: false, regularWidth: false)
+            let plan = KeyboardOneHandLayoutPolicy.plan(
+                mode: .right, panelWidth: width, isPhonePortrait: available)
+            if width == 402 {
+                XCTAssertTrue(plan.active)
+                XCTAssertEqual(plan.contentWidth, 341)
+                XCTAssertTrue(plan.gutterOnLeft)
+            } else {
+                XCTAssertEqual(plan, .inactive(panelWidth: width))
+            }
+        }
+    }
+
     // MARK: Standard portrait widths narrow for real
 
     /// Exact widths for the shipped iPhone portrait sizes: content is floored at
@@ -54,7 +114,9 @@ final class OneHandLayoutPolicyTests: XCTestCase {
             (428, 363),  // 363.8 -> 363, gutter 65
             (430, 365),  // 365.5 -> 365, gutter 65
             (440, 374),
-            (600, 510),  // upper bound stays activatable
+            (450, 382),
+            (466, 396),
+            (600, 510),
         ]
         for (width, content) in cases {
             for mode in [KeyboardOneHandMode.left, .right] {
