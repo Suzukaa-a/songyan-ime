@@ -44,6 +44,7 @@ extension KeyboardViewController {
         keyboardOnlyComposition = false
         cancelledMarkedEcho = nil
         expectedContext = nil
+        deferredMarked = nil
         session.reportCompositionPresentation(.idle)
         session.resetHostContext()
     }
@@ -145,6 +146,7 @@ extension KeyboardViewController {
     }
 
     func updateMarked(_ composition: MarkedComposition?) {
+        deferredMarked = nil
         guard let composition, !composition.text.isEmpty else {
             cancelOwnedMarked()
             keyboardOnlyComposition = false
@@ -175,6 +177,10 @@ extension KeyboardViewController {
         if composition == pendingMarked, markedDocument == document,
             expectedContext == context
         {
+            return
+        }
+        if hostTextFinalizedThisTurn {
+            deferredMarked = composition
             return
         }
         if markedDocument == nil { markedInsertionContext = context }
@@ -210,7 +216,20 @@ extension KeyboardViewController {
         writeProxy {
             textDocumentProxy.insertText(text)
         }
+        noteHostTextFinalized()
         return true
+    }
+
+    /// See `hostTextFinalizedThisTurn`: the next turn writes the mark held meanwhile.
+    private func noteHostTextFinalized() {
+        guard !hostTextFinalizedThisTurn else { return }
+        hostTextFinalizedThisTurn = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.hostTextFinalizedThisTurn = false
+            guard let marked = self.deferredMarked else { return }
+            self.updateMarked(marked)
+        }
     }
 
     func cancelOwnedMarked() {
@@ -238,6 +257,7 @@ extension KeyboardViewController {
             textDocumentProxy.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
             textDocumentProxy.unmarkText()
         }
+        noteHostTextFinalized()
         _ = observeCancelledMarkedEcho()
     }
 
@@ -379,6 +399,8 @@ extension KeyboardViewController: KeyboardPadHost {
     func dispatchCommit(_ text: String) -> Bool {
         guard session.backend?.hostInputIsReady != false else { return false }
         guard let document = writableDocument() else { return false }
+        // The commit replaces any composition still waiting to be marked.
+        deferredMarked = nil
         _ = observeMarkedEcho()
         _ = observeCancelledMarkedEcho()
         guard expectedContext == proxyContext else {
@@ -399,6 +421,7 @@ extension KeyboardViewController: KeyboardPadHost {
         cancelledMarkedEcho = nil
         keyboardOnlyComposition = false
         writeProxy { textDocumentProxy.insertText(text) }
+        noteHostTextFinalized()
         session.quickInsert.recordCommitted(text)
         return true
     }

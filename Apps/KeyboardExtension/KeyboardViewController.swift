@@ -145,6 +145,11 @@ class KeyboardViewController: UIInputViewController {
         let context: ProxyDocumentContext
     }
     var cancelledMarkedEcho: CancelledMarkedEcho?
+    /// The host applies one main-queue turn of proxy writes as a single batch with
+    /// its unmark last, so a mark written after a commit in the same turn ends up
+    /// as typed text. Such a mark waits in `deferredMarked` for the next turn.
+    var hostTextFinalizedThisTurn = false
+    var deferredMarked: MarkedComposition?
     var proxyContext: ProxyDocumentContext {
         ProxyDocumentContext(
             before: textDocumentProxy.documentContextBeforeInput,
@@ -602,6 +607,7 @@ class KeyboardViewController: UIInputViewController {
         // The keyboard is about to hide: stop the learning-transfer poll (a transfer already running continues).
         stopLearningTransferPolling()
         routeRefreshedThisAppearance = false
+        if isBoundHost { endPresentationNotices() }
         #if DEBUG
             stopTimingProbe()
         #endif

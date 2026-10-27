@@ -260,6 +260,14 @@ extension KeyboardViewController {
         return ("unexpected", cocoa.code, "无法读取输入方案，请打开「松烟」App 重新选择。")
     }
 
+    /// The route status outlives the controller, so a notice raised by a choice made in this presentation
+    /// (a failed save, a temporary switch) would otherwise still show at the start of the next one.
+    /// Falls back to the notice of the last applied route.
+    func endPresentationNotices() {
+        let baseline = Self.rescuedRoute == nil ? Self.applied?.notice : nil
+        route.assignIfChanged(\.notice, route.selectionError ?? baseline)
+    }
+
     /// `viewWillAppear` refreshes first and the repeat from `viewDidAppear` is skipped, so one appearance reads once.
     func refreshRouteOncePerAppearance() {
         guard !routeRefreshedThisAppearance else { return }

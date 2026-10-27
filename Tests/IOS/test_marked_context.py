@@ -27,7 +27,7 @@ class MarkedContextProductionTests(unittest.TestCase):
             "observeMarkedEcho", "observeCancelledMarkedEcho", "writeProxy", "updateMarked",
             "commitOverEchoedMarked", "cancelOwnedMarked", "checkDocumentOwnership",
             "writableDocument", "adoptDocument", "stillOwns", "abandonDocumentOwnership",
-            "forgetLocalDocumentState", "dispatchCommit",
+            "forgetLocalDocumentState", "dispatchCommit", "noteHostTextFinalized",
             "textDidChange", "selectionDidChange"))
         mark = section(core, "    /// A display-only replacement", "    /// Conservative visibility")
         program = r'''
@@ -139,6 +139,8 @@ final class Subject: InputController {
     func scheduleHostTraitsRefresh() {}
 ''' + methods + r'''
 }
+// Each step below is a separate main-queue turn unless it says otherwise.
+func nextTurn() { RunLoop.main.run(until: Date()) }
 // An ordinary short mark in a long document: context lengths differ on each read.
 let windowed = Subject()
 let original = windowed.textDocumentProxy.document
@@ -182,6 +184,7 @@ growing.textDocumentProxy.delayed = false
 precondition(growing.dispatchCommit(long))
 precondition(growing.textDocumentProxy.document == before + long + after)
 precondition(growing.textDocumentProxy.insertCalls == 1 && growing.session.quickInsert.commits == [long])
+nextTurn()
 growing.updateMarked(nil)
 growing.updateMarked(MarkedComposition(text: "ni"))
 precondition(growing.pendingMarked?.text == "ni", "next composition can use inline display again")
@@ -203,6 +206,7 @@ for reset in [false, true] {
             replacement.updateMarked(MarkedComposition(text: "ni hao"))
             precondition(replacement.dispatchCommit(commit))
             precondition(proxy.document == head + commit + tail && proxy.mark == nil)
+            nextTurn()
             replacement.updateMarked(MarkedComposition(text: "ma"))
             precondition(replacement.dispatchCommit("吗"))
             precondition(proxy.document == head + commit + "吗" + tail, "replacement must leave the caret after committed text")
@@ -223,6 +227,28 @@ precondition(interior.dispatchCommit("你"))
 precondition(interiorProxy.document == "左👈你👉右" && interiorProxy.mark == nil)
 precondition(interiorProxy.documentContextBeforeInput == "左👈你" && interiorProxy.documentContextAfterInput == "👉右")
 print("PASS selected prefill replacement, subsequent append, equal commit, Unicode and interior composition caret")
+
+// One turn of proxy writes reaches the host as one batch with its unmark applied
+// last: a mark written in the turn of a commit would be finalized as typed text.
+let burst = Subject()
+let burstBefore = burst.textDocumentProxy.originalBefore
+let burstAfter = burst.textDocumentProxy.originalAfter
+burst.updateMarked(MarkedComposition(text: "ni"))
+precondition(burst.dispatchCommit("你"))
+let burstCalls = burst.textDocumentProxy.setMarkedCalls
+burst.updateMarked(MarkedComposition(text: "g"))
+burst.updateMarked(MarkedComposition(text: "gao"))
+precondition(burst.textDocumentProxy.setMarkedCalls == burstCalls && burst.pendingMarked == nil)
+nextTurn()
+precondition(burst.textDocumentProxy.setMarkedCalls == burstCalls + 1 && burst.pendingMarked?.text == "gao")
+precondition(burst.clears == 0)
+precondition(burst.dispatchCommit("好"))
+burst.updateMarked(MarkedComposition(text: "x"))
+precondition(burst.dispatchCommit("x"))
+nextTurn()
+precondition(burst.pendingMarked == nil && burst.textDocumentProxy.setMarkedCalls == burstCalls + 1)
+precondition(burst.textDocumentProxy.document == burstBefore + "你好x" + burstAfter && burst.clears == 0)
+print("PASS a mark after a commit in the same turn waits for the next turn; a later commit drops it")
 
 for change in 0..<4 {
     let external = Subject()
