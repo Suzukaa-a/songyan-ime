@@ -704,25 +704,28 @@ public struct KeyboardPanelView: View {
                     .frame(height: CGFloat(plan.headerHeight), alignment: .bottom)
             }
             VStack(spacing: 4) {
-                if let pageDefinition, pageDefinition.chrome != nil {
+                switch keyAreaRenderer {
+                case .authoredChromePage:
                     // Authored page: rows, rails and footer all come from data, drawn by the same
                     // shell the preview uses. The gate takes the live return/clear-input state.
-                    KeyAreaRenderGate(
-                        token: keyAreaRenderToken(phone: nil, readsComposition: pageDefinitionReadsComposition)
-                    ) {
-                        authoredChromePage(pageDefinition)
+                    if let pageDefinition {
+                        KeyAreaRenderGate(
+                            token: keyAreaRenderToken(phone: nil, readsComposition: pageDefinitionReadsComposition)
+                        ) {
+                            authoredChromePage(pageDefinition)
+                        }
+                        .equatable()
+                        .frame(
+                            height: mainAreaHeight + KeyboardPanelGeometry.controlSpacing + keyHeight,
+                            alignment: .top)
                     }
-                    .equatable()
-                    .frame(
-                        height: mainAreaHeight + KeyboardPanelGeometry.controlSpacing + keyHeight,
-                        alignment: .top)
-                } else if pageDefinition == nil && usesPhoneDefinition && page == .numeric {
+                case .phoneDigitPad:
                     phoneSymbolKeypad
-                } else if showsCategorySymbolPage {
+                case .categorySymbolPage:
                     phoneCategorySymbolKeypad
-                } else if usesStandardT9 {
+                case .phonePad:
                     standardT9Keypad
-                } else {
+                case .authoredRows, .standardQwerty, .mergedPad, .configuredRows, .symbolRows:
                     VStack(spacing: 4) {
                         if showsAllCandidates && !controller.snapshot.candidates.isEmpty {
                             expandedCandidates
@@ -737,7 +740,7 @@ public struct KeyboardPanelView: View {
                         }
                     }
                     .frame(height: mainAreaHeight, alignment: .top)
-                    if usesConfiguredLayout && !usesStandardT9 && !definitionFacts.isBundledControlRowPolicy {
+                    if usesConfiguredLayout && !definitionFacts.isBundledControlRowPolicy {
                         // Author layout bar: the declared control row is rendered with its actions,
                         // order, widths and long-press menus; shortcut injections are de-duplicated
                         // against entries the author already declared.

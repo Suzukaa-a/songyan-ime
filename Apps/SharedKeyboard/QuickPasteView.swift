@@ -54,11 +54,12 @@ final class QuickPasteSlotLease {
     private var revision: UInt64 = 0
     private var eligible = false
 
-    func observe(identity: ObjectIdentifier, changes: AnyPublisher<Void, Never>) {
+    /// Called on every panel render; the publisher is only built when the identity changes.
+    func observe(identity: ObjectIdentifier, changes: @autoclosure () -> AnyPublisher<Void, Never>) {
         guard observedIdentity != identity else { return }
         observedIdentity = identity
         revision &+= 1
-        observation = changes.sink { [weak self] in self?.revision &+= 1 }
+        observation = changes().sink { [weak self] in self?.revision &+= 1 }
     }
 
     func updateEligibility(_ value: Bool) {

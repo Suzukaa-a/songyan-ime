@@ -241,7 +241,6 @@ struct ShiftKey: UIViewRepresentable {
         private var activatedOnDown = false
 
         override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-            AlternateCharacterKey.CharacterButton.commitPendingTap()
             let began = super.beginTracking(touch, with: event)
             activatedOnDown = false
             // Like the system keyboard, Shift turns on at touch-down: a letter tapped while
@@ -435,7 +434,6 @@ struct CursorSpaceKey: UIViewRepresentable {
         }
 
         override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-            AlternateCharacterKey.CharacterButton.commitPendingTap()
             cancelPress()
             isHighlighted = true
             latestX = touch.location(in: window).x
@@ -443,7 +441,7 @@ struct CursorSpaceKey: UIViewRepresentable {
             originX = latestX
             pressStartedAt = ProcessInfo.processInfo.systemUptime
             refreshAppearance()
-            AlternateCharacterKey.CharacterButton.pendingTap = self
+            KeyRollover.hold(self)
             if moveCursor != nil {
                 let timer = Timer(timeInterval: Self.cursorHoldDelay, repeats: false) { [weak self] _ in
                     MainActor.assumeIsolated {
@@ -467,9 +465,7 @@ struct CursorSpaceKey: UIViewRepresentable {
         }
 
         private func startCursorMode() {
-            if AlternateCharacterKey.CharacterButton.pendingTap === self {
-                AlternateCharacterKey.CharacterButton.pendingTap = nil
-            }
+            KeyRollover.release(self)
             hintTimer?.invalidate()
             hintTimer = nil
             isDragging = true
@@ -509,9 +505,7 @@ struct CursorSpaceKey: UIViewRepresentable {
         override func cancelTracking(with event: UIEvent?) { cancelPress() }
 
         @objc func cancelPress() {
-            if AlternateCharacterKey.CharacterButton.pendingTap === self {
-                AlternateCharacterKey.CharacterButton.pendingTap = nil
-            }
+            KeyRollover.release(self)
             hintTimer?.invalidate()
             hintTimer = nil
             isDragging = false
@@ -691,7 +685,6 @@ struct RepeatingDeleteKey: UIViewRepresentable {
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
         @objc private func beginRepeating() {
-            AlternateCharacterKey.CharacterButton.commitPendingTap()
             stopRepeating()
             guard isEnabled, window != nil else { return }
             action?(false)

@@ -125,8 +125,14 @@ private struct KeyboardMainLayoutPreview: View {
     private var composing: Bool { !isEnglishMode && (sample == .composing || sample == .expanded) }
     private var expanded: Bool { composing && sample == .expanded }
     private var returnTitle: String { composing ? "确认" : "换行" }
+    /// A main-layout preview never carries an authored page or the categorised #+= grid.
+    private var renderer: KeyAreaRenderer {
+        KeyboardPanelRules.keyAreaRenderer(
+            page: page, isEnglishMode: isEnglishMode, authoredPage: nil, facts: facts,
+            showsCategorySymbolPage: false)
+    }
     private var usesConfiguredLayout: Bool { page == .letters && !isEnglishMode }
-    private var usesStandardT9: Bool { usesConfiguredLayout && facts.isPhone }
+    private var usesStandardT9: Bool { renderer == .phonePad }
     private var usesStandardQwerty: Bool { isEnglishMode || facts.isBundledQwertyMainShell }
     private var usesBundledMergedPad: Bool { usesConfiguredLayout && facts.isBundledMergedPad }
     /// An editor shows the declared rails and footer, so every stored key can be selected.
@@ -162,11 +168,12 @@ private struct KeyboardMainLayoutPreview: View {
             }
             .frame(height: CGFloat(geometry.headerHeight))
             VStack(spacing: 4) {
-                if usesStandardT9 {
+                switch renderer {
+                case .phonePad:
                     phonePad(split: split)
-                } else if page == .numeric && facts.isPhone {
+                case .phoneDigitPad:
                     phoneDigitPad(split: split)
-                } else {
+                default:
                     let mainRowCount = usesConfiguredLayout && !usesStandardQwerty ? max(1, facts.mainRows.count) : 3
                     let mainAreaHeight = CGFloat(geometry.mainAreaHeight)
                     VStack(spacing: 4) {
@@ -200,39 +207,40 @@ private struct KeyboardMainLayoutPreview: View {
 
     @ViewBuilder
     private func keyRows(split: ActiveLayoutSplit?) -> some View {
-        switch page {
-        case .letters:
-            if usesStandardQwerty {
-                KeyboardStandardQwertyPad(
-                    split: split,
-                    row: { index, metrics in standardQwertyRow(index, metrics: metrics, split: split) },
-                    shift: { ShiftKey(state: .off, isEnglishMode: isEnglishMode, tap: {}, doubleTap: {}) },
-                    delete: { RepeatingDeleteKey {} })
-            } else if usesBundledMergedPad {
-                KeyboardMergedPad(
-                    rows: facts.mainRows, split: split,
-                    key: { key, row, index in
-                        keyFace(
-                            key, path: .row(row, key: index),
-                            id: "merged-\(key.action.value ?? "\(row)-\(index)")")
-                    },
-                    separator: { KeyboardMergedSeparatorKey(isComposing: composing) {} },
-                    delete: { RepeatingDeleteKey {} })
-            } else {
-                HStack(spacing: 4) {
-                    auxiliaryColumn(.leading)
-                    VStack(spacing: 4) {
-                        ForEach(facts.mainRows.indices, id: \.self) { index in
-                            definitionRow(index, inset: definitionInset(index), split: split)
-                        }
+        switch renderer {
+        case .standardQwerty:
+            KeyboardStandardQwertyPad(
+                split: split,
+                row: { index, metrics in standardQwertyRow(index, metrics: metrics, split: split) },
+                shift: { ShiftKey(state: .off, isEnglishMode: isEnglishMode, tap: {}, doubleTap: {}) },
+                delete: { RepeatingDeleteKey {} })
+        case .mergedPad:
+            KeyboardMergedPad(
+                rows: facts.mainRows, split: split,
+                key: { key, row, index in
+                    keyFace(
+                        key, path: .row(row, key: index),
+                        id: "merged-\(key.action.value ?? "\(row)-\(index)")")
+                },
+                separator: { KeyboardMergedSeparatorKey(isComposing: composing) {} },
+                delete: { RepeatingDeleteKey {} })
+        case .configuredRows:
+            HStack(spacing: 4) {
+                auxiliaryColumn(.leading)
+                VStack(spacing: 4) {
+                    ForEach(facts.mainRows.indices, id: \.self) { index in
+                        definitionRow(index, inset: definitionInset(index), split: split)
                     }
-                    auxiliaryColumn(.trailing)
                 }
+                auxiliaryColumn(.trailing)
             }
-        case .numeric, .symbols:
+        case .symbolRows:
             KeyboardSymbolPageRows(
                 rows: SymbolPageTable.numericRows(ascii: usesASCIIPunctuation), split: split,
                 onTap: { _ in }, delete: { RepeatingDeleteKey {} })
+        case .authoredChromePage, .phoneDigitPad, .categorySymbolPage, .authoredRows, .phonePad:
+            // Drawn by the body, or never shown by a main-layout preview.
+            EmptyView()
         }
     }
 

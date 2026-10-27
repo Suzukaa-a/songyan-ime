@@ -5,9 +5,31 @@ import LayoutKit
 import SwiftUI
 
 /// A key that acts on release. While it is held, the next key's touch-down commits
-/// it first (`AlternateCharacterKey.CharacterButton.pendingTap`).
+/// it first (`KeyRollover`).
 @MainActor protocol KeyboardRolloverPress: AnyObject {
     func commitRolloverPress()
+}
+
+/// The key a finger is still on as a plain tap. Fast two-thumb typing lands the next key
+/// before this one lifts; like the system keyboard, that touch-down commits this key first,
+/// so keys keep press order instead of lift order. Every key's touch-down reports here.
+@MainActor enum KeyRollover {
+    private static weak var pending: (any KeyboardRolloverPress)?
+
+    /// A key went down: the press still held on another key is typed first.
+    static func keyDown(_ key: AnyObject) {
+        guard let held = pending, held !== key else { return }
+        pending = nil
+        held.commitRolloverPress()
+    }
+
+    /// `key` is now a plain tap that the next touch-down types first.
+    static func hold(_ key: any KeyboardRolloverPress) { pending = key }
+
+    /// `key` no longer acts on release as a plain tap (lifted, cancelled, held, slid off).
+    static func release(_ key: AnyObject) {
+        if pending === key { pending = nil }
+    }
 }
 
 /// Ordered alternate KeyCaps are the renderer's data boundary; no LayoutKit types required.
@@ -184,12 +206,6 @@ struct AlternateCharacterKey: UIViewRepresentable {
         /// The finger left the key before a hold completed. Like the system
         /// keyboard, the character key under the finger at lift types instead.
         var slidOff = false
-        /// The key a finger is still on as a plain tap. Fast two-thumb typing lands
-        /// the next key before this one lifts; like the system keyboard, that
-        /// touch-down commits this key first, so keys keep press order instead
-        /// of lift order. Space and Return take part too: a letter lifted before
-        /// them would otherwise join the composition they were about to confirm.
-        static weak var pendingTap: (any KeyboardRolloverPress)?
         /// This press was already typed by a rollover; the rest of its touch is inert.
         var consumed = false
         /// A flick key's touch rose out of the key without becoming its swipe-up.
@@ -629,7 +645,10 @@ struct AlternateCharacterKey: UIViewRepresentable {
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
             // Feedback on touch-down (system keyboard behavior); the effect feedback of the same keypress is then coalesced, not repeated.
-            if isEnabled { KeyboardFeedbackService.shared.keyTouchDown() }
+            if isEnabled {
+                KeyboardFeedbackService.shared.keyTouchDown()
+                KeyRollover.keyDown(self)
+            }
             super.touchesBegan(touches, with: event)
         }
 
@@ -654,15 +673,9 @@ struct AlternateCharacterKey: UIViewRepresentable {
             }
         }
 
-        /// Return keeps press order like the character keys, but a slide off it still cancels.
+        /// Return keeps press order like the character keys (a letter lifted before it would
+        /// otherwise join the composition it was about to confirm), but a slide off it still cancels.
         private var joinsRollover: Bool { typesCharacter || (cap?.action == .enter && !layoutPicker) }
-
-        /// Called when another key goes down while a key is still a plain tap.
-        static func commitPendingTap() {
-            guard let key = pendingTap else { return }
-            pendingTap = nil
-            key.commitRolloverPress()
-        }
 
         func commitRolloverPress() {
             guard popup == nil, !didHold, !didSwipeUp, !didLetterSwipe, !slidOff,
@@ -674,7 +687,6 @@ struct AlternateCharacterKey: UIViewRepresentable {
         }
 
         override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-            if Self.pendingTap !== self { Self.commitPendingTap() }
             cancelPress()
             consumed = false
             isHighlighted = true
@@ -682,7 +694,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
             layoutHoldOrigin = lastLocation
             touchOrigin = lastLocation
             letterTracker = letterSwipe.isEmpty ? nil : LetterSwipeTracker(letterCount: letterSwipe.count)
-            if joinsRollover { Self.pendingTap = self }
+            if joinsRollover { KeyRollover.hold(self) }
             showKeyPreviewIfNeeded()
             if layoutPicker || !alternates.isEmpty {
                 // Main run loop timers fire on the main thread.
@@ -741,7 +753,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
                 holdTimer = nil
                 keyPreview?.hide(for: self, immediately: true)
                 keyPreview = nil
-                if Self.pendingTap === self { Self.pendingTap = nil }
+                KeyRollover.release(self)
                 isHighlighted = false
                 slidOff = true
             }
@@ -816,7 +828,7 @@ struct AlternateCharacterKey: UIViewRepresentable {
                 didLetterSwipe = true
                 holdTimer?.invalidate()
                 holdTimer = nil
-                if Self.pendingTap === self { Self.pendingTap = nil }
+                KeyRollover.release(self)
             }
             if changed {
                 swipeChoice = tracker.choice

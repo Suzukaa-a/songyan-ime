@@ -10,44 +10,35 @@ extension KeyboardPanelView {
     /// Main key row of the letters / 123 / #+= pages (123 and #+= are both direct literal keys).
     @ViewBuilder
     private var keyRows: some View {
-        if let pageDefinition {
-            authoredPage(pageDefinition)
-        } else {
-            switch page {
-            case .letters:
-                if usesStandardQwerty {
-                    standardQwertyKeypad
-                } else if usesBundledMergedPad {
-                    mergedKeypad
-                } else if usesConfiguredLayout {
-                    configuredKeypad
-                } else {
-                    // Renderer input stays at KeyboardRow/KeyCap; LayoutKit can supply these rows.
-                    ForEach(Array(letterRows.enumerated()), id: \.element.id) { index, row in
-                        WeightedKeyRow(caps: row.caps, edgeUnits: letterRowInset(index), alternates: alternates) {
-                            cap in
-                            handleKey(cap.action)
-                        }
-                    }
-                }
-            case .numeric, .symbols:
-                // The shared 26/14 page keeps exactly the same symbols and geometry.
-                // Every literal symbol is a character key and keeps the character
-                // surface, like the letters it replaces; only real controls (Delete,
-                // the page key, CN/EN, Return) carry the control/accent tone. A key
-                // with a long-press list shows its first entry in the corner, as the
-                // letters do; the lists are kept short so the rows stay calm. These
-                // caps are as narrow as 26-key letters,
-                // so they reuse the same panel-local key preview: the finger-covered
-                // glyph is confirmed above the key while its hit rectangle, action
-                // and slide-off cancel stay exactly those of the key itself. The full
-                // #+= symbol page is shared even for a phone letter definition;
-                // compressing it into 3x3 hides too many direct-access symbols.
-                KeyboardSymbolPageRows(
-                    rows: symbolRows, split: activeSplit, alternates: alternates,
-                    onTap: { handleKey($0.action) },
-                    delete: { RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) } })
-            }
+        switch keyAreaRenderer {
+        case .authoredRows:
+            if let pageDefinition { authoredPage(pageDefinition) }
+        case .standardQwerty:
+            standardQwertyKeypad
+        case .mergedPad:
+            mergedKeypad
+        case .configuredRows:
+            configuredKeypad
+        case .symbolRows:
+            // The shared 26/14 page keeps exactly the same symbols and geometry.
+            // Every literal symbol is a character key and keeps the character
+            // surface, like the letters it replaces; only real controls (Delete,
+            // the page key, CN/EN, Return) carry the control/accent tone. A key
+            // with a long-press list shows its first entry in the corner, as the
+            // letters do; the lists are kept short so the rows stay calm. These
+            // caps are as narrow as 26-key letters,
+            // so they reuse the same panel-local key preview: the finger-covered
+            // glyph is confirmed above the key while its hit rectangle, action
+            // and slide-off cancel stay exactly those of the key itself. The full
+            // #+= symbol page is shared even for a phone letter definition;
+            // compressing it into 3x3 hides too many direct-access symbols.
+            KeyboardSymbolPageRows(
+                rows: symbolRows, split: activeSplit, alternates: alternates,
+                onTap: { handleKey($0.action) },
+                delete: { RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) } })
+        case .authoredChromePage, .phoneDigitPad, .categorySymbolPage, .phonePad:
+            // These shells are drawn by the panel body, never inside the rows area.
+            EmptyView()
         }
     }
 
@@ -71,11 +62,7 @@ extension KeyboardPanelView {
         if pageDefinition != nil { return pageDefinitionReadsComposition }
         guard page == .letters, !controller.isEnglishMode else { return false }
         if usesBundledMergedPad || isBuiltinPhonePad || usesStandardT9 { return true }
-        let auxiliary = (activeDefinition?.auxiliaryAreas ?? []).flatMap(\.keys)
-        return (definitionMainRows.flatMap(\.keys) + auxiliary).contains {
-            $0.action.type == .enter || $0.action.type == .clearInput
-                || $0.action == LayoutAction(.code, value: "'")
-        }
+        return definitionFacts.mainKeysReadComposition
     }
 
     /// Every authored region counts: an Enter key draws the live Return title and enabled state,
@@ -190,6 +177,13 @@ extension KeyboardPanelView {
         // English always uses the built-in English shell; Chinese keeps it for the known 26-key
         // structure even after metadata edits (labels/LP), not only for the strict content identity.
         controller.isEnglishMode || definitionFacts.isBundledQwertyMainShell
+    }
+
+    /// The key-area shell for this page, decided by the rule the host previews share.
+    var keyAreaRenderer: KeyAreaRenderer {
+        KeyboardPanelRules.keyAreaRenderer(
+            page: page, isEnglishMode: controller.isEnglishMode, authoredPage: pageDefinition,
+            facts: definitionFacts, showsCategorySymbolPage: showsCategorySymbolPage)
     }
 
     private var standardQwertyKeypad: some View {

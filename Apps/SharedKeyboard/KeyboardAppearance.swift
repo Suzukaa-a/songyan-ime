@@ -610,7 +610,11 @@ class SkinnedButton: UIButton, KeyboardKeyHitTarget {
         super.point(inside: point, with: event) || KeyboardRoutedTouch.accepts(self, point)
     }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if emitsTouchDownFeedback, isEnabled { KeyboardFeedbackService.shared.keyTouchDown() }
+        if isEnabled {
+            if emitsTouchDownFeedback { KeyboardFeedbackService.shared.keyTouchDown() }
+            // Every key keeps press order: a character still held is typed before this key acts.
+            KeyRollover.keyDown(self)
+        }
         super.touchesBegan(touches, with: event)
     }
     // Representables reassign these on every SwiftUI update; only a real change

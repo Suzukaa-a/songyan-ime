@@ -720,15 +720,6 @@ extension KeyboardPanelView {
         }
     }
 
-    var letterRows: [KeyboardRow] {
-        controller.isEnglishMode ? controller.englishLetterRows : KeyboardLayoutTable.mainRows(for: controller.layout)
-    }
-
-    func letterRowInset(_ index: Int) -> CGFloat {
-        guard controller.isEnglishMode || controller.layout == .qwerty26 else { return 0 }
-        return index == 1 ? 0.5 : (index == 2 ? 1.5 : 0)
-    }
-
     /// Expands the current page of candidates: CandidateKit default renderer (list/grid, column count/spacing, and whole-row
     /// long sentences are all configurable). The height budget follows the main key-row area (compact and native globe unchanged).
     var expandedCandidates: some View {

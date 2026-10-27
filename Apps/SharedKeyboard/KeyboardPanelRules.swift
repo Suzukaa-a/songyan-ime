@@ -54,6 +54,23 @@ enum KeyboardPanelRules {
             : (mainIsBuiltinPhonePad() && !hasAuthoredPage())
     }
 
+    /// The key-area shell the panel and the main-layout preview draw. Order matters: an authored
+    /// chrome page owns its whole shell, a phone keypad's 123 page and the categorised #+= grid
+    /// come before the letter shells, and the phone pad wins over the bundled 26-key shell.
+    static func keyAreaRenderer(
+        page: KeyboardPage, isEnglishMode: Bool, authoredPage: KeyboardPageDefinition?,
+        facts: DefinitionResolutionMemo.Facts, showsCategorySymbolPage: @autoclosure () -> Bool
+    ) -> KeyAreaRenderer {
+        if authoredPage?.chrome != nil { return .authoredChromePage }
+        if authoredPage == nil && page == .numeric && facts.isPhone { return .phoneDigitPad }
+        if showsCategorySymbolPage() { return .categorySymbolPage }
+        if authoredPage != nil { return .authoredRows }
+        guard page == .letters else { return .symbolRows }
+        if !isEnglishMode && facts.isPhone { return .phonePad }
+        if isEnglishMode || facts.isBundledQwertyMainShell { return .standardQwerty }
+        return facts.isBundledMergedPad ? .mergedPad : .configuredRows
+    }
+
     /// The phone treatment belongs to the visible shell: an English QWERTY letter page uses the
     /// shared symbol entry and bottom Return even when the Chinese definition is a phone pad.
     static func phoneShellVisible(
@@ -156,6 +173,25 @@ enum KeyboardPanelRules {
             id: id, title: letter && shiftActive() ? key.label.uppercased() : key.label,
             subtitle: key.secondaryLabel ?? key.longPress?.first?.label, action: action)
     }
+}
+
+/// Which key-area shell draws the current page; resolved once by `KeyboardPanelRules.keyAreaRenderer`.
+enum KeyAreaRenderer: Equatable {
+    /// An authored page whose rows, rails and footer all come from data.
+    case authoredChromePage
+    /// The digit pad a phone keypad uses for its 123 page.
+    case phoneDigitPad
+    /// The categorised #+= grid.
+    case categorySymbolPage
+    /// An authored page without chrome, drawn in the ordinary rows area.
+    case authoredRows
+    /// The phone-keypad letter shell (bundled T9 and imported definitions of the same structure).
+    case phonePad
+    case standardQwerty
+    case mergedPad
+    case configuredRows
+    /// The row-shaped 123 / #+= pages.
+    case symbolRows
 }
 
 extension LayoutAction {
