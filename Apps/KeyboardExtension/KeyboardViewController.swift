@@ -153,6 +153,9 @@ class KeyboardViewController: UIInputViewController {
     /// Orders asynchronous shared-selection saves. Only the newest request from
     /// the still-active controller may publish a completion notice.
     private var selectionSaveGeneration: UInt64 = 0
+    /// Orders saves across controllers and presentations: a failure may only roll the
+    /// remembered layout back while no newer selection has been made.
+    static var layoutSaveGeneration: UInt64 = 0
     var proxyWriteInProgress = false
     var expectedContext: ProxyDocumentContext?
     /// Set in `viewWillAppear`; the proxy is first read once the host handoff settles.
@@ -576,6 +579,8 @@ class KeyboardViewController: UIInputViewController {
             guard let self, Self.activeController === self else { return }
             self.selectionSaveGeneration &+= 1
             let requestGeneration = self.selectionSaveGeneration
+            Self.layoutSaveGeneration &+= 1
+            let layoutGeneration = Self.layoutSaveGeneration
             guard let backend = self.session.backend else { return }
             // Classify the running identity before touching the shared store. A session
             // on the bundled fallback (`prebuiltDirectory == nil`) is not a publication: its
@@ -608,12 +613,16 @@ class KeyboardViewController: UIInputViewController {
             let runtimeIdentity = KeyboardRecipeStore.SelectionRuntimeIdentity.published
             let schemaID = change.schemaID
             let layout = change.layout
+            let session: KeyboardPadSession = self.session
             Task { @MainActor [weak self, weak backend] in
                 do {
                     let outcome = try await EngineOpQueue.async {
                         try KeyboardRecipeStore.saveSelection(
                             schemaID: schemaID, layout: layout,
                             runtimeIdentity: runtimeIdentity)
+                    }
+                    if outcome != .saved {
+                        await Self.rememberSavedLayout(in: session, ifCurrent: layoutGeneration)
                     }
                     guard let self, let backend,
                         Self.activeController === self,
@@ -635,6 +644,7 @@ class KeyboardViewController: UIInputViewController {
                             """)
                     }
                 } catch {
+                    await Self.rememberSavedLayout(in: session, ifCurrent: layoutGeneration)
                     guard let self, let backend,
                         Self.activeController === self,
                         self.selectionSaveGeneration == requestGeneration,

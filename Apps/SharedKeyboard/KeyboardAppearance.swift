@@ -137,9 +137,11 @@ public struct KeyboardInitialPresentation {
         let hint = CandidateReadingRowHint(
             selection: readingRowSelection, eligible: eligible,
             candidateAreaRequired: candidateAreaRequired)
-        guard CandidateReadingRowHint(storedValue: defaults.object(forKey: CandidateReadingRowHint.defaultsKey)) != hint
+        guard
+            let hints = CandidateReadingRowHint.recording(
+                hint, into: defaults.object(forKey: CandidateReadingRowHint.defaultsKey))
         else { return }
-        defaults.set(hint.storedValue, forKey: CandidateReadingRowHint.defaultsKey)
+        defaults.set(hints, forKey: CandidateReadingRowHint.defaultsKey)
     }
 
     public static func load() -> Self {

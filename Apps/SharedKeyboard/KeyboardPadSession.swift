@@ -854,6 +854,12 @@ public final class KeyboardPadSession: ObservableObject {
         await refreshPublishedKeyboards()
     }
 
+    /// Points the remembered layout at the keyboard the next start shows, for a running
+    /// switch that turned out not to be saved. The running layout is unchanged.
+    public func rememberLayout(_ layout: KeyboardLayoutKind) {
+        persistLayout(layout)
+    }
+
     /// Remembers the selected Chinese layout in this process's `UserDefaults.standard` only (not the App Group
     /// container: HostApp and the extension each persist in their own sandbox). Layout kinds are shared by
     /// every resource set, so the stored value stays meaningful after a switch.

@@ -174,14 +174,37 @@ public struct CandidateReadingRowHint: Equatable, Sendable {
         selection == (currentSelection ?? "") ? candidateAreaRequired : true
     }
 
-    /// Reads and resolves the hint (a `nil` hint means not granted).
+    /// Selections whose hints are kept. A switch that is not saved returns to an earlier
+    /// keyboard on the next presentation, so that keyboard's hint must survive the switch.
+    public static let retainedSelections = 6
+
+    /// Stored hints, newest first.
+    public static func hints(storedValue: Any?) -> [Self] {
+        (storedValue as? [Any])?.compactMap(Self.init(storedValue:)) ?? []
+    }
+
+    /// The stored list with `hint` first, replacing its selection's older entry; nil when
+    /// that selection already holds this exact hint (nothing to write).
+    public static func recording(_ hint: Self, into storedValue: Any?) -> [[String: Any]]? {
+        let stored = hints(storedValue: storedValue)
+        guard !stored.contains(hint) else { return nil }
+        let kept = stored.filter { $0.selection != hint.selection }.prefix(retainedSelections - 1)
+        return ([hint] + kept).map(\.storedValue)
+    }
+
+    private static func hint(storedValue: Any?, currentSelection: String?) -> Self? {
+        hints(storedValue: storedValue).first { $0.selection == (currentSelection ?? "") }
+    }
+
+    /// Reads and resolves the current selection's hint (no hint means not granted).
     public static func resolve(storedValue: Any?, currentSelection: String?) -> Bool {
-        CandidateReadingRowHint(storedValue: storedValue)?.resolve(currentSelection: currentSelection) ?? false
+        hint(storedValue: storedValue, currentSelection: currentSelection)?.resolve(
+            currentSelection: currentSelection) ?? false
     }
 
     public static func resolveCandidateArea(storedValue: Any?, currentSelection: String?) -> Bool {
-        CandidateReadingRowHint(storedValue: storedValue)?.resolveCandidateArea(currentSelection: currentSelection)
-            ?? true
+        hint(storedValue: storedValue, currentSelection: currentSelection)?.resolveCandidateArea(
+            currentSelection: currentSelection) ?? true
     }
 }
 

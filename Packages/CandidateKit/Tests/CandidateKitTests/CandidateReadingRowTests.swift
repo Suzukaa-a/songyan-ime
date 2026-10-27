@@ -222,15 +222,44 @@ final class CandidateReadingRowTests: XCTestCase {
     func testMissingOrCorruptHintFailsClosed() {
         XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: nil, currentSelection: "|"))
         XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: "merged14", currentSelection: "|"))
-        XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: ["selection": "|"], currentSelection: "|"))
+        XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: [["selection": "|"]], currentSelection: "|"))
         XCTAssertFalse(
             CandidateReadingRowHint.resolve(
-                storedValue: ["selection": 1, "eligible": true],
+                storedValue: [["selection": 1, "eligible": true]],
                 currentSelection: "|"))
         XCTAssertTrue(
             CandidateReadingRowHint.resolve(
-                storedValue: ["selection": "|", "eligible": true],
+                storedValue: [["selection": "|", "eligible": true]],
                 currentSelection: "|"))
+    }
+
+    func testHintsAreKeptPerSelectionSoAnUnsavedSwitchKeepsTheSavedOne() throws {
+        let qwerty = CandidateReadingRowHint(selection: "qwerty26|", eligible: false, candidateAreaRequired: false)
+        let merged = CandidateReadingRowHint(selection: "merged14|", eligible: true)
+        let first = try XCTUnwrap(CandidateReadingRowHint.recording(qwerty, into: nil))
+        let both = try XCTUnwrap(CandidateReadingRowHint.recording(merged, into: first))
+        XCTAssertTrue(CandidateReadingRowHint.resolve(storedValue: both, currentSelection: "merged14|"))
+        XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: both, currentSelection: "qwerty26|"))
+        XCTAssertFalse(
+            CandidateReadingRowHint.resolveCandidateArea(storedValue: both, currentSelection: "qwerty26|"),
+            "the earlier keyboard's hint survives the switch")
+        XCTAssertNil(CandidateReadingRowHint.recording(qwerty, into: both), "an unchanged hint is not rewritten")
+        let updated = CandidateReadingRowHint(selection: "qwerty26|", eligible: true)
+        let replaced = try XCTUnwrap(CandidateReadingRowHint.recording(updated, into: both))
+        XCTAssertEqual(CandidateReadingRowHint.hints(storedValue: replaced), [updated, merged])
+    }
+
+    func testHintListIsBounded() throws {
+        var stored: Any?
+        for index in 0..<(CandidateReadingRowHint.retainedSelections + 2) {
+            stored = try XCTUnwrap(
+                CandidateReadingRowHint.recording(
+                    CandidateReadingRowHint(selection: "layout\(index)|", eligible: true), into: stored))
+        }
+        let hints = CandidateReadingRowHint.hints(storedValue: stored)
+        XCTAssertEqual(hints.count, CandidateReadingRowHint.retainedSelections)
+        XCTAssertEqual(hints.first?.selection, "layout\(CandidateReadingRowHint.retainedSelections + 1)|")
+        XCTAssertFalse(CandidateReadingRowHint.resolve(storedValue: stored, currentSelection: "layout0|"))
     }
 
     func testCandidateAreaHintOnlySuppressesMatchingLayoutSelection() {
@@ -241,7 +270,7 @@ final class CandidateReadingRowTests: XCTestCase {
         XCTAssertTrue(hint.resolveCandidateArea(currentSelection: "qwerty26|custom"))
         XCTAssertFalse(
             CandidateReadingRowHint.resolveCandidateArea(
-                storedValue: hint.storedValue,
+                storedValue: [hint.storedValue],
                 currentSelection: "literal|custom"))
         XCTAssertTrue(
             CandidateReadingRowHint.resolveCandidateArea(

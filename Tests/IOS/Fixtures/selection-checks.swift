@@ -45,6 +45,17 @@ func selectionChecks(_ base: URL) throws {
     try KeyboardRecipeStore.setEnabled(true, rootURL: root)  // keyboard chooses recipe itself
     check(
         try KeyboardRecipeStore.activation(rootURL: root)?.recipeEnabled == true, "keyboard selection shared with host")
+    // A failed in-keyboard save leaves the record's layout, which the next presentation shows.
+    try KeyboardRecipeStore.saveSelection(
+        schemaID: "rime_ice", layout: .merged14, runtimeIdentity: .published, rootURL: root)
+    check(KeyboardRecipeStore.savedLayout(rootURL: root) == .merged14, "saved layout follows a save")
+    try fm.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
+    expectFailure {
+        try KeyboardRecipeStore.saveSelection(
+            schemaID: "rime_ice", layout: .phone9, runtimeIdentity: .published, rootURL: root)
+    }
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path)
+    check(KeyboardRecipeStore.savedLayout(rootURL: root) == .merged14, "failed save keeps the saved layout")
     let saved = try Data(contentsOf: activeURL)
     expectFailure {
         try KeyboardRecipeStore.publish(
@@ -67,6 +78,7 @@ func selectionChecks(_ base: URL) throws {
     check(
         try KeyboardRecipeStore.snapshot(rootURL: root, selectedOnly: true) == nil,
         "builtin works despite damaged recipe resources")
+    check(KeyboardRecipeStore.savedLayout(rootURL: root) == nil, "built-in keeps the running layout")
     // A record without a source kind is not a usable publication: reading it fails, so the
     // keyboard falls back to built-in pinyin through the normal error path.
     var unkinded = try JSONSerialization.jsonObject(with: saved) as! [String: Any]
@@ -126,6 +138,6 @@ func selectionChecks(_ base: URL) throws {
         recovered?.revision == "recovered" && recovered?.recipeEnabled == true, "damaged record: publishing replaces it"
     )
     print(
-        "PASS: shared selection, unkinded record rejected, failed save, temporary fallback, typed import four-layout route, reselect, damaged record recovery"
+        "PASS: shared selection, saved layout after a failed save, unkinded record rejected, failed save, temporary fallback, typed import four-layout route, reselect, damaged record recovery"
     )
 }

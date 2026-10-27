@@ -288,6 +288,14 @@ public enum KeyboardRecipeStore {
         }
     }
 
+    /// The layout the keyboard's next presentation starts on: the shared record's selection,
+    /// which a failed in-keyboard save left in place. nil when the record names none (no
+    /// published scheme in use, unreadable): the next presentation keeps the running layout.
+    public static func savedLayout(rootURL: URL? = nil) -> KeyboardLayoutKind? {
+        guard let activation = try? activation(rootURL: rootURL), activation.recipeEnabled else { return nil }
+        return activation.selectedLayout
+    }
+
     /// The record a write starts from. A damaged or unreadable record counts as missing, so
     /// switching to built-in or publishing a scheme replaces it instead of failing on it.
     public static func writeBaseline(rootURL: URL? = nil) throws -> Activation? {

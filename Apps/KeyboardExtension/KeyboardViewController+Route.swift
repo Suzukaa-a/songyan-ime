@@ -78,6 +78,15 @@ extension KeyboardViewController {
         return session.resourceSet?.publicationGeneration != nil && KeyboardRecipeStore.canWriteSharedContainer
     }
 
+    /// A save that did not land leaves the shared record on the earlier choice, which the
+    /// next presentation shows: the remembered layout (and so that presentation's height)
+    /// follows the record again. Runs even after this presentation ended.
+    static func rememberSavedLayout(in session: KeyboardPadSession, ifCurrent generation: UInt64) async {
+        let saved = try? await KeyboardResourceReadQueue.async { KeyboardRecipeStore.savedLayout() }
+        guard let layout = saved, layoutSaveGeneration == generation else { return }
+        session.rememberLayout(layout)
+    }
+
     /// Shown when a choice is made while the keyboard was temporarily switched to the bundled fallback.
     var temporaryBuiltinSelectionNotice: String {
         "暂时使用\(ProductionInputAvailability.fallbackInputMethodName)，下次打开键盘时恢复原来的选择。"
