@@ -63,9 +63,19 @@ fi
 USER_DIR="${BRIDGE_USER:-$(new_isolated_dir "${RUN_DIR}/user")}"
 
 prepare_native_bridge
-compile_bridge_c
-compile_bridge_cpp rime_spelling
-compile_bridge_cpp rime_display_map
+# Same link set as the T9 harness: the grammar build of the bridge takes
+# rb_component_available from rime_grammar_diagnostics.cc (a real registry
+# lookup), so RimeBackend enables exactly the schemas this prefix can run.
+# The octagram plugin itself is not linked; its requirement hook is a no-op.
+compile_bridge_c -DRB_WITH_GRAMMAR=1
+cat > "${RUN_DIR}/rb_grammar_noop.cc" <<'EOF'
+extern "C" void rb_require_grammar(void) {}
+EOF
+for shim in rime_spelling rime_display_map rime_grammar_diagnostics; do
+  compile_bridge_cpp "${shim}"
+done
+"${MAC_CXX}" -std=c++17 -O2 -c -isysroot "${MACOS_SDK}" -mmacosx-version-min=13.0 \
+  "${RUN_DIR}/rb_grammar_noop.cc" -o "${RUN_DIR}/rb_grammar_noop.o"
 
 # Stage the production Swift sources into one module (the app compiles them as
 # separate modules; here the cross-module imports are stripped and the unrelated
@@ -116,6 +126,7 @@ swiftc -O -D SONGYAN_TEST_FAILPOINTS -Xcc -fmodule-map-file="${RUN_DIR}/RimeKitM
   "${IOS_TOOLS_DIR}/harness-mac/bridge-contracts-main.swift" \
   "${STAGE}"/*.swift \
   "${RUN_DIR}/rime_bridge.o" "${RUN_DIR}/rime_spelling.o" "${RUN_DIR}/rime_display_map.o" \
+  "${RUN_DIR}/rime_grammar_diagnostics.o" "${RUN_DIR}/rb_grammar_noop.o" \
   "${RUN_DIR}/learning-support/RimeLeversSupport.o" \
   "${MAC_LINK_FLAGS[@]}" \
   -target arm64-apple-macos13.0 -o "${RUN_DIR}/harness"

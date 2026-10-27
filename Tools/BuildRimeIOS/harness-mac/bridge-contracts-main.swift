@@ -35,6 +35,53 @@ func check(_ condition: Bool, _ name: String) {
 
 @main
 struct BridgeContractsMain {
+    /// A key batch reads the state once and matches key-by-key input. Runs on its own
+    /// user directory so its learning never reorders the fixtures below.
+    static func checkKeyBatches(shared: String, user: String) {
+        let backend = RimeBackend(
+            sharedDirectory: URL(fileURLWithPath: shared),
+            userDirectory: URL(fileURLWithPath: user).appendingPathComponent("key-batches"))
+        try! backend.startIfNeeded()
+        try! backend.selectSchema("songyan_quanpin")
+        // Commits mid-batch, punctuation, digit selection, Return, idle literals and backspace.
+        // The first pass learns the commits so the compared passes rank alike.
+        for sequence in [
+            "nihao", "nihao hao", "ni,hao", "nihao1ni", "ni\nhao", "nihao  ni", "1a", "ni\u{08}\u{08}\u{08}a",
+        ] {
+            let keys = sequence.map(String.init)
+            func stepped() -> EngineSnapshot? {
+                _ = try! backend.cancelComposition()
+                var last: EngineSnapshot?
+                var committed = ""
+                for key in keys {
+                    let next = try! backend.processKey(key)
+                    committed += next.committed
+                    last = next
+                }
+                last?.committed = committed
+                return last
+            }
+            _ = stepped()
+            let expected = stepped()
+            _ = try! backend.cancelComposition()
+            let batch = backend.processKeys(keys, gate: OpenKeyGate())
+            check(
+                batch.error == nil && batch.processed == keys.count && batch.snapshot == expected,
+                "batch matches key by key: \(sequence.debugDescription) -> \(expected?.committed.debugDescription ?? "nil")"
+            )
+        }
+        _ = try! backend.cancelComposition()
+        for ch in "nihao" { _ = try! backend.processKey(String(ch)) }
+        backend.armSnapshotFailureForTesting()
+        let failed = backend.processKeys([" ", "n"], gate: OpenKeyGate())
+        check(
+            failed.error != nil && failed.processed == 1 && failed.snapshot?.committed == "你好"
+                && backend.inputUnavailableReason != nil,
+            "failed closing read withholds only the last key")
+        _ = try! backend.cancelComposition()
+        backend.shutdown()
+    }
+
     static func main() {
         var shared = "", user = "", prebuilt = ""
         var args = CommandLine.arguments.dropFirst().makeIterator()
@@ -47,6 +94,7 @@ struct BridgeContractsMain {
             }
         }
         guard !shared.isEmpty, !user.isEmpty else { fail("args required") }
+        checkKeyBatches(shared: shared, user: user)
 
         let engine = RimeEngine(
             configuration: .init(
@@ -350,6 +398,32 @@ struct BridgeContractsMain {
             check(lockDescriptorCount() == 1, "resume #\(cycle) owns one LOCK FD")
             check(!engine.state().isComposing, "resume #\(cycle) discards old preedit")
         }
+        // ---- Commit preview arrives with the snapshot's own context read ----
+        _ = try! engine.cancelComposition()
+        type("nihao")
+        var rawContext = RimeContext()
+        rawContext.data_size = Int32(MemoryLayout<RimeContext>.size - MemoryLayout<Int32>.size)
+        guard let api = rime_get_api(), api.pointee.get_context(engine.session, &rawContext) != 0 else {
+            fail("raw context read")
+        }
+        let rawPreview = rawContext.commit_text_preview.map { String(cString: $0) } ?? ""
+        _ = api.pointee.free_context(&rawContext)
+        check(
+            !rawPreview.isEmpty && engine.state().commitTextPreview == rawPreview, "snapshot carries the commit preview"
+        )
+        _ = try! engine.cancelComposition()
+        check(engine.state().commitTextPreview.isEmpty, "idle snapshot has no commit preview")
+
+        // ---- Fed keys: per-key commit in order, one state read at the end ----
+        type("nihao")
+        let fed = try! engine.feedKey(.space)
+        check(fed.consumed && !fed.hasInput && fed.commitText == "你好", "fed key returns its own commit")
+        check(try! engine.actionState().commitText.isEmpty, "fed commit is consumed exactly once")
+        for ch in "ni" { _ = try! engine.feedKey(RimeKey(character: ch)!) }
+        let fedState = try! engine.actionState()
+        check(fedState.isComposing && fedState.input == "ni" && !fedState.candidates.isEmpty, "state after fed keys")
+        _ = try! engine.cancelComposition()
+
         // ---- 7. Unread action snapshots never leak into the next key ----
         func expectError(
             _ expected: RimeEngineError, _ label: String,
@@ -415,6 +489,9 @@ struct BridgeContractsMain {
         expectError(.noSession, "no-session key throws") { _ = try engine.processKey(.space) }
         expectError(.noSession, "no-session sequence throws") { _ = try engine.processKeySequence("ni") }
         expectError(.noSession, "no-session commit throws") { _ = try engine.commitComposition() }
+        expectError(.noSession, "no-session fed key throws") { _ = try engine.feedKey(.space) }
+        expectError(.noSession, "no-session state read throws") { _ = try engine.actionState() }
+        check(!engine.requiresSnapshotRecovery, "missing session needs no recovery")
         check(try! engine.resumeSession(), "no-session recovery recreates session")
         engine.shutdown()
         check(lockDescriptorCount() == 0, "full shutdown leaves no userdb LOCK FD")
@@ -461,6 +538,7 @@ struct BridgeContractsMain {
         check(
             input.snapshot.rawInput == "n" && document == "existing host text" && errors >= 3,
             "recovered backend accepts fresh input only")
+
         backend.shutdown()
         print("ALL PASS")
     }

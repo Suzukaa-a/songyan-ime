@@ -21,6 +21,10 @@ static void* test_calloc(size_t count, size_t size) {
 #undef malloc
 #undef calloc
 
+/* rime_spelling.cc is not linked: this test never asks for a spelling, so
+ * there is no decoded dictionary for the bridge to drop. */
+void rb_spelling_reset(void) {}
+
 static void fault(int index) { allocation_count = 0; fail_at = index; }
 
 int main(int argc, char** argv) {
