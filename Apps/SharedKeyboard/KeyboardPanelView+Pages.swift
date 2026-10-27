@@ -125,10 +125,10 @@ extension KeyboardPanelView {
     /// width (never per row or per rail); an inactive split becomes nil, so every renderer draws
     /// one continuous row with a single space and no gutter.
     var activeSplit: ActiveLayoutSplit? {
-        // Main activation precedes the optional tools rail; drawing uses the actual content width.
-        let main = activeDefinition?.split?.resolved(forWidth: widthBox.mainSplitWidth)
-        if page == .letters && !controller.isEnglishMode { return main }
-        return ActiveLayoutSplit.resolving(nested: pageDefinition?.split, parent: main, width: widthBox.contentWidth)
+        KeyboardPanelRules.activeSplit(
+            main: activeDefinition?.split, mainWidth: widthBox.mainSplitWidth,
+            showsMainLetters: page == .letters && !controller.isEnglishMode,
+            pageSplit: pageDefinition?.split, contentWidth: widthBox.contentWidth)
     }
 
     /// Tells the user why the built-in page replaced their authored one for this visit: the page
@@ -204,30 +204,9 @@ extension KeyboardPanelView {
     }
 
     private func pageCap(_ key: LayoutKey, id: String, kind: KeyboardPageKind, alternate: Bool = false) -> KeyCap {
-        // Explicit bilingual pairs resolve first: an English page may pair arbitrary text, so the
-        // single-letter code heuristic must not swallow it. Fixed literals keep their value.
-        if let literal = key.resolvedLiteralValue(usesASCIIPunctuation: effectiveUsesASCIIPunctuation) {
-            let paired = key.action.isPairedLiteral
-            let letter =
-                !paired && kind == .english && literal.count == 1
-                && literal.utf8.count == 1 && literal.first?.isLetter == true
-            let action: KeyAction =
-                letter
-                ? (alternate ? .letterVariant(literal) : .code(literal.lowercased()))
-                : .literal(literal)
-            let title = key.literalFaceTitle(usesASCIIPunctuation: effectiveUsesASCIIPunctuation)
-            return KeyCap(
-                id: id,
-                title: letter && controller.shiftState.isActive ? title.uppercased() : title,
-                subtitle: key.secondaryLabel ?? key.longPress?.first?.label, action: action)
-        }
-        let value = key.action.value ?? ""
-        let letter = kind == .english && value.count == 1 && value.utf8.count == 1 && value.first?.isLetter == true
-        let action: KeyAction =
-            letter ? (alternate ? .letterVariant(value) : .code(value.lowercased())) : keyAction(key.action)
-        return KeyCap(
-            id: id, title: letter && controller.shiftState.isActive ? key.label.uppercased() : key.label,
-            subtitle: key.secondaryLabel ?? key.longPress?.first?.label, action: action)
+        KeyboardPanelRules.pageCap(
+            key, id: id, kind: kind, alternate: alternate,
+            usesASCIIPunctuation: effectiveUsesASCIIPunctuation, shiftActive: controller.shiftState.isActive)
     }
 }
 

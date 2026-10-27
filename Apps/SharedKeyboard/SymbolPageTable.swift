@@ -39,6 +39,13 @@ enum SymbolPageTable {
         rows(BuiltinLayouts.numericPageRows(ascii: ascii), prefix: "num", capPrefix: "n")
     }
 
+    /// A phone keypad's 123 grid: 1–9 from the 123 row in three rows of three; 0 sits in the
+    /// bottom row.
+    static func phoneDigitRows(ascii: Bool) -> [[KeyCap]] {
+        let digits = numericRows(ascii: ascii).first?.caps ?? []
+        return (0..<3).map { row in Array(digits.dropFirst(row * 3).prefix(3)) }
+    }
+
     /// A phone (digit pad) definition's symbol page, organised like mainstream 9-key
     /// pinyin (Sogou, iFlytek, Baidu: 常用 first, then 中文 / 英文 split by width,
     /// then themed sets): a category rail and a scrolling grid of keys as large as the

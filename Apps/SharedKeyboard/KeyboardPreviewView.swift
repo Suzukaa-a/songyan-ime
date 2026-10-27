@@ -4,747 +4,529 @@ import LayoutKit
 import SkinKit
 import SwiftUI
 
-/// Presentation-only adapter: shares native key faces with the live panel, without a session or engine.
-/// `candidateBar` and `skin` come from the same appearance item: the preview must also show the candidate-area layout,
-/// otherwise "keyboard appearance" would read as colors only.
+/// Presentation-only adapter: draws a main layout through the live panel's key-area views and
+/// rules, without a session or engine. `candidateBar` and `skin` come from the same appearance
+/// item: the preview must also show the candidate-area layout, otherwise "keyboard appearance"
+/// would read as colors only.
 public struct KeyboardPreviewView: View {
     public let layout: LayoutDefinition
     public var skin: SkinDefinition
     public var candidateBar: CandidateBarDefinition
     public var previewDark: Bool?
     private let onSelectKey: ((LayoutKeyPath) -> Void)?
-    private let pageDefinition: KeyboardPageDefinition?
-    private let pageUsesPhoneLayout: Bool
-    private let onSelectCategoryKey: ((String, Int) -> Void)?
-    private let selectedCategoryKey: (String, Int)?
-    @State private var categoryPreference = false
-    /// The preview's real width: a split preview follows the same whole-surface decision as the keyboard.
-    @State private var previewWidth: CGFloat = 0
+    @State private var language = PreviewLanguage.chinese
+    @State private var sample = PreviewSample.idle
+    @State private var inspected: LayoutKey?
+    @State private var preferences = KeyboardPreviewPreferences.cached
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    private var keyHeight: CGFloat { verticalSizeClass == .compact ? 44 : 54 }
-    /// Width of the merged pad's separator/Delete pair; mirrors `KeyboardPanelView.sharedDeleteWidth`
-    /// so a floating preview keeps exactly the live pad's geometry.
-    private func mergedSideWidth(for width: CGFloat) -> CGFloat { max(56, (width - 32) / 10 * 1.8) }
-    @State private var mode = "中文"
-    @State private var sample = "空闲"
-    @State private var inspected: LayoutKey?
+
     public init(
-        layout: LayoutDefinition, pageDefinition: KeyboardPageDefinition? = nil, pageUsesPhoneLayout: Bool = false,
-        skin: SkinDefinition = .systemDefault,
+        layout: LayoutDefinition, skin: SkinDefinition = .systemDefault,
         candidateBar: CandidateBarDefinition = .systemDefault,
-        previewDark: Bool? = nil, onSelectKey: ((LayoutKeyPath) -> Void)? = nil,
-        onSelectCategoryKey: ((String, Int) -> Void)? = nil, selectedCategoryKey: (String, Int)? = nil
+        previewDark: Bool? = nil, onSelectKey: ((LayoutKeyPath) -> Void)? = nil
     ) {
         self.layout = layout
         self.skin = skin
         self.candidateBar = candidateBar
         self.previewDark = previewDark
         self.onSelectKey = onSelectKey
-        self.pageDefinition = pageDefinition
-        self.pageUsesPhoneLayout = pageUsesPhoneLayout
-        self.onSelectCategoryKey = onSelectCategoryKey
-        self.selectedCategoryKey = selectedCategoryKey
     }
-    private var appearance: KeyboardAppearance { .init(skin: skin, dark: previewDark ?? (colorScheme == .dark)) }
+
     private var editing: Bool { onSelectKey != nil }
-    private var definition: LayoutDefinition {
-        !editing && mode == "英文" ? BuiltinLayouts.qwerty26.settingSplit(layout.split) : layout
+    private var layoutKind: KeyboardLayoutKind? {
+        layout.input.builtinLayout.flatMap { KeyboardLayoutKind(rawValue: $0.rawValue) }
     }
-    private var activeSplit: ActiveLayoutSplit? {
-        definition.split?.resolved(forWidth: Double(previewWidth))
-    }
-    /// The bundled preset whose shape this definition has. Shape, not full equality: a copy that only
-    /// renames or re-ids keeps its preset chrome, while an edited row changes `rows` and falls back
-    /// to the definition's own weights.
-    private var preset: LayoutDefinition? {
-        // Full input identity, including the schema binding: a schema-bound or imported layout
-        // whose rows happen to equal a preset must not make the preview draw a native shell that
-        // the runtime's strict predicates would reject.
-        BuiltinLayouts.all.first {
-            $0.input == definition.input
-                && $0.rows == definition.rows && $0.auxiliaryAreas == definition.auxiliaryAreas
-        }
-    }
-    /// Same structural identity as the runtime: main-row faces/metadata may differ, while the
-    /// native merged columns and synthesized separator/Delete stay.
-    private var merged: Bool {
-        preset?.id == BuiltinLayouts.merged14.id || preset?.id == BuiltinLayouts.merged18.id
-            || BuiltinLayouts.matchesMainShell(definition, as: .merged14)
-            || BuiltinLayouts.matchesMainShell(definition, as: .merged18)
-    }
-    /// Same structural identity as the runtime: Chinese keeps the standard 26-key shell after
-    /// metadata edits; English always uses the built-in English shell.
-    private var qwerty: Bool {
-        preset?.id == BuiltinLayouts.qwerty26.id || BuiltinLayouts.matchesMainShell(definition, as: .qwerty26)
-    }
-    /// Structural phone shell selection mirrors the runtime's `PhoneKeypadStructure` decision.
-    private var phoneShape: Bool {
-        preset?.id == BuiltinLayouts.phone9.id || PhoneKeypadStructure.matches(definition)
-    }
-    /// Only the narrow visual identity draws the shell's own fixed rails/control row; an edited
-    /// footer/rail or main-row face keeps the T9 shell but renders the authored regions.
-    private var phoneVisual: Bool {
-        preset?.id == BuiltinLayouts.phone9.id || BuiltinLayouts.matchesPhone9VisualShell(definition)
-    }
-    private var phone: Bool { phoneShape }
-    private var bundledControlRowPolicy: Bool {
-        [.qwerty26, .merged14, .merged18].contains { BuiltinLayouts.matchesControlRowPolicy(definition, as: $0) }
-    }
-    private var controls: Bool {
-        definition.rows.last?.keys.allSatisfy { $0.action.type != .code && $0.action.type != .literal } == true
-    }
-    private var mainRows: [LayoutRow] { controls ? Array(definition.rows.dropLast()) : definition.rows }
-    private var composing: Bool { !editing && mode != "英文" && (sample == "组合" || sample == "展开") }
-    private var expanded: Bool { composing && sample == "展开" }
-    private var returnTitle: String { composing ? "确认" : "换行" }
-    private var previewAlternates: [LayoutOption] {
-        inspected?.longPress ?? definition.rows.flatMap(\.keys).first(where: { !($0.longPress ?? []).isEmpty })?
-            .longPress ?? []
-    }
-    private var previewAlternateWidth: CGFloat {
-        // Same text-measured 44...72pt cells as CharacterButton.showAlternates.
-        let font = appearance.uiFont(min(20, appearance.skin.typography.keySize))
-        let textWidth = previewAlternates.reduce(CGFloat.zero) {
-            max($0, ($1.label as NSString).size(withAttributes: [.font: font]).width)
-        }
-        return max(44, min(72, textWidth + 20))
-    }
-    private var previewControlPolicy: KeyboardControlPolicy {
-        // Matches production: on the built-in 9-key layout the confirm key sits in the right trailing column, so the bottom row has no duplicate Return.
-        // The number page has no trailing column, so Return goes back to the shared control row.
-        let hasPhoneRail = phone && mode != "数字"
-        return .init(
-            page: mode == "数字" ? .numeric : .letters,
-            isEnglishMode: mode == "英文", hasGlobe: false,
-            isPhoneLayout: hasPhoneRail, usesASCIIPunctuation: mode == "英文",
-            includesBottomEnter: !hasPhoneRail)
-    }
-    private var previewControlRow: some View { previewControlRow(columns: nil) }
-    private func previewControlRow(columns: KeyboardControlPolicy.PhoneColumns?) -> some View {
-        ControlRow(
-            policy: previewControlPolicy,
-            returnTitle: returnTitle, layoutName: nil, layoutHintName: nil, layoutHintToken: nil,
-            modeKey: AlternateCharacterKey(
-                cap: .init(
-                    id: "mode", title: previewControlPolicy.languageTitle,
-                    subtitle: mode == "数字" ? "返回" : nil,
-                    action: .cycleLayout), alternates: [], layoutPicker: true
-            ) { _ in },
-            systemKeyboardSwitch: nil, moveCursor: nil, onPage: { _ in },
-            onKey: { _ in }, phoneColumns: columns, split: activeSplit, splitRowIndex: mainRows.count)
-    }
+
     public var body: some View {
+        // Resolved once per body: every region reads these facts instead of comparing the
+        // definition against each bundled preset again.
+        let facts = DefinitionResolutionMemo.Facts(usable: [], active: layout)
         VStack(spacing: 6) {
-            if !editing && pageDefinition == nil {
-                Picker("示例语言", selection: $mode) { ForEach(["中文", "英文", "数字"], id: \.self) { Text($0) } }.pickerStyle(
-                    .segmented)
-                Picker("示例状态", selection: $sample) { ForEach(["空闲", "组合", "展开", "长按"], id: \.self) { Text($0) } }
-                    .pickerStyle(.segmented)
+            if !editing {
+                Picker("示例语言", selection: $language) {
+                    ForEach(PreviewLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("示例状态", selection: $sample) {
+                    ForEach(PreviewSample.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
             }
-            if let pageDefinition, pageDefinition.numericPresentation == .automatic {
-                // The built-in 123 page owns this content (its marks and keypad shape follow the
-                // live keyboard), so drawing rows here would preview a page the keyboard never shows.
-                KeyboardPagePreviewView(
-                    page: pageDefinition, inheritedSplit: layout.split, isPhoneLayout: pageUsesPhoneLayout)
-            } else if let pageDefinition {
-                authoredPageCanvas(pageDefinition)
-            } else {
-                canvas
+            KeyboardPreviewFrame(layout: layoutKind, mainSplit: layout.split, dock: preferences.dock(for: layoutKind)) {
+                widths in
+                KeyboardMainLayoutPreview(
+                    definition: layout, facts: facts,
+                    language: editing ? .chinese : language, sample: editing ? .idle : sample,
+                    editing: editing, showsGlobe: preferences.showsGlobe(editing: editing), widths: widths,
+                    candidateBar: candidateBar, inspected: inspected,
+                    onSelect: { path, key in
+                        inspected = key
+                        onSelectKey?(path)
+                    })
             }
-            if editing && pageDefinition == nil {
-                Text("选择要修改的按键").font(.caption).foregroundStyle(.secondary).frame(
-                    maxWidth: .infinity, alignment: .leading)
+            if editing {
+                Text("轻点要修改的按键").font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .environment(\.keyboardAppearance, appearance)
-        .environment(\.keyboardKeyHeight, keyHeight)
-        .modifier(PreviewWidthProbe(width: $previewWidth))
+        .environment(\.keyboardAppearance, KeyboardAppearance(skin: skin, dark: previewDark ?? (colorScheme == .dark)))
+        .environment(\.keyboardKeyHeight, preferences.keyHeight(compact: verticalSizeClass == .compact))
         .onChange(of: layout) { inspected = nil }
-        .onAppear { categoryPreference = KeyboardSymbolPagePreferences.usesCategoryPage }
+        .task { preferences = await KeyboardPreviewPreferences.load() }
     }
-    private var canvas: some View {
+}
+
+private enum PreviewLanguage: CaseIterable {
+    case chinese, english, numeric
+
+    var title: String {
+        switch self {
+        case .chinese: return "中文"
+        case .english: return "英文"
+        case .numeric: return "数字"
+        }
+    }
+}
+
+private enum PreviewSample: CaseIterable {
+    case idle, composing, expanded, longPress
+
+    var title: String {
+        switch self {
+        case .idle: return "空闲"
+        case .composing: return "组合"
+        case .expanded: return "展开"
+        case .longPress: return "长按"
+        }
+    }
+}
+
+/// The key area the panel draws for a main layout, in one sample state. Shell and footer choices,
+/// splits and geometry come from the panel's own facts, rules and views; only the per-key face is
+/// local, because the panel's key builder reads the live session.
+private struct KeyboardMainLayoutPreview: View {
+    @Environment(\.keyboardAppearance) private var appearance
+    @Environment(\.keyboardKeyHeight) private var keyHeight
+    let definition: LayoutDefinition
+    let facts: DefinitionResolutionMemo.Facts
+    let language: PreviewLanguage
+    let sample: PreviewSample
+    let editing: Bool
+    let showsGlobe: Bool
+    let widths: KeyboardPreviewWidths
+    let candidateBar: CandidateBarDefinition
+    let inspected: LayoutKey?
+    let onSelect: (LayoutKeyPath, LayoutKey) -> Void
+
+    private var page: KeyboardPage { language == .numeric ? .numeric : .letters }
+    private var isEnglishMode: Bool { language == .english }
+    private var usesASCIIPunctuation: Bool { isEnglishMode }
+    private var composing: Bool { !isEnglishMode && (sample == .composing || sample == .expanded) }
+    private var expanded: Bool { composing && sample == .expanded }
+    private var returnTitle: String { composing ? "确认" : "换行" }
+    private var usesConfiguredLayout: Bool { page == .letters && !isEnglishMode }
+    private var usesStandardT9: Bool { usesConfiguredLayout && facts.isPhone }
+    private var usesStandardQwerty: Bool { isEnglishMode || facts.isBundledQwertyMainShell }
+    private var usesBundledMergedPad: Bool { usesConfiguredLayout && facts.isBundledMergedPad }
+    /// An editor shows the declared rails and footer, so every stored key can be selected.
+    private var showsBundledPhoneShell: Bool { facts.isBuiltinPhonePad && !editing }
+
+    private var geometry: KeyboardPanelGeometry {
+        KeyboardPanelGeometry(
+            candidateHeight: candidateBar.collapsed.height, keyHeight: Double(keyHeight),
+            selectedMainRows: max(1, facts.mainRows.count),
+            candidateSize: appearance.skin.typography.candidateSize)
+    }
+
+    private var controlPolicy: KeyboardControlPolicy {
+        KeyboardPanelRules.controlPolicy(
+            page: page, isEnglishMode: isEnglishMode, hasGlobe: showsGlobe,
+            usesASCIIPunctuation: usesASCIIPunctuation,
+            phoneShellVisible: KeyboardPanelRules.phoneShellVisible(
+                usesStandardT9: usesStandardT9, page: page, hasAuthoredPage: false,
+                mainIsPhoneKeypad: facts.isPhone, showsCategorySymbolPage: false),
+            usesFixedEditingRail: showsBundledPhoneShell,
+            declaredTrailingReturn: railEntries(.trailing).contains { $0.key.action.type == .enter },
+            showsCategorySymbolPage: false)
+    }
+
+    var body: some View {
+        let split = KeyboardPanelRules.activeSplit(
+            main: definition.split, mainWidth: widths.mainSplit, showsMainLetters: usesConfiguredLayout,
+            pageSplit: nil, contentWidth: widths.content)
+        let geometry = geometry
         VStack(spacing: 0) {
             Group {
-                Group {
-                    if composing { candidateArea(expanded: false) } else { Color.clear }
-                }.frame(
-                    height: CandidateBarDefinition.Collapsed.effectiveHeight(
-                        candidateBar.collapsed.height,
-                        candidateSize: appearance.skin.typography.candidateSize))
+                if composing { candidateArea(expanded: false) } else { Color.clear }
             }
+            .frame(height: CGFloat(geometry.headerHeight))
             VStack(spacing: 4) {
-                if phone && !editing && mode != "数字" {
-                    phonePreview
+                if usesStandardT9 {
+                    phonePad(split: split)
+                } else if page == .numeric && facts.isPhone {
+                    phoneDigitPad(split: split)
                 } else {
-                    if expanded {
-                        candidateArea(expanded: true).frame(height: keyHeight * 3 + 8)
-                    } else if mode == "数字" && !editing {
-                        numericRows
-                    } else {
-                        mainRowsArea
-                    }
-                    if !editing
-                        && (mode == "数字" || expanded
-                            || ((merged || qwerty) && bundledControlRowPolicy))
-                    {
-                        previewControlRow
-                    } else {
-                        HStack(spacing: 4) {
-                            if controls {
-                                controlRowPreview
-                            }
-                            if !editing {
-                                AlternateCharacterKey(
-                                    cap: .init(id: "mode", title: "ABC", action: .cycleLayout), alternates: [],
-                                    layoutPicker: true
-                                ) { _ in }.frame(width: 44, height: keyHeight)
-                            }
+                    let mainRowCount = usesConfiguredLayout && !usesStandardQwerty ? max(1, facts.mainRows.count) : 3
+                    let mainAreaHeight = CGFloat(geometry.mainAreaHeight)
+                    VStack(spacing: 4) {
+                        if expanded {
+                            candidateArea(expanded: true)
+                        } else if CGFloat(mainRowCount) * (keyHeight + 4) - 4 > mainAreaHeight + 1 {
+                            ScrollView { VStack(spacing: 4) { keyRows(split: split) } }
+                                .sharpCandidateScrollEdges()
+                        } else {
+                            VStack(spacing: 4) { keyRows(split: split) }
                         }
                     }
-                }
-            }
-            if sample == "长按", !editing {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.adaptive(minimum: previewAlternateWidth, maximum: previewAlternateWidth), spacing: 4)
-                    ], alignment: .leading, spacing: 0
-                ) {
-                    ForEach(Array(previewAlternates.enumerated()), id: \.offset) { _, option in
-                        AlternateCharacterKey(
-                            cap: .init(id: option.label, title: option.label, action: action(option.action)),
-                            alternates: []
-                        ) { _ in }.frame(height: 46)
-                    }
-                }.padding(.horizontal, 6).padding(.top, 4)
-            }
-        }.padding(4).background(appearance.background).clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-    /// The 123 page mirrors the live symbol page: ten equal columns, and a nine-character third row
-    /// that gives Delete one column of its own, so no symbol is narrower than a 26-key letter.
-    private var numericRows: some View {
-        ForEach(Array(SymbolPageTable.numericRows(ascii: false).enumerated()), id: \.offset) { index, row in
-            GeometryReader { proxy in
-                let metrics = StandardKeyRowGeometry(width: Double(proxy.size.width), split: activeSplit)
-                HStack(spacing: 4) {
-                    WeightedKeyRow(
-                        caps: row.caps, split: activeSplit, rowIndex: index,
-                        fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap)
-                    ) { _ in }
-                    .frame(
-                        width: index == 2 ? max(0, proxy.size.width - CGFloat(metrics.keyWidth) - 4) : proxy.size.width)
-                    if index == 2 {
-                        RepeatingDeleteKey {}.frame(width: CGFloat(metrics.keyWidth), height: keyHeight)
+                    .frame(height: mainAreaHeight, alignment: .top)
+                    if editing || (usesConfiguredLayout && !facts.isBundledControlRowPolicy) {
+                        layoutUtilityBar(split: split)
+                    } else {
+                        controlRow(split: split, columns: nil)
                     }
                 }
-            }.frame(height: keyHeight)
+            }
+            if sample == .longPress {
+                longPressSample
+            }
         }
-    }
-    private var phonePreview: some View {
-        StablePhoneKeypadShell(
-            trailingSpansControlRow: phoneVisual,
-            expandsForSplit: activeSplit != nil,
-            leading: { metrics in
-                if phoneVisual {
-                    bundledPhoneLeading(metrics)
-                } else {
-                    authoredPhoneRail(.leading, metrics: metrics)
-                }
-            },
-            main: { metrics in
-                if expanded {
-                    candidateArea(expanded: true).frame(height: CGFloat(metrics.mainHeight))
-                } else {
-                    VStack(spacing: CGFloat(metrics.spacing)) {
-                        ForEach(Array(mainRows.enumerated()), id: \.offset) { index, _ in
-                            configuredRow(index)
-                        }
-                    }
-                }
-            },
-            trailing: { metrics in
-                if phoneVisual {
-                    bundledPhoneTrailing(metrics)
-                } else {
-                    authoredPhoneRail(.trailing, metrics: metrics)
-                }
-            },
-            bottom: { metrics in
-                if phoneVisual {
-                    previewControlRow(columns: .init(rail: metrics.railWidth, digit: metrics.digitWidth))
-                } else {
-                    authoredPhoneFooter(metrics)
-                }
-            })
+        .padding(4)
+        .background(appearance.background)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    /// The bundled T9 leading column: reading placeholders while composing, otherwise the three
-    /// quick-symbol slots with the first slot opening the remaining menu.
-    private func bundledPhoneLeading(_ metrics: PhoneKeypadMetrics) -> some View {
-        VStack(spacing: CGFloat(metrics.spacing)) {
-            if composing {
-                Text("拼音选项").font(.caption2).multilineTextAlignment(.center)
+    // MARK: Key area
+
+    @ViewBuilder
+    private func keyRows(split: ActiveLayoutSplit?) -> some View {
+        switch page {
+        case .letters:
+            if usesStandardQwerty {
+                KeyboardStandardQwertyPad(
+                    split: split,
+                    row: { index, metrics in standardQwertyRow(index, metrics: metrics, split: split) },
+                    shift: { ShiftKey(state: .off, isEnglishMode: isEnglishMode, tap: {}, doubleTap: {}) },
+                    delete: { RepeatingDeleteKey {} })
+            } else if usesBundledMergedPad {
+                KeyboardMergedPad(
+                    rows: facts.mainRows, split: split,
+                    key: { key, row, index in
+                        keyFace(
+                            key, path: .row(row, key: index),
+                            id: "merged-\(key.action.value ?? "\(row)-\(index)")")
+                    },
+                    separator: { KeyboardMergedSeparatorKey(isComposing: composing) {} },
+                    delete: { RepeatingDeleteKey {} })
             } else {
-                let caps = SymbolPageTable.quickRail(symbols: T9QuickSymbolStore.defaultSymbols, ascii: false)
-                ForEach(Array(caps.prefix(3).enumerated()), id: \.element.id) { index, cap in
-                    AlternateCharacterKey(
-                        cap: cap,
-                        alternates: index == 0 ? Array(caps.dropFirst(3)) : [],
-                        phoneKey: true, phoneSideKey: true
-                    ) { _ in }
-                    .frame(height: CGFloat(metrics.rowHeight))
+                HStack(spacing: 4) {
+                    auxiliaryColumn(.leading)
+                    VStack(spacing: 4) {
+                        ForEach(facts.mainRows.indices, id: \.self) { index in
+                            definitionRow(index, inset: definitionInset(index), split: split)
+                        }
+                    }
+                    auxiliaryColumn(.trailing)
                 }
             }
+        case .numeric, .symbols:
+            KeyboardSymbolPageRows(
+                rows: SymbolPageTable.numericRows(ascii: usesASCIIPunctuation), split: split,
+                onTap: { _ in }, delete: { RepeatingDeleteKey {} })
         }
     }
 
-    /// The bundled T9 trailing column (Delete / 重输 / Return).
-    private func bundledPhoneTrailing(_ metrics: PhoneKeypadMetrics) -> some View {
-        let slots = metrics.railSlots(.trailing, spans: PhoneKeypadRailPolicy.bundledTrailingSpans)
-        return VStack(spacing: CGFloat(metrics.spacing)) {
-            RepeatingDeleteKey {}.frame(height: CGFloat(slots[0].height))
-            ControlKeyFace(text: "重输").frame(height: CGFloat(slots[1].height))
-                .opacity(composing ? 1 : 0.45)
-            ReturnKey(title: returnTitle) { _ in }.frame(height: CGFloat(slots[2].height))
+    @ViewBuilder
+    private func standardQwertyRow(
+        _ index: Int, metrics: StandardKeyRowGeometry, split: ActiveLayoutSplit?
+    ) -> some View {
+        if isEnglishMode {
+            WeightedKeyRow(
+                caps: KeyboardLayoutTable.englishRows()[index].caps, showsKeyPreview: true,
+                split: split, rowIndex: index,
+                fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap)
+            ) { _ in }
+        } else if facts.mainRows.indices.contains(index) {
+            definitionRow(
+                index, split: split, fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap))
         }
     }
 
-    /// An edited T9 rail is rendered from its declaration, with the same slot spans the runtime uses.
-    private func authoredRailEntries(
-        _ position: LayoutAuxiliaryArea.Position
-    ) -> [(LayoutKeyPath, LayoutKey)] {
-        var entries: [(LayoutKeyPath, LayoutKey)] = []
+    /// The familiar stagger belongs to the standard 26-key shell.
+    private func definitionInset(_ index: Int) -> CGFloat {
+        guard facts.isBundledQwertyMainShell else { return 0 }
+        return index == 1 ? 0.5 : (index == 2 ? 1.5 : 0)
+    }
+
+    private func visibleSources(_ keys: [LayoutKey]) -> [Int] {
+        keys.indices.filter { showsGlobe || keys[$0].action.type != .globe }
+    }
+
+    private func definitionRow(
+        _ index: Int, inset: CGFloat = 0, spacing: CGFloat = 4, split: ActiveLayoutSplit?,
+        fixedKeyWidth: CGFloat? = nil, splitGap: CGFloat? = nil
+    ) -> some View {
+        let keys = facts.mainRows[index].keys
+        let sources = visibleSources(keys)
+        return KeyboardDefinitionRow(
+            keys: sources.map { keys[$0] }, inset: inset, spacing: spacing, split: split, rowIndex: index,
+            fixedKeyWidth: fixedKeyWidth, splitGap: splitGap
+        ) { key, visible in
+            keyFace(key, path: .row(index, key: sources[visible]), id: "row-\(index)-\(visible)")
+        }
+    }
+
+    private struct RailEntry {
+        let path: LayoutKeyPath
+        let key: LayoutKey
+    }
+
+    /// The declared side keys in `PhoneKeypadRailPolicy.declaredKeys` order, with their stored
+    /// addresses and the same globe visibility as the keyboard.
+    private func railEntries(_ position: LayoutAuxiliaryArea.Position) -> [RailEntry] {
+        var entries: [RailEntry] = []
         for (area, value) in (definition.auxiliaryAreas ?? []).enumerated()
         where value.position == position && !value.requiresEngineDisambiguation {
-            for (index, key) in value.keys.enumerated() {
-                entries.append((LayoutKeyPath.auxiliary(area, key: index), key))
+            for (index, key) in value.keys.enumerated() where showsGlobe || key.action.type != .globe {
+                entries.append(RailEntry(path: .auxiliary(area, key: index), key: key))
             }
         }
         return entries
     }
 
-    @ViewBuilder
-    private func authoredPhoneRail(
-        _ position: LayoutAuxiliaryArea.Position, metrics: PhoneKeypadMetrics
-    ) -> some View {
-        let entries = authoredRailEntries(position)
-        if entries.isEmpty {
-            if position == .leading, composing {
-                Text("拼音选项").font(.caption2).multilineTextAlignment(.center)
-                    .frame(width: CGFloat(metrics.railWidth))
-            } else {
-                Color.clear
-            }
-        } else {
-            let spans = PhoneKeypadMetrics.slotSpans(
-                keyCount: entries.count, rowCount: PhoneKeypadMetrics.mainRowCount)
-            let slots = metrics.railSlots(position == .leading ? .leading : .trailing, spans: spans)
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: CGFloat(metrics.spacing)) {
-                    if position == .leading, composing {
-                        Text("拼音选项").font(.caption2).multilineTextAlignment(.center)
-                    }
-                    ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
-                        keyFace(entry, side: true)
-                            .frame(height: CGFloat(slots[index].height))
-                    }
-                }
-            }
-            .sharpCandidateScrollEdges()
+    private func auxiliaryColumn(_ position: LayoutAuxiliaryArea.Position) -> some View {
+        let entries = railEntries(position)
+        return KeyboardAuxiliaryColumn(keys: entries.map(\.key), rowCount: facts.mainRows.count) { key, index in
+            keyFace(key, path: entries[index].path, id: "\(position.rawValue)-\(index)")
         }
     }
 
-    /// An edited T9 footer renders the authored control row; shortcuts are de-duplicated against
-    /// entries the author already declared, matching the live author bar.
-    private func authoredPhoneFooter(_ metrics: PhoneKeypadMetrics) -> some View {
-        let keys = controls ? (definition.rows.last?.keys ?? []) : []
-        let hasNumeric = keys.contains { $0.action.pageSwitchTarget == .numeric }
-        let hasSymbols = keys.contains { $0.action.pageSwitchTarget == .symbols }
-        let hasLayout = keys.contains { $0.action.type == .modeSwitch }
-        return HStack(spacing: CGFloat(metrics.spacing)) {
-            if !hasNumeric { previewFooterShortcut("123") }
-            if !hasSymbols { previewFooterShortcut(KeyboardControlPolicy.symbolPageTitle) }
-            if let last = definition.rows.indices.last {
-                ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
-                    keyFace((.row(last, key: index), key))
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            if !hasLayout {
-                AlternateCharacterKey(
-                    cap: .init(id: "preview-mode", title: "ABC", action: .cycleLayout),
-                    alternates: [], layoutPicker: true
-                ) { _ in }
-                .frame(width: 44)
-            }
-        }
-        .frame(height: CGFloat(metrics.rowHeight))
-        .padding(.horizontal, 4)
-    }
+    // MARK: Phone keypad
 
-    private func previewFooterShortcut(_ title: String) -> some View {
-        AlternateCharacterKey(
-            cap: .init(id: "preview-footer-\(title)", title: title, action: .cycleLayout),
-            alternates: []
-        ) { _ in }
-        .frame(width: 44)
-    }
-
-    private func mergedPreviewRow(_ index: Int) -> some View {
-        let row = mainRows[index].keys.enumerated().map { (LayoutKeyPath.row(index, key: $0.offset), $0.element) }
-        let isLast = index == mainRows.count - 1
-        return GeometryReader { proxy in
-            let side = mergedSideWidth(for: proxy.size.width)
-            let gap = CGFloat(
-                activeSplit?.gap(
-                    width: Double(proxy.size.width), keyCount: (mainRows.map { $0.keys.count }.max() ?? 1) + 2)
-                    ?? 0)
-            let boundary = activeSplit?.breakIndex(row: index, keyCount: row.count)
-            // Same shell and widths as the live merged pad: separator in the Shift slot, weighted caps.
-            let metrics = MergedKeypadGeometry.rows(
-                weights: mainRows.map { $0.keys.map(\.widthWeight) },
-                width: max(0, proxy.size.width - gap), spacing: 4, sideWidth: side)
-            HStack(spacing: 4) {
-                if isLast { ControlKeyFace(text: "分词").frame(width: side) }
-                ForEach(Array(row.enumerated()), id: \.offset) { keyIndex, entry in
-                    if keyIndex == boundary, gap > 0 {
-                        KeyboardSplitGap().frame(width: gap - 4, height: keyHeight)
-                    }
-                    keyFace(entry).frame(width: metrics[index].keyWidths[keyIndex], height: keyHeight)
-                }
-                if isLast { RepeatingDeleteKey {}.frame(width: side) }
-            }
-            .frame(width: proxy.size.width)
-        }.frame(height: keyHeight)
-    }
-
-    @ViewBuilder private func auxiliary(_ position: LayoutAuxiliaryArea.Position) -> some View {
-        let keys: [(LayoutKeyPath, LayoutKey)] = (definition.auxiliaryAreas ?? []).enumerated().flatMap { area, value in
-            value.position == position && !value.requiresEngineDisambiguation
-                ? value.keys.enumerated().compactMap { index, key in
-                    !editing && (key.action.type == .globe || (phone && key.action.type == .enter))
-                        ? nil : (LayoutKeyPath.auxiliary(area, key: index), key)
-                } : []
-        }
-        if !keys.isEmpty {
-            VStack(spacing: 4) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { _, entry in keyFace(entry, side: true) }
-            }
-            .frame(width: 44, height: CGFloat(mainRows.count) * (keyHeight + 4) - 4)
-        }
-    }
-    /// Main area of the row-shaped layouts: the 26-key page and a phone page both render one row per
-    /// definition row, so a page and a keyboard read the same. A non-preset definition keeps its own weights.
-    private var mainRowsArea: some View {
-        ScrollView {
-            HStack(spacing: 4) {
-                auxiliary(.leading)
-                VStack(spacing: 4) {
-                    ForEach(Array(mainRows.enumerated()), id: \.offset) { index, _ in
-                        if qwerty {
-                            standardQwertyRow(index)
-                        } else if merged {
-                            mergedPreviewRow(index)
-                        } else {
-                            configuredRow(index)
-                        }
-                    }
-                }
-                auxiliary(.trailing)
-            }
-        }.scrollDisabled(mainRows.count <= 3)
-            .frame(height: CGFloat(min(3, max(1, mainRows.count))) * (keyHeight + 4) - 4)
-    }
-
-    /// The bundled 26-key letter page: its 26 letters share one equal width, Shift opens and Delete
-    /// closes the third row, and the split gap and per-row break follow the available width exactly
-    /// as the live keypad does. Only a preset-shaped definition reaches this branch.
-    private func standardQwertyRow(_ index: Int) -> some View {
-        GeometryReader { proxy in
-            // One geometry for the whole row: the side keys and the letter run share it, so the
-            // third row absorbs exactly the space the ten-column letter grid leaves over.
-            let metrics = StandardKeyRowGeometry(width: Double(proxy.size.width), split: activeSplit)
-            if index == 2 {
-                HStack(spacing: 4) {
-                    // The live Shift key face; the preview has no session, so nothing is wired to it.
-                    ShiftKey(state: .off, tap: {}, doubleTap: {})
-                        .frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
-                    standardRow(index, metrics: metrics)
-                    RepeatingDeleteKey {}.frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
-                }
-            } else {
-                standardRow(index, metrics: metrics)
-            }
-        }.frame(height: keyHeight)
-    }
-
-    /// One equal-width letter run: `metrics.keyWidth` for every key, the split gap at the row’s
-    /// own break, and a centred inset so the first two rows keep the 26-key stagger shape.
-    private func standardRow(_ index: Int, metrics: StandardKeyRowGeometry) -> some View {
-        let keys = visibleEntries(index)
-        return GeometryReader { proxy in
-            let gap = CGFloat(metrics.gap)
-            let boundary = activeSplit?.breakIndex(row: index, keyCount: keys.count)
-            let available = max(0, proxy.size.width - CGFloat(max(0, keys.count - 1)) * 4 - gap)
-            HStack(spacing: 4) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { keyIndex, entry in
-                    if keyIndex == boundary, gap > 0 {
-                        KeyboardSplitGap().frame(width: gap - 4, height: keyHeight)
-                    }
-                    keyFace(entry).frame(width: CGFloat(metrics.keyWidth), height: keyHeight)
-                }
-            }
-            .padding(.horizontal, max(0, (available - CGFloat(metrics.keyWidth) * CGFloat(keys.count)) / 2))
-            .frame(width: proxy.size.width, alignment: .center)
-        }
-    }
-
-    /// A non-preset row keeps the weights the definition declares. The third row of a 9-key pad
-    /// carries what the definition authors, so a DIY width is never silently turned into a column.
-    private func configuredRow(_ index: Int) -> some View {
-        let keys = visibleEntries(index)
-        let projection = LayoutRowWidthProjection(weights: keys.map { $0.1.widthWeight })
-        return GeometryReader { proxy in
-            let count = max(1, keys.count)
-            let gap = CGFloat(activeSplit?.gap(width: Double(proxy.size.width), keyCount: count) ?? 0)
-            let boundary = activeSplit?.breakIndex(row: index, keyCount: count)
-            let available = max(0, proxy.size.width - CGFloat(max(0, count - 1)) * 4 - gap)
-            HStack(spacing: 4) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { keyIndex, entry in
-                    if keyIndex == boundary, gap > 0 {
-                        KeyboardSplitGap().frame(width: gap - 4, height: keyHeight)
-                    }
-                    keyFace(entry).frame(
-                        width: available * CGFloat(projection.keyFractions[keyIndex]), height: keyHeight)
-                }
-            }
-            .padding(.horizontal, available * CGFloat(projection.insetFraction))
-            .frame(width: proxy.size.width, alignment: .center)
-        }.frame(height: keyHeight)
-    }
-
-    /// The definition's own control row, drawn as the live panel draws it: every declared key stays
-    /// in place and keeps its action, and the row's keys share the width it declares.
-    @ViewBuilder private var controlRowPreview: some View {
-        if let last = definition.rows.last, let split = activeSplit {
-            let row = definition.rows.count - 1
-            let boundary = split.breakIndex(row: row, keyCount: last.keys.count)
-            let visible = last.keys.indices.filter {
-                last.keys[$0].action.type != .space && (editing || last.keys[$0].action.type != .globe)
-            }
-            let left = visible.filter { $0 < boundary }
-            let right = visible.filter { $0 >= boundary }
-            SplitSpaceKeyboardRow(
-                leftKeys: left, rightKeys: right,
-                leftWidths: left.map { max(44, last.keys[$0].widthWeight * 44) },
-                rightWidths: right.map { max(44, last.keys[$0].widthWeight * 44) }, split: split,
-                spaceWidthMultiplier: 3 * (last.keys.first { $0.action.type == .space }?.widthWeight ?? 4) / 4,
-                key: { keyFace((.row(row, key: $0), last.keys[$0])) },
-                space: {
-                    if let index = last.keys.firstIndex(where: { $0.action.type == .space }) {
-                        keyFace((.row(row, key: index), last.keys[index]))
+    private func phonePad(split: ActiveLayoutSplit?) -> some View {
+        StablePhoneKeypadShell(
+            trailingSpansControlRow: showsBundledPhoneShell,
+            expandsForSplit: split != nil,
+            leading: { metrics in rail(.leading, metrics: metrics) },
+            main: { metrics in
+                VStack(spacing: CGFloat(metrics.spacing)) {
+                    if expanded {
+                        candidateArea(expanded: true)
                     } else {
-                        ControlKeyFace(text: "空格")
+                        ForEach(facts.mainRows.indices, id: \.self) { index in
+                            definitionRow(index, spacing: CGFloat(metrics.spacing), split: split)
+                        }
                     }
-                }, fallback: { singleSpaceControlRowPreview })
-        } else {
-            singleSpaceControlRowPreview
+                }
+            },
+            trailing: { metrics in rail(.trailing, metrics: metrics) },
+            bottom: { metrics in
+                if showsBundledPhoneShell {
+                    controlRow(split: split, columns: .init(rail: metrics.railWidth, digit: metrics.digitWidth))
+                } else {
+                    layoutUtilityBar(split: split)
+                }
+            })
+    }
+
+    private func phoneDigitPad(split: ActiveLayoutSplit?) -> some View {
+        KeyboardPhoneDigitPad(
+            usesASCIIPunctuation: usesASCIIPunctuation, split: split,
+            trailingSpansControlRow: showsBundledPhoneShell,
+            onKey: { _ in }, expanded: { EmptyView() },
+            trailing: { metrics in rail(.trailing, metrics: metrics) },
+            bottom: { metrics in
+                controlRow(
+                    split: split,
+                    columns: showsBundledPhoneShell ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil)
+            })
+    }
+
+    /// The same rail policy as the keyboard: the bundled 9-key draws its own rails, an imported
+    /// keypad its declared keys. Reading choices need the engine, so composing shows a caption.
+    @ViewBuilder
+    private func rail(_ position: LayoutAuxiliaryArea.Position, metrics: PhoneKeypadMetrics) -> some View {
+        let entries = railEntries(position)
+        let content = PhoneKeypadRailPolicy.content(
+            isBuiltinPhonePad: showsBundledPhoneShell, declaredKeyCount: entries.count)
+        switch content {
+        case .bundledAuthored:
+            if position == .trailing {
+                KeyboardFixedEditingRail(previewMetrics: metrics, returnTitle: returnTitle, isComposing: composing)
+            } else if composing {
+                readingCaption
+            } else {
+                KeyboardPhoneSymbolRail(
+                    caps: SymbolPageTable.quickRail(
+                        symbols: T9QuickSymbolStore.defaultSymbols, ascii: usesASCIIPunctuation),
+                    metrics: metrics, onSelect: { _ in })
+            }
+        case .declared:
+            KeyboardPhoneDeclaredRail(
+                keys: entries.map(\.key), position: position, metrics: metrics,
+                readings: { if composing { readingCaption } },
+                key: { key, index in keyFace(key, path: entries[index].path, id: "\(position.rawValue)-\(index)") })
+        case .empty:
+            if position == .leading && composing { readingCaption } else { Color.clear }
         }
     }
 
-    @ViewBuilder private var singleSpaceControlRowPreview: some View {
-        if let last = definition.rows.last {
-            let index = definition.rows.count - 1
-            let entries = last.keys.enumerated().compactMap { offset, key -> (LayoutKeyPath, LayoutKey)? in
-                editing || key.action.type != .globe
-                    ? (LayoutKeyPath.row(index, key: offset), key) : nil
-            }
-            GeometryReader { proxy in
-                let projection = LayoutRowWidthProjection(weights: entries.map { $0.1.widthWeight })
-                let minimum: CGFloat = editing ? 0 : 44
-                let available = max(0, proxy.size.width - CGFloat(max(0, entries.count - 1)) * 4)
-                let remainder = max(0, available - CGFloat(entries.count) * minimum)
-                HStack(spacing: 4) {
-                    ForEach(Array(entries.enumerated()), id: \.offset) { offset, entry in
-                        keyFace(entry).frame(
-                            width: minimum + remainder * CGFloat(projection.keyFractions[offset]),
-                            height: keyHeight)
-                    }
-                }
-                .frame(width: proxy.size.width, alignment: .center)
-            }.frame(height: keyHeight)
+    private var readingCaption: some View {
+        Text("拼音选项").font(.caption2).multilineTextAlignment(.center)
+    }
+
+    // MARK: Footer
+
+    private func controlRow(split: ActiveLayoutSplit?, columns: KeyboardControlPolicy.PhoneColumns?) -> some View {
+        KeyboardPreviewControlRow(
+            policy: controlPolicy, returnTitle: returnTitle, showsGlobe: showsGlobe, columns: columns,
+            split: split, splitRowIndex: facts.mainRows.count)
+    }
+
+    /// An editor shows the declared control row as stored; the keyboard's bundled shells hide the
+    /// keys their own controls replace.
+    private func layoutUtilityBar(split: ActiveLayoutSplit?) -> some View {
+        let row = editing ? (facts.controlRow == nil ? nil : definition.rows.last) : facts.controlRow
+        let rowIndex = definition.rows.count - 1
+        return KeyboardLayoutUtilityBar(
+            controlRow: row, rowIndex: facts.mainRows.count, split: split,
+            showsGlobe: showsGlobe, definitionHasGlobe: facts.hasGlobe, onPage: { _ in },
+            key: { key, id, index in keyFace(key, path: index < 0 ? nil : .row(rowIndex, key: index), id: id) },
+            globe: { NativeInputModeKey(handleEvent: { _, _ in }, accessibilitySwitch: {}) },
+            modeSwitch: { KeyboardPreviewModeKey(policy: controlPolicy) })
+    }
+
+    // MARK: Key faces
+
+    /// Code and literal keys use the panel's key face with its native-shell policies; function
+    /// keys draw through the authored key face, which renders the same native controls.
+    @ViewBuilder
+    private func keyFace(_ key: LayoutKey, path: LayoutKeyPath?, id: String) -> some View {
+        let select = {
+            if let path { onSelect(path, key) }
+        }
+        if key.action.type == .code || key.action.type == .literal {
+            engineKeyFace(key, id: id, select: select)
+        } else {
+            functionKeyFace(key, path: path, select: select)
         }
     }
 
     @ViewBuilder
-    private func authoredPageCanvas(_ page: KeyboardPageDefinition) -> some View {
-        let browser =
-            page.usesSymbolBrowser
-            && (page.symbolPresentation != .automatic || pageUsesPhoneLayout || categoryPreference)
-        if browser {
-            KeyboardCategoryPagePreview(
-                page: page, split: activeSplit,
-                key: { key, category, index in
-                    keyFace((.row(0, key: index), key), onSelect: { onSelectCategoryKey?(category, index) })
-                        .overlay {
-                            if selectedCategoryKey?.0 == category && selectedCategoryKey?.1 == index {
-                                RoundedRectangle(cornerRadius: appearance.skin.keycap.cornerRadius)
-                                    .stroke(Color.accentColor, lineWidth: 2).allowsHitTesting(false)
-                            }
-                        }
-                },
-                footer: { metrics, split in
-                    authoredPageControlRow(
-                        page, browser: true, split: split,
-                        columns: .init(rail: metrics.railWidth, digit: metrics.digitWidth))
-                }
-            )
-            .padding(4).background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 8))
-        } else {
-            let source = page.symbolPresentation == .automatic ? KeyboardPagePresets.symbolsChinese : page
-            VStack(spacing: 4) {
-                ScrollView {
-                    VStack(spacing: 4) {
-                        KeyboardPageRows(
-                            page: source, split: activeSplit,
-                            key: { key, row, index in keyFace((.row(row, key: index), key)) },
-                            shift: { ShiftKey(state: .off, isEnglishMode: true, tap: {}, doubleTap: {}) },
-                            delete: { RepeatingDeleteKey {} })
-                    }
-                }.scrollDisabled(source.rows.count <= 3)
-                    .frame(height: keyHeight * 3 + 8, alignment: .top)
-                authoredPageControlRow(source, browser: false, split: activeSplit, columns: nil)
-            }.padding(4).background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 8))
+    private func engineKeyFace(_ key: LayoutKey, id: String, select: @escaping () -> Void) -> some View {
+        let isT9FirstKey = facts.isKnownPhone9Primary && id == "row-0-0"
+        let presetKey = KeyboardPanelRules.knownMainShellPreset(facts).flatMap {
+            KeyboardPanelRules.mainShellPresetKey(in: $0, id: id, key: key)
+        }
+        let bundledMergedFace =
+            usesBundledMergedPad && presetKey.map { KeyboardPanelRules.keyFaceUnchanged(key, preset: $0) } == true
+        let letterGroup = LetterGroupLayout.group(of: key) ?? []
+        // The live first key shows its cycle while idle and the separator while composing.
+        let title: String =
+            if isT9FirstKey {
+                key.titleMode != .custom && facts.isBuiltinPhonePad
+                    ? (composing
+                        ? "分词"
+                        : SymbolPageTable.quickCycle(
+                            symbols: T9QuickSymbolStore.defaultSymbols, ascii: usesASCIIPunctuation
+                        ).prefix(3).joined())
+                    : key.label
+            } else if bundledMergedFace {
+                key.label.lowercased()
+            } else {
+                key.literalFaceTitle(usesASCIIPunctuation: usesASCIIPunctuation)
+            }
+        // The merged pad keeps its preset menus suppressed; edited and other keys show what the
+        // author declared.
+        let options: [KeyCap] =
+            usesBundledMergedPad && presetKey?.longPress == key.longPress
+            ? []
+            : (key.longPress ?? []).enumerated().compactMap { index, option in
+                guard option.action.type == .code || option.action.type == .literal else { return nil }
+                return KeyCap(
+                    id: "\(id)-option-\(index)", title: option.label,
+                    action: option.action.keyAction(usesASCIIPunctuation: usesASCIIPunctuation))
+            }
+        let separatorIdle = usesStandardT9 && key.action == LayoutAction(.code, value: "'") && !composing
+        AlternateCharacterKey(
+            cap: KeyCap(
+                id: id, title: title, subtitle: bundledMergedFace ? nil : key.secondaryLabel,
+                action: key.action.keyAction(usesASCIIPunctuation: usesASCIIPunctuation)),
+            alternates: options,
+            phoneKey: usesStandardT9,
+            phoneSideKey: usesStandardT9 && !id.hasPrefix("row-"),
+            letterGroup: letterGroup.count > 1
+                ? letterGroup.map { bundledMergedFace ? String($0).lowercased() : String($0) } : []
+        ) { _ in select() }
+        .opacity(separatorIdle ? 0.45 : 1)
+    }
+
+    /// The authored face reads only the control state here; `.symbols` keeps literal letter
+    /// semantics out of these keys.
+    @ViewBuilder
+    private func functionKeyFace(_ key: LayoutKey, path: LayoutKeyPath?, select: @escaping () -> Void) -> some View {
+        if key.action.type != .globe || showsGlobe {
+            let pagePath = authoredPath(path)
+            KeyboardAuthoredPageKey(
+                key: key, path: pagePath,
+                state: KeyboardPageAuthoredState(
+                    page: page, kind: .symbols, isEnglishMode: isEnglishMode, shiftState: .off,
+                    returnTitle: returnTitle, isReturnEnabled: true, symbolLocked: false,
+                    isComposing: composing, hasGlobe: showsGlobe, isPhoneStyled: false,
+                    usesASCIIPunctuation: usesASCIIPunctuation),
+                actions: KeyboardPageAuthoredActions(
+                    perform: { _, _, _ in select() },
+                    performShiftDoubleTap: { _ in select() },
+                    moveCursor: nil, systemKeyboardSwitch: editing ? nil : { _, _ in },
+                    spaceLayoutName: nil, spaceHintName: nil, spaceHintToken: nil),
+                actionTable: KeyboardPageAuthoredActionTable(singleKey: key, path: pagePath),
+                editorSelection: editing)
         }
     }
 
-    private func authoredPageControlRow(
-        _ page: KeyboardPageDefinition, browser: Bool, split: ActiveLayoutSplit?,
-        columns: KeyboardControlPolicy.PhoneColumns?
-    ) -> some View {
-        let policy = KeyboardControlPolicy(
-            page: page.kind == .english ? .letters : (page.kind == .numeric ? .numeric : .symbols),
-            isEnglishMode: page.kind == .english, hasGlobe: true, isPhoneLayout: browser,
-            usesASCIIPunctuation: page.defaultSymbolMarks == .ascii, includesBottomEnter: !browser,
-            usesCategorySymbolPage: page.symbolPresentation == .categorized)
-        return ControlRow(
-            policy: policy, returnTitle: "换行", layoutName: nil, layoutHintName: nil, layoutHintToken: nil,
-            modeKey: AlternateCharacterKey(
-                cap: KeyCap(
-                    id: "preview-page-mode", title: policy.languageTitle(for: nil),
-                    action: .cycleLayout
-                ), alternates: []
-            ) { _ in },
-            systemKeyboardSwitch: { _, _ in }, moveCursor: nil, onPage: { _ in }, onKey: { _ in },
-            phoneColumns: columns, split: split, splitRowIndex: page.rows.count)
-    }
-
-    private func rowEntries(_ index: Int) -> [(LayoutKeyPath, LayoutKey)] {
-        guard mainRows.indices.contains(index) else { return [] }
-        return mainRows[index].keys.enumerated().map { (LayoutKeyPath.row(index, key: $0.offset), $0.element) }
-    }
-
-    private func visibleEntries(_ index: Int) -> [(LayoutKeyPath, LayoutKey)] {
-        rowEntries(index).filter { editing || $0.1.action.type != .globe }
-    }
-
-    /// Only function keys of a custom main layout draw through the shared authored-page key view, so
-    /// their titleMode and author secondary label match the running keyboard (native faces included).
-    /// The shared face only needs a non-English kind for these keys; code/literal keys keep the
-    /// original preview path (merged/alternate/phone styling untouched).
-    private var previewLayoutState: KeyboardPageAuthoredState {
-        KeyboardPageAuthoredState(
-            page: .letters, kind: .symbols, isEnglishMode: mode == "英文", shiftState: .off,
-            returnTitle: returnTitle, isReturnEnabled: true, symbolLocked: false,
-            isComposing: composing, hasGlobe: true, isPhoneStyled: phone,
-            usesASCIIPunctuation: previewUsesASCIIPunctuation,
-            usesCategorySymbolPage: pageDefinition?.symbolPresentation == .categorized)
-    }
-
-    private func previewLayoutActions(select: @escaping () -> Void) -> KeyboardPageAuthoredActions {
-        KeyboardPageAuthoredActions(
-            perform: { _, _, _ in select() },
-            performShiftDoubleTap: { _ in select() },
-            moveCursor: nil, systemKeyboardSwitch: nil, spaceLayoutName: nil,
-            spaceHintName: nil, spaceHintToken: nil)
-    }
-
-    private func authoredPath(_ path: LayoutKeyPath) -> KeyboardPageKeyPath {
+    /// Face identity only: an authored face reads the region for its tone, not the action.
+    private func authoredPath(_ path: LayoutKeyPath?) -> KeyboardPageKeyPath {
         switch path {
         case .row(let row, let key): return .row(row, key: key)
         case .auxiliary(let area, let key):
-            // Preview identity only: an authored face reads the region for its tone, not the action.
-            return .chrome(area.isMultiple(of: 2) ? .leading : .trailing, key: key)
+            let position = definition.auxiliaryAreas?[area].position
+            return .chrome(position == .leading ? .leading : .trailing, key: key)
+        case nil: return .chrome(.bottom, key: 0)
         }
     }
 
-    /// The authored face owns function controls only: engine code/literal keys keep the original
-    /// preview path so merged hints/alternates and phone styling are not re-routed.
-    private func usesAuthoredPreviewFace(_ key: LayoutKey) -> Bool {
-        pageDefinition == nil && preset == nil
-            && key.action.type != .code && key.action.type != .literal
+    // MARK: Samples
+
+    private var previewAlternates: [LayoutOption] {
+        inspected?.longPress
+            ?? definition.rows.flatMap(\.keys).first(where: { !($0.longPress ?? []).isEmpty })?.longPress ?? []
     }
 
-    @ViewBuilder private func authoredLayoutKeyFace(
-        _ entry: (LayoutKeyPath, LayoutKey), select: @escaping () -> Void
-    ) -> some View {
-        let key = entry.1
-        let path = authoredPath(entry.0)
-        let state = previewLayoutState
-        // Keep the disabled look while staying tappable: the editor selects a key instead of running it.
-        let dimmed = key.action.type != .shift && !state.isEnabled(key)
-        KeyboardAuthoredPageKey(
-            key: key, path: path, state: state, actions: previewLayoutActions(select: select),
-            actionTable: KeyboardPageAuthoredActionTable(singleKey: key, path: path),
-            editorSelection: true
-        )
-        .opacity(dimmed ? 0.4 : 1)
-    }
-
-    @ViewBuilder private func keyFace(
-        _ entry: (LayoutKeyPath, LayoutKey), side: Bool = false, onSelect: (() -> Void)? = nil
-    ) -> some View {
-        let key = entry.1
-        let select = {
-            if let onSelect {
-                onSelect()
-            } else {
-                inspected = key
-                onSelectKey?(entry.0)
+    private var longPressSample: some View {
+        // Same text-measured 44...72pt cells as CharacterButton.showAlternates.
+        let font = appearance.uiFont(min(20, appearance.skin.typography.keySize))
+        let textWidth = previewAlternates.reduce(CGFloat.zero) {
+            max($0, ($1.label as NSString).size(withAttributes: [.font: font]).width)
+        }
+        let width = max(44, min(72, textWidth + 20))
+        return LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: width, maximum: width), spacing: 4)],
+            alignment: .leading, spacing: 0
+        ) {
+            ForEach(Array(previewAlternates.enumerated()), id: \.offset) { _, option in
+                AlternateCharacterKey(
+                    cap: .init(
+                        id: option.label, title: option.label,
+                        action: option.action.keyAction(usesASCIIPunctuation: usesASCIIPunctuation)),
+                    alternates: []
+                ) { _ in }
+                .frame(height: 46)
             }
         }
-        if usesAuthoredPreviewFace(key) {
-            authoredLayoutKeyFace(entry, select: select)
-        } else if key.action.type == .backspace && (key.longPress ?? []).isEmpty {
-            RepeatingDeleteKey(action: select)
-        } else if key.action.type == .enter {
-            ReturnKey(
-                title: returnTitle,
-                alternates: (key.longPress ?? []).enumerated().map { index, option in
-                    KeyCap(id: "preview-return-\(index)", title: option.label, action: action(option.action))
-                }
-            ) { _ in select() }
-        } else if key.action.type == .space {
-            CursorSpaceKey(
-                title: key.label, layoutName: nil, layoutHintName: nil, layoutHintToken: nil, onTap: select,
-                moveCursor: nil)
-        } else if key.action.type == .globe {
-            Button(action: select) { ControlKeyFace(symbol: "globe") }.buttonStyle(KeyboardPressStyle())
-        } else {
-            AlternateCharacterKey(
-                cap: .init(
-                    id: key.label,
-                    title: key.literalFaceTitle(usesASCIIPunctuation: previewUsesASCIIPunctuation),
-                    subtitle: merged && key.secondaryLabel == "合并键" ? nil : key.secondaryLabel,
-                    action: action(key.action)),
-                alternates: merged && !editing
-                    ? []
-                    : (key.longPress ?? []).map { .init(id: $0.label, title: $0.label, action: action($0.action)) },
-                phoneKey: phone, phoneSideKey: phone && side
-            ) { _ in select() }
-            .opacity(phone && key.action == LayoutAction(.code, value: "'") && !composing ? 0.45 : 1)
-        }
+        .padding(.horizontal, 6)
+        .padding(.top, 4)
     }
+
     private func candidateArea(expanded: Bool) -> some View {
         let state = CandidatePresentationState(
             preedit: "ni hao", rawInput: "nihao",
@@ -756,39 +538,18 @@ public struct KeyboardPreviewView: View {
         let context = CandidateAreaContext(
             state: state, bar: candidateBar, actions: .init { _ in },
             typography: .init(
-                candidateSize: skin.typography.candidateSize, secondarySize: skin.typography.secondarySize))
+                candidateSize: appearance.skin.typography.candidateSize,
+                secondarySize: appearance.skin.typography.secondarySize))
         let renderer = CandidateRendererRegistry.renderer(id: DefaultCandidateAreaRenderer.rendererID)
         return Group {
             if expanded { renderer.makeExpanded(context) } else { renderer.makeCollapsed(context) }
-        }.environment(
+        }
+        .environment(
             \.candidateSkinToken,
             CandidateSkinToken(
                 candidateColor: Color(uiColor: appearance.text(on: "panel")),
                 secondaryColor: Color(uiColor: appearance.text(on: "panel", secondary: true)),
                 accentColor: appearance.accentForeground, panelColor: appearance.color("panel"),
-                fontFamily: skin.typography.family, fontWeight: skin.typography.weight))
-    }
-    /// One preview source for faces, actions and the language caption: an explicit page default
-    /// wins, otherwise an English page previews the real English branch.
-    private var previewSymbolMarks: KeyboardNumericMarks {
-        if let marks = pageDefinition?.defaultSymbolMarks { return marks }
-        return mode == "英文" ? .ascii : .chinese
-    }
-
-    private var previewUsesASCIIPunctuation: Bool { previewSymbolMarks == .ascii }
-
-    private func action(_ value: LayoutAction) -> KeyAction {
-        switch value.type {
-        case .code: return .code(value.value ?? "")
-        case .literal:
-            return .literal(value.literalValue(usesASCIIPunctuation: previewUsesASCIIPunctuation) ?? "")
-        case .space: return .space
-        case .enter: return .enter
-        case .backspace: return .backspace
-        case .modeSwitch: return .cycleLayout
-        case .globe: return .switchKeyboard
-        // Page-level UI actions have no engine face; the preview only styles the cap.
-        case .shift, .pageSwitch, .languageSwitch, .symbolLock, .clearInput: return .cycleLayout
-        }
+                fontFamily: appearance.skin.typography.family, fontWeight: appearance.skin.typography.weight))
     }
 }

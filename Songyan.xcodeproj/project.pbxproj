@@ -104,6 +104,8 @@
 		3DB757756DEB49A5812D7138 /* KeyboardPanelView+ControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0590BF69F5468194145F08 /* KeyboardPanelView+ControlRow.swift */; };
 		96C7E93E860F40AF831A727E /* KeyboardPanelView+CandidateArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6317E3D4FCEA4FB4A86359CB /* KeyboardPanelView+CandidateArea.swift */; };
 		92EAF5370B644C32A2B50B85 /* SymbolPageTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 998ECA1EAB884DE79F05CA5C /* SymbolPageTable.swift */; };
+		EE2C25A7F0A3427FA4A6F467 /* KeyboardKeyAreaViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78BD7728B9A54AC28CD79095 /* KeyboardKeyAreaViews.swift */; };
+		1BEFB556DFC6488CB2C9B714 /* KeyboardPanelRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62515D6DB54403385CBE81B /* KeyboardPanelRules.swift */; };
 		89E6DF57F8644698ABBE0E51 /* WeightedKeyRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8B2049ED794BD29AAC22E6 /* WeightedKeyRow.swift */; };
 		642F46E84D644ED4AFFF45DE /* AlternateCharacterKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE51B9F5F6904570AB0E415D /* AlternateCharacterKey.swift */; };
 		8D90EB19BFA841CDAC7DD386 /* AlternateCharacterKey+Popup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D562BD9960405DA9C24453 /* AlternateCharacterKey+Popup.swift */; };
@@ -129,6 +131,8 @@
 		630D75C4EC3344C59DC89F34 /* KeyboardPanelView+ControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0590BF69F5468194145F08 /* KeyboardPanelView+ControlRow.swift */; };
 		878B26335E794C4B82B3D73C /* KeyboardPanelView+CandidateArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6317E3D4FCEA4FB4A86359CB /* KeyboardPanelView+CandidateArea.swift */; };
 		5A1E980F00C844429B27D8B7 /* SymbolPageTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 998ECA1EAB884DE79F05CA5C /* SymbolPageTable.swift */; };
+		9FABF102A37D413DA9F45432 /* KeyboardKeyAreaViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78BD7728B9A54AC28CD79095 /* KeyboardKeyAreaViews.swift */; };
+		B3116D49B58C4B459269AD19 /* KeyboardPanelRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62515D6DB54403385CBE81B /* KeyboardPanelRules.swift */; };
 		B985072888984643BCD7C221 /* WeightedKeyRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8B2049ED794BD29AAC22E6 /* WeightedKeyRow.swift */; };
 		C698FE2AB25F420B9037B456 /* AlternateCharacterKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE51B9F5F6904570AB0E415D /* AlternateCharacterKey.swift */; };
 		DF192CBF8EA240D0B42289F2 /* AlternateCharacterKey+Popup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D562BD9960405DA9C24453 /* AlternateCharacterKey+Popup.swift */; };
@@ -326,6 +330,8 @@
 		AF0590BF69F5468194145F08 /* KeyboardPanelView+ControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPanelView+ControlRow.swift"; sourceTree = "<group>"; };
 		6317E3D4FCEA4FB4A86359CB /* KeyboardPanelView+CandidateArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardPanelView+CandidateArea.swift"; sourceTree = "<group>"; };
 		998ECA1EAB884DE79F05CA5C /* SymbolPageTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolPageTable.swift; sourceTree = "<group>"; };
+		78BD7728B9A54AC28CD79095 /* KeyboardKeyAreaViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardKeyAreaViews.swift; sourceTree = "<group>"; };
+		C62515D6DB54403385CBE81B /* KeyboardPanelRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPanelRules.swift; sourceTree = "<group>"; };
 		FB8B2049ED794BD29AAC22E6 /* WeightedKeyRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightedKeyRow.swift; sourceTree = "<group>"; };
 		FE51B9F5F6904570AB0E415D /* AlternateCharacterKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlternateCharacterKey.swift; sourceTree = "<group>"; };
 		90D562BD9960405DA9C24453 /* AlternateCharacterKey+Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AlternateCharacterKey+Popup.swift"; sourceTree = "<group>"; };
@@ -565,6 +571,8 @@
 				AF0590BF69F5468194145F08 /* KeyboardPanelView+ControlRow.swift */,
 				6317E3D4FCEA4FB4A86359CB /* KeyboardPanelView+CandidateArea.swift */,
 				998ECA1EAB884DE79F05CA5C /* SymbolPageTable.swift */,
+				78BD7728B9A54AC28CD79095 /* KeyboardKeyAreaViews.swift */,
+				C62515D6DB54403385CBE81B /* KeyboardPanelRules.swift */,
 				FB8B2049ED794BD29AAC22E6 /* WeightedKeyRow.swift */,
 				FE51B9F5F6904570AB0E415D /* AlternateCharacterKey.swift */,
 				90D562BD9960405DA9C24453 /* AlternateCharacterKey+Popup.swift */,
@@ -791,6 +799,8 @@
 				3DB757756DEB49A5812D7138 /* KeyboardPanelView+ControlRow.swift in Sources */,
 				96C7E93E860F40AF831A727E /* KeyboardPanelView+CandidateArea.swift in Sources */,
 				92EAF5370B644C32A2B50B85 /* SymbolPageTable.swift in Sources */,
+				EE2C25A7F0A3427FA4A6F467 /* KeyboardKeyAreaViews.swift in Sources */,
+				1BEFB556DFC6488CB2C9B714 /* KeyboardPanelRules.swift in Sources */,
 				89E6DF57F8644698ABBE0E51 /* WeightedKeyRow.swift in Sources */,
 				642F46E84D644ED4AFFF45DE /* AlternateCharacterKey.swift in Sources */,
 				8D90EB19BFA841CDAC7DD386 /* AlternateCharacterKey+Popup.swift in Sources */,
@@ -925,6 +935,8 @@
 				630D75C4EC3344C59DC89F34 /* KeyboardPanelView+ControlRow.swift in Sources */,
 				878B26335E794C4B82B3D73C /* KeyboardPanelView+CandidateArea.swift in Sources */,
 				5A1E980F00C844429B27D8B7 /* SymbolPageTable.swift in Sources */,
+				9FABF102A37D413DA9F45432 /* KeyboardKeyAreaViews.swift in Sources */,
+				B3116D49B58C4B459269AD19 /* KeyboardPanelRules.swift in Sources */,
 				B985072888984643BCD7C221 /* WeightedKeyRow.swift in Sources */,
 				C698FE2AB25F420B9037B456 /* AlternateCharacterKey.swift in Sources */,
 				DF192CBF8EA240D0B42289F2 /* AlternateCharacterKey+Popup.swift in Sources */,

@@ -5,59 +5,19 @@ import LayoutKit
 import SwiftUI
 
 extension KeyboardPanelView {
-    /// Bundled merged letter pad (14-key, 18-key): the definition's rows at their weighted widths
-    /// (`MergedKeypadGeometry`), with the separator in the Shift slot and Delete closing the last row.
     /// Keys keep the definition's codes; the Chinese merged page has no case, so the Shift slot becomes word-split.
     var mergedKeypad: some View {
-        GeometryReader { geometry in
-            let spacing: CGFloat = 4
-            let rows = definitionMainRows
-            let side = sharedDeleteWidth(for: geometry.size.width)
-            let gap = CGFloat(
-                activeSplit?.gap(
-                    width: Double(geometry.size.width), keyCount: (rows.map { $0.keys.count }.max() ?? 1) + 2) ?? 0)
-            let metrics = MergedKeypadGeometry.rows(
-                weights: rows.map { $0.keys.map(\.widthWeight) },
-                width: max(0, geometry.size.width - gap), spacing: spacing,
-                sideWidth: side)
-            VStack(spacing: spacing) {
-                ForEach(Array(zip(rows, metrics).enumerated()), id: \.offset) { index, entry in
-                    let isLast = index == rows.count - 1
-                    HStack(spacing: spacing) {
-                        if isLast {
-                            mergedSeparatorKey.frame(width: side, height: keyHeight)
-                        }
-                        ForEach(Array(entry.0.keys.enumerated()), id: \.offset) { keyIndex, key in
-                            if keyIndex == activeSplit?.breakIndex(row: index, keyCount: entry.0.keys.count), gap > 0 {
-                                KeyboardSplitGap().frame(width: gap - spacing, height: keyHeight)
-                            }
-                            definitionKey(key, id: "merged-\(key.action.value ?? "\(index)-\(keyIndex)")")
-                                .frame(width: entry.1.keyWidths[keyIndex], height: keyHeight)
-                        }
-                        if isLast {
-                            RepeatingDeleteKey { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) }
-                                .frame(width: side, height: keyHeight)
-                        }
-                    }
-                    .frame(width: geometry.size.width)
+        KeyboardMergedPad(
+            rows: definitionMainRows, split: activeSplit,
+            key: { key, index, keyIndex in
+                definitionKey(key, id: "merged-\(key.action.value ?? "\(index)-\(keyIndex)")")
+            },
+            separator: {
+                KeyboardMergedSeparatorKey(isComposing: controller.snapshot.isComposing) {
+                    handleDefinitionAction(.code("'"))
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
-        .frame(height: CGFloat(max(1, definitionMainRows.count)) * (keyHeight + 4) - 4)
-    }
-
-    /// Syllable separator in the merged pad's Shift slot; only a composition uses it.
-    private var mergedSeparatorKey: some View {
-        AlternateCharacterKey(
-            cap: KeyCap(id: "merged-separator", title: "分词", action: .code("'")),
-            alternates: [], visualRole: "control",
-            titleSize: appearance.controlTextSize
-        ) { _ in
-            handleDefinitionAction(.code("'"))
-        }
-        .disabled(!controller.snapshot.isComposing)
-        .accessibilityLabel("分词")
+            },
+            delete: { RepeatingDeleteKey { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) } })
     }
 
     func definitionInset(_ row: LayoutRow, index: Int) -> CGFloat {
@@ -72,46 +32,12 @@ extension KeyboardPanelView {
         spacing: CGFloat = 4, split: ActiveLayoutSplit? = nil, rowIndex: Int = 0,
         fixedKeyWidth: CGFloat? = nil, splitGap: CGFloat? = nil
     ) -> some View {
-        let keys = visibleKeys(row.keys)
-        return GeometryReader { geometry in
-            let gap = splitGap ?? CGFloat(split?.gap(width: Double(geometry.size.width), keyCount: keys.count) ?? 0)
-            let boundary = split?.breakIndex(row: rowIndex, keyCount: keys.count)
-            let available = max(0, geometry.size.width - CGFloat(max(0, keys.count - 1)) * spacing - gap)
-            let widths = LayoutRowWidthProjection(weights: keys.map(\.widthWeight), inset: Double(inset))
-            let isControls = id == "controls"
-            let minimum: CGFloat = isControls ? 44 : 0
-            let remainder = max(0, available - CGFloat(keys.count) * minimum)
-            let row = HStack(spacing: spacing) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
-                    if index == boundary, gap > 0 {
-                        KeyboardSplitGap().frame(width: gap - spacing, height: keyHeight)
-                    }
-                    definitionKey(key, id: "\(id)-\(index)")
-                        .frame(
-                            width: fixedKeyWidth
-                                ?? (isControls
-                                    ? minimum + remainder * CGFloat(widths.keyFractions[index])
-                                    : available * CGFloat(widths.keyFractions[index])),
-                            height: keyHeight)
-                }
-            }
-            .padding(
-                .horizontal,
-                fixedKeyWidth.map { max(0, (available - $0 * CGFloat(keys.count)) / 2) }
-                    ?? (available * CGFloat(widths.insetFraction)))
-            if isControls {
-                // Only an authored control row can exceed the width (44pt minimum
-                // per key), so only it may scroll.
-                ScrollView(.horizontal, showsIndicators: false) { row }
-                    .sharpCandidateScrollEdges()
-            } else {
-                // Letter/digit rows fill the width exactly, so they need no ScrollView:
-                // one per row would add gesture arbitration to every key touch and
-                // an iOS 26 scroll edge effect along the top of the first row.
-                row
-            }
+        KeyboardDefinitionRow(
+            keys: visibleKeys(row.keys), inset: inset, spacing: spacing, split: split, rowIndex: rowIndex,
+            fixedKeyWidth: fixedKeyWidth, splitGap: splitGap, isControls: id == "controls"
+        ) { key, index in
+            definitionKey(key, id: "\(id)-\(index)")
         }
-        .frame(height: keys.isEmpty ? 0 : keyHeight)
     }
 
     func visibleKeys(_ keys: [LayoutKey]) -> [LayoutKey] {
@@ -123,19 +49,13 @@ extension KeyboardPanelView {
         // Called only by `configuredKeypad` (i.e. `usesStandardT9 == false`), so no always-true condition such as
         // `!usesStandardT9 || ...` is written here. Whether Return belongs to the shared T9 bottom row is decided by
         // `PhoneKeypadRailPolicy` / `t9AuxiliaryKeys`; DIY definitions keep their own keys verbatim.
-        let keys = visibleKeys(
-            (activeDefinition?.auxiliaryAreas ?? [])
-                .filter { $0.position == position && !$0.requiresEngineDisambiguation }.flatMap(\.keys))
-        if !keys.isEmpty {
-            VStack(spacing: 4) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
-                    definitionKey(key, id: "\(position.rawValue)-\(index)")
-                        .frame(maxHeight: .infinity)
-                }
-            }
-            .frame(
-                width: 44,
-                height: CGFloat(max(1, definitionMainRows.count)) * (keyHeight + 4) - 4)
+        KeyboardAuxiliaryColumn(
+            keys: visibleKeys(
+                (activeDefinition?.auxiliaryAreas ?? [])
+                    .filter { $0.position == position && !$0.requiresEngineDisambiguation }.flatMap(\.keys)),
+            rowCount: definitionMainRows.count
+        ) { key, index in
+            definitionKey(key, id: "\(position.rawValue)-\(index)")
         }
     }
 
@@ -601,39 +521,13 @@ extension KeyboardPanelView {
         }
     }
 
-    /// The known bundled main-shell preset (26 or merged 14/18) whose main rows still provide the
-    /// native geometry. Footer/aux sheets are not part of this identity.
     private var knownMainShellPreset: LayoutDefinition? {
-        if definitionFacts.isBundledQwertyMainShell { return BuiltinLayouts.qwerty26 }
-        if definitionFacts.isBundledMergedPad {
-            switch activeDefinition?.input.builtinLayout {
-            case .some(.merged14): return BuiltinLayouts.merged14
-            case .some(.merged18): return BuiltinLayouts.merged18
-            default: return nil
-            }
-        }
-        return nil
+        KeyboardPanelRules.knownMainShellPreset(definitionFacts)
     }
 
-    /// The preset key at the same declared address, for the per-key face/long-press comparison.
-    /// The merged shell addresses its keys by action (the layout data has no stable row address),
-    /// so those ids are resolved by the unchanged main-row action.
     private func knownMainShellPresetKey(for id: String, key: LayoutKey) -> LayoutKey? {
         guard let preset = knownMainShellPreset else { return nil }
-        // Runs per rendered key: scan in place instead of building arrays.
-        if id.hasPrefix("merged-") {
-            for row in preset.rows.prefix(PhoneKeypadMetrics.mainRowCount) {
-                if let match = row.keys.first(where: { $0.action == key.action }) { return match }
-            }
-            return nil
-        }
-        guard id.hasPrefix("row-") else { return nil }
-        let address = id.dropFirst(4)
-        guard let dash = address.firstIndex(of: "-"),
-            let row = Int(address[..<dash]), let column = Int(address[address.index(after: dash)...]),
-            preset.rows.indices.contains(row), preset.rows[row].keys.indices.contains(column)
-        else { return nil }
-        return preset.rows[row].keys[column]
+        return KeyboardPanelRules.mainShellPresetKey(in: preset, id: id, key: key)
     }
 
     /// The author's long-press order is the menu order, mixing code/literal actions and page-UI
@@ -654,15 +548,8 @@ extension KeyboardPanelView {
         }
     }
 
-    /// The bundled merged pad's face policy (lowercase caps, suppressed secondary labels) only
-    /// applies while the key face is still the preset. An authored label/secondary/title is shown
-    /// verbatim; the letter group and swipe still come from that authored label.
     private func bundledKeyFaceUnchanged(_ key: LayoutKey, preset: LayoutKey) -> Bool {
-        key.label == preset.label
-            && key.secondaryLabel == preset.secondaryLabel
-            && key.titleMode == preset.titleMode
-            && key.action == preset.action
-            && key.width == preset.width
+        KeyboardPanelRules.keyFaceUnchanged(key, preset: preset)
     }
 
     /// The bundled T9 digit keys type their digit on an upward flick, the same
@@ -761,121 +648,29 @@ extension KeyboardPanelView {
     }
 
     func keyAction(_ action: LayoutAction) -> KeyAction {
-        switch action.type {
-        case .code: return .code(action.value ?? "")
-        case .literal:
-            return .literal(
-                action.literalValue(usesASCIIPunctuation: effectiveUsesASCIIPunctuation) ?? "")
-        case .space: return .space
-        case .backspace: return .backspace
-        case .enter: return .enter
-        case .globe: return .switchKeyboard
-        case .modeSwitch: return .cycleLayout
-        // Page-level UI actions have no engine face; only authored chrome keys dispatch them.
-        case .shift, .pageSwitch, .languageSwitch, .symbolLock, .clearInput: return .cycleLayout
-        }
+        action.keyAction(usesASCIIPunctuation: effectiveUsesASCIIPunctuation)
     }
 
     private var definitionHasGlobe: Bool { definitionFacts.hasGlobe }
 
-    /// Shortcuts the generic author bar would add only when the authored control row does not
-    /// already declare the same entry (page/globe/layout). This avoids duplicating author keys.
-    private var footerShortcutDedupe: (numeric: Bool, symbols: Bool, layout: Bool) {
-        let keys = definitionControlRow?.keys ?? []
-        return (
-            numeric: keys.contains { $0.action.pageSwitchTarget == .numeric },
-            symbols: keys.contains { $0.action.pageSwitchTarget == .symbols },
-            layout: keys.contains { $0.action.type == .modeSwitch }
-        )
-    }
-
-    @ViewBuilder
     var layoutUtilityBar: some View {
-        if let split = activeSplit {
-            let keys = definitionControlRow?.keys ?? []
-            let boundary = split.breakIndex(row: definitionMainRows.count, keyCount: keys.count)
-            let visible = keys.indices.filter {
-                keys[$0].action.type != .space
-                    && (keys[$0].action.type != .globe || systemKeyboardSwitch != nil)
-            }
-            let dedupe = footerShortcutDedupe
-            let shortcuts: [LayoutFooterItem] =
-                (dedupe.numeric ? [] : [.numericShortcut]) + (dedupe.symbols ? [] : [.symbolShortcut])
-                + (!definitionHasGlobe && systemKeyboardSwitch != nil ? [.globe] : [])
-            let left = shortcuts + visible.filter { $0 < boundary }.map(LayoutFooterItem.key)
-            let right =
-                visible.filter { $0 >= boundary }.map(LayoutFooterItem.key)
-                + (dedupe.layout ? [] : [LayoutFooterItem.layoutSwitch])
-            let space =
-                keys.first { $0.action.type == .space }
-                ?? LayoutKey(label: "空格", width: 4, action: .init(.space))
-            SplitSpaceKeyboardRow(
-                leftKeys: left, rightKeys: right,
-                leftWidths: left.map { $0.width(keys: keys) },
-                rightWidths: right.map { $0.width(keys: keys) }, split: split,
-                spaceWidthMultiplier: 3 * space.widthWeight / 4,
-                key: { layoutFooterKey($0, keys: keys) },
-                space: { definitionKey(space, id: "controls-space") },
-                fallback: { singleSpaceLayoutUtilityBar })
-        } else {
-            singleSpaceLayoutUtilityBar
-        }
-    }
-
-    @ViewBuilder
-    private func layoutFooterKey(_ item: LayoutFooterItem, keys: [LayoutKey]) -> some View {
-        switch item {
-        case .numericShortcut: layoutPageShortcut("123", target: .numeric)
-        case .symbolShortcut: layoutPageShortcut(KeyboardControlPolicy.symbolPageTitle, target: .symbols)
-        case .globe:
-            if let systemKeyboardSwitch {
-                NativeInputModeKey(
-                    handleEvent: systemKeyboardSwitch,
-                    accessibilitySwitch: { controller.handle(.switchKeyboard) })
-            }
-        case .layoutSwitch: modeSwitchKey
-        case .key(let index): definitionKey(keys[index], id: "controls-\(index)")
-        }
-    }
-
-    private var singleSpaceLayoutUtilityBar: some View {
-        let dedupe = footerShortcutDedupe
-        return HStack(spacing: 4) {
-            if !dedupe.numeric { layoutPageShortcut("123", target: .numeric) }
-            if !dedupe.symbols {
-                layoutPageShortcut(KeyboardControlPolicy.symbolPageTitle, target: .symbols)
-            }
-            if let row = definitionControlRow {
-                definitionRow(row, id: "controls")
-            } else {
-                Spacer(minLength: 0)
-            }
-            if !definitionHasGlobe, let systemKeyboardSwitch {
-                NativeInputModeKey(
-                    handleEvent: systemKeyboardSwitch,
-                    accessibilitySwitch: { controller.handle(.switchKeyboard) }
-                )
-                .frame(width: 44, height: keyHeight)
-            }
-            if !dedupe.layout {
-                modeSwitchKey.frame(width: 44, height: keyHeight)
-            }
-        }
-        .font(.system(size: 15, weight: .medium))
-        .foregroundStyle(.primary)
-        .buttonStyle(KeyboardPressStyle())
-    }
-
-    private func layoutPageShortcut(_ title: String, target: KeyboardPage) -> some View {
-        AlternateCharacterKey(
-            cap: KeyCap(id: "layout-page-\(title)", title: title, action: .cycleLayout), alternates: []
-        ) { _ in
-            emitKeyFeedback()
-            page = target
-            showsAllCandidates = false
-        }
-        .frame(width: 44, height: keyHeight)
-        .accessibilityLabel(target == .numeric ? "打开数字符号页" : "打开符号页")
+        KeyboardLayoutUtilityBar(
+            controlRow: definitionControlRow, rowIndex: definitionMainRows.count, split: activeSplit,
+            showsGlobe: systemKeyboardSwitch != nil, definitionHasGlobe: definitionHasGlobe,
+            onPage: { target in
+                emitKeyFeedback()
+                page = target
+                showsAllCandidates = false
+            },
+            key: { key, id, _ in definitionKey(key, id: id) },
+            globe: {
+                if let systemKeyboardSwitch {
+                    NativeInputModeKey(
+                        handleEvent: systemKeyboardSwitch,
+                        accessibilitySwitch: { controller.handle(.switchKeyboard) })
+                }
+            },
+            modeSwitch: { modeSwitchKey })
     }
 
     func alternates(for cap: KeyCap) -> [KeyCap] {
@@ -939,19 +734,5 @@ extension KeyboardPanelView {
     var expandedCandidates: some View {
         candidateRendererView(expanded: true)
             .frame(height: mainAreaHeight)
-    }
-}
-
-/// One slot of the split author control row: a shortcut the bar adds, or a declared key.
-private enum LayoutFooterItem: Hashable {
-    case numericShortcut
-    case symbolShortcut
-    case globe
-    case layoutSwitch
-    case key(Int)
-
-    func width(keys: [LayoutKey]) -> Double {
-        guard case .key(let index) = self else { return 44 }
-        return max(44, keys[index].widthWeight * 44)
     }
 }

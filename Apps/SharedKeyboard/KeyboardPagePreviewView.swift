@@ -4,240 +4,343 @@ import LayoutKit
 import QuickContentKit
 import SkinKit
 import SwiftUI
+import UIKit
 
-/// Measures the preview's real width so a split preview uses the same whole-surface decision as
-/// the running keyboard. Previews are static surfaces, so one settling pass is enough.
-struct PreviewWidthProbe: ViewModifier {
-    @Binding var width: CGFloat
+// MARK: - Preview support
 
-    func body(content: Content) -> some View {
-        content.background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear { width = proxy.size.width }
-                    .onChange(of: proxy.size.width) { _, newWidth in width = newWidth }
-            }
-        }
+/// Keyboard settings a preview mirrors. Read off the main thread; the last read seeds the next
+/// preview so it does not start from defaults.
+///
+/// Globe keys: a preview draws them when it is an editor, so they can be selected, or when the
+/// keyboard last reported that the system needs its own switch key (unknown counts as needed).
+/// Main-layout and page previews both follow this rule.
+struct KeyboardPreviewPreferences: Equatable, Sendable {
+    var heightPreset = KeyboardHeightPreset.standard
+    var prefersCategorySymbolPage = false
+    var needsInputModeSwitchKey = true
+    var docks: [KeyboardLayoutKind: KeyboardContentDock] = [:]
+
+    @MainActor static var cached = KeyboardPreviewPreferences()
+
+    func keyHeight(compact: Bool) -> CGFloat { CGFloat(heightPreset.keyHeight(compact: compact)) }
+
+    func dock(for layout: KeyboardLayoutKind?) -> KeyboardContentDock {
+        layout.flatMap { docks[$0] } ?? .center
+    }
+
+    func showsGlobe(editing: Bool) -> Bool { editing || needsInputModeSwitchKey }
+
+    @MainActor static func load() async -> Self {
+        let value = await Task.detached(priority: .userInitiated) { read() }.value
+        cached = value
+        return value
+    }
+
+    private static func read() -> Self {
+        var docks: [KeyboardLayoutKind: KeyboardContentDock] = [:]
+        for layout in KeyboardLayoutKind.allCases { docks[layout] = KeyboardContentDockPreferences.dock(for: layout) }
+        return Self(
+            heightPreset: KeyboardHeightPreferences.current,
+            prefersCategorySymbolPage: KeyboardSymbolPagePreferences.usesCategoryPage,
+            needsInputModeSwitchKey: KeyboardSystemRequirements.requiresKeyboardSwitchEntry(),
+            docks: docks)
     }
 }
 
-struct KeyboardCategoryGrid<Key: View>: View {
-    @Environment(\.keyboardKeyHeight) private var keyHeight
-    let keys: [LayoutKey]
-    let columns: Int
-    let split: ActiveLayoutSplit?
-    @ViewBuilder var key: (LayoutKey, Int) -> Key
+/// The widths the keyboard settles its split decisions on, derived from the preview's frame.
+struct KeyboardPreviewWidths: Equatable {
+    /// The key area width (after the surface's 4pt side padding).
+    let content: Double
+    /// The width the main layout's split activation is decided on.
+    let mainSplit: Double
+}
+
+/// Applies the keyboard's own width rules to the preview's frame: a wide surface caps and docks
+/// the content like the keyboard, and split decisions read the same widths. Content stays hidden
+/// until the real width is known, so a split preview never draws unsplit first.
+struct KeyboardPreviewFrame<Content: View>: View {
+    let layout: KeyboardLayoutKind?
+    let mainSplit: LayoutSplitConfiguration?
+    let dock: KeyboardContentDock
+    @ViewBuilder var content: (KeyboardPreviewWidths) -> Content
+    @State private var width: CGFloat = 0
 
     var body: some View {
-        let rows = stride(from: 0, to: keys.count, by: columns).map { start in
-            Array(start..<min(start + columns, keys.count))
-        }
-        let fullRows = keys.count / columns
-        let referenceWeights =
-            fullRows > 0
-            ? keys[((fullRows - 1) * columns)..<(fullRows * columns)].map(\.widthWeight)
-            : keys.map(\.widthWeight)
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 4) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { row, indices in
-                    GeometryReader { proxy in
-                        let geometry = KeyboardCategoryRowGeometry(
-                            width: Double(proxy.size.width), columns: columns,
-                            weights: indices.map { keys[$0].widthWeight }, row: row, split: split,
-                            referenceWeights: referenceWeights)
-                        let used = geometry.usedWidth
-                        HStack(spacing: 0) {
-                            HStack(spacing: 4) {
-                                ForEach(Array(indices.enumerated()), id: \.element) { local, source in
-                                    if local == geometry.splitIndex, geometry.gap > 0 {
-                                        KeyboardSplitGap().frame(width: geometry.gap - 4, height: keyHeight)
-                                    }
-                                    key(keys[source], source)
-                                        .frame(
-                                            width: geometry.keyWidths[local],
-                                            height: keyHeight)
-                                }
-                            }.frame(width: used)
-                            if Double(proxy.size.width) > used {
-                                KeyboardSplitGap().frame(width: Double(proxy.size.width) - used, height: keyHeight)
-                            }
-                        }
-                    }.frame(height: keyHeight)
+        let raw = Double(width)
+        let plan = KeyboardWideContentPolicy.plan(
+            panelWidth: raw,
+            maximumContentWidth: KeyboardPanelRules.wideMaximumContentWidth(
+                rawWidth: raw, mainSplit: mainSplit, layout: layout),
+            dock: dock)
+        let contentWidth = plan.active ? plan.contentWidth : raw
+        content(KeyboardPreviewWidths(content: max(0, contentWidth - 8), mainSplit: max(0, raw - 8)))
+            .frame(width: CGFloat(contentWidth))
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .opacity(width > 0 ? 1 : 0)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { width = proxy.size.width }
+                        .onChange(of: proxy.size.width) { _, newWidth in width = newWidth }
                 }
             }
-        }.sharpCandidateScrollEdges()
+    }
+
+    private var alignment: Alignment {
+        switch dock {
+        case .left: return .leading
+        case .center: return .center
+        case .right: return .trailing
+        }
     }
 }
 
+/// The panel's language key without the published-keyboard menu a preview has no session for.
+struct KeyboardPreviewModeKey: View {
+    let policy: KeyboardControlPolicy
+
+    var body: some View {
+        AlternateCharacterKey(
+            cap: KeyCap(id: "input-mode", title: policy.languageTitle(for: nil), action: .cycleLayout),
+            alternates: [], layoutPicker: true
+        ) { _ in }
+        .accessibilityLabel(policy.languageAccessibilityLabel(for: nil))
+    }
+}
+
+/// The panel's control row with inert actions.
+struct KeyboardPreviewControlRow: View {
+    let policy: KeyboardControlPolicy
+    var returnTitle = "换行"
+    let showsGlobe: Bool
+    var columns: KeyboardControlPolicy.PhoneColumns? = nil
+    let split: ActiveLayoutSplit?
+    let splitRowIndex: Int
+
+    var body: some View {
+        ControlRow(
+            policy: policy, returnTitle: returnTitle, layoutName: nil, layoutHintName: nil,
+            layoutHintToken: nil, modeKey: KeyboardPreviewModeKey(policy: policy),
+            systemKeyboardSwitch: showsGlobe ? { _, _ in } : nil, moveCursor: nil,
+            onPage: { _ in }, onKey: { _ in }, phoneColumns: columns, split: split,
+            splitRowIndex: splitRowIndex)
+    }
+}
+
+extension KeyboardFixedEditingRail {
+    /// The idle editing rail of a preview.
+    init(previewMetrics metrics: PhoneKeypadMetrics, returnTitle: String = "换行", isComposing: Bool = false) {
+        self.init(
+            metrics: metrics, returnTitle: returnTitle, isReturnEnabled: true, isComposing: isComposing,
+            onDelete: { _ in }, onReset: {}, onReturn: { _ in })
+    }
+}
+
+// MARK: - Page preview
+
+/// Draws a page the way the keyboard resolves and draws it, through the same views and rules.
+/// A preview has no session: it shows the idle Chinese state, with an explicit page default
+/// deciding the symbol branch.
 public struct KeyboardPagePreviewView: View {
     public let page: KeyboardPageDefinition
     public var inheritedSplit: LayoutSplitConfiguration?
     /// The running main layout is a phone keypad: an automatic page then shows its digit pad
     /// instead of the ten-column row page, exactly as the key area does.
     public var isPhoneLayout: Bool
+    /// The running main layout, for the wide-surface width cap. Nil falls back to the phone
+    /// keypad cap when `isPhoneLayout` is set.
+    public var mainLayout: KeyboardLayoutKind?
+    public var skin: SkinDefinition
+    public var previewDark: Bool?
     private let onSelectKey: ((KeyboardPageKeyPath) -> Void)?
     private let onSelectCategoryKey: ((String, Int) -> Void)?
     private let selectedCategoryKey: (String, Int)?
     private let selectedPageKey: KeyboardPageKeyPath?
     @StateObject private var symbolLibrary = SymbolLibraryModel(onInsert: { _ in false }, loadsImmediately: false)
     @State private var openCategoryID: String?
-    @State private var previewWidth: CGFloat = 0
+    @State private var preferences = KeyboardPreviewPreferences.cached
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    private var keyHeight: CGFloat { verticalSizeClass == .compact ? 44 : 54 }
 
     public init(
         page: KeyboardPageDefinition, inheritedSplit: LayoutSplitConfiguration? = nil,
-        isPhoneLayout: Bool = false, onSelectKey: ((KeyboardPageKeyPath) -> Void)? = nil,
+        isPhoneLayout: Bool = false, mainLayout: KeyboardLayoutKind? = nil,
+        skin: SkinDefinition = .systemDefault, previewDark: Bool? = nil,
+        onSelectKey: ((KeyboardPageKeyPath) -> Void)? = nil,
         onSelectCategoryKey: ((String, Int) -> Void)? = nil, selectedCategoryKey: (String, Int)? = nil,
         selectedPageKey: KeyboardPageKeyPath? = nil
     ) {
         self.page = page
         self.inheritedSplit = inheritedSplit
         self.isPhoneLayout = isPhoneLayout
+        self.mainLayout = mainLayout
+        self.skin = skin
+        self.previewDark = previewDark
         self.onSelectKey = onSelectKey
         self.onSelectCategoryKey = onSelectCategoryKey
         self.selectedCategoryKey = selectedCategoryKey
         self.selectedPageKey = selectedPageKey
     }
 
-    /// A preview has no session: an explicit page default wins, otherwise an English page shows
-    /// the English branch and numeric/symbol pages show Chinese. The same value feeds resolution,
-    /// authored state, categories and the footer caption.
-    private var previewSymbolMarks: KeyboardNumericMarks {
-        page.defaultSymbolMarks ?? (page.kind == .english ? .ascii : .chinese)
+    private var editing: Bool { onSelectKey != nil || onSelectCategoryKey != nil }
+    private var showsGlobe: Bool { preferences.showsGlobe(editing: editing) }
+
+    /// An explicit page default wins, otherwise an English page shows the English branch and
+    /// numeric/symbol pages show Chinese. The same value feeds resolution, faces and the footer.
+    private var usesASCIIPunctuation: Bool {
+        (page.defaultSymbolMarks ?? (page.kind == .english ? .ascii : .chinese)) == .ascii
     }
 
-    private var previewUsesASCIIPunctuation: Bool { previewSymbolMarks == .ascii }
+    private var resolution: KeyboardPageResolution {
+        KeyboardPageResolver.resolve(
+            page: page, kind: page.kind,
+            input: .init(usesASCIIPunctuation: usesASCIIPunctuation, mainLayoutIsPhoneKeypad: isPhoneLayout))
+    }
 
     public var body: some View {
-        // The whole preview surface decides the split once; rows inside never re-apply the
-        // automatic width threshold after a rail narrowed them. A nested full preview gets the
-        // stored setting and resolves it against the same surface.
-        let pageSplit = LayoutSplitConfiguration.resolving(page: page.split, main: inheritedSplit)
-        let split = pageSplit?.resolved(forWidth: Double(previewWidth))
-        let resolution = KeyboardPageResolver.resolve(
-            page: page, kind: page.kind,
-            // A preview has no live session: it shows the page's own initial branch (Chinese when
-            // nil). The editor picker writes the same field, so opening the copy shows the branch
-            // the runtime will start from.
-            input: .init(
-                usesASCIIPunctuation: previewUsesASCIIPunctuation,
-                mainLayoutIsPhoneKeypad: isPhoneLayout))
-        Group {
-            switch resolution {
-            case .authored(let authored):
-                if authored.chrome != nil {
-                    authoredChromePreview(authored, split: split)
-                } else {
-                    KeyboardPreviewView(
-                        layout: authored.layoutDefinition.settingSplit(pageSplit),
-                        pageDefinition: authored, pageUsesPhoneLayout: isPhoneLayout,
-                        onSelectKey: authored.usesSymbolBrowser ? nil : legacySelection,
-                        onSelectCategoryKey: onSelectCategoryKey, selectedCategoryKey: selectedCategoryKey)
-                }
-            case .automaticSymbolPage:
-                KeyboardPreviewView(
-                    layout: page.layoutDefinition.settingSplit(pageSplit),
-                    pageDefinition: page, pageUsesPhoneLayout: isPhoneLayout,
-                    onSelectCategoryKey: onSelectCategoryKey, selectedCategoryKey: selectedCategoryKey)
-            case .automaticNumeric(let form, let marks):
-                automaticNumericPreview(form: form, marks: marks, pageSplit: pageSplit)
-            case .builtIn:
-                EmptyView()
+        let resolution = resolution
+        let appearance = KeyboardAppearance(skin: skin, dark: previewDark ?? (colorScheme == .dark))
+        let layout = mainLayout ?? (isPhoneLayout ? .phone9 : nil)
+        KeyboardPreviewFrame(layout: layout, mainSplit: inheritedSplit, dock: preferences.dock(for: layout)) {
+            widths in
+            content(resolution, widths: widths)
+                .padding(4)
+                .background(appearance.background, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .environment(\.keyboardAppearance, appearance)
+        .environment(\.keyboardKeyHeight, preferences.keyHeight(compact: verticalSizeClass == .compact))
+        .task { preferences = await KeyboardPreviewPreferences.load() }
+        // Category pages read recents and the library's sets.
+        .task(id: showsCategories(resolution)) {
+            if showsCategories(resolution) { await symbolLibrary.reload().value }
+        }
+    }
+
+    private func showsCategories(_ resolution: KeyboardPageResolution) -> Bool {
+        switch resolution {
+        case .authored(let authored): return authored.symbolPresentation == .categorized
+        case .automaticSymbolPage: return isPhoneLayout || preferences.prefersCategorySymbolPage
+        case .automaticNumeric, .builtIn: return false
+        }
+    }
+
+    /// The resolver answers `.builtIn` only for a missing page or another kind, which a page
+    /// preview never asks for; every other case is drawn like the key area draws it.
+    @ViewBuilder
+    private func content(_ resolution: KeyboardPageResolution, widths: KeyboardPreviewWidths) -> some View {
+        if let authored = resolution.page {
+            let split = pageSplit(authored.split, widths: widths)
+            if authored.chrome != nil {
+                authoredChromePreview(authored, split: split, widths: widths)
+            } else if authored.kind == .symbols && authored.symbolPresentation == .categorized {
+                categoryPad(authored, split: split, widths: widths)
+            } else {
+                rowsPage(authored, split: split)
             }
-        }
-        .modifier(PreviewWidthProbe(width: $previewWidth))
-    }
-
-    // MARK: Authored page (chrome != nil)
-
-    /// A page with authored chrome is drawn by the same shell as the live keyboard, so the editor
-    /// sees exactly the geometry, rails and footer the keyboard will run.
-    private func authoredChromePreview(_ page: KeyboardPageDefinition, split: ActiveLayoutSplit?)
-        -> some View
-    {
-        KeyboardAuthoredPageView(
-            page: page, split: split, state: previewChromeState(page), actions: previewChromeActions(),
-            selectedPath: selectedPageKey,
-            editorSelection: onSelectKey != nil || onSelectCategoryKey != nil,
-            categoryMain: { metrics in previewCategoryMain(page, metrics: metrics) },
-            categoryLeading: { metrics in previewCategoryLeading(page, metrics: metrics) }
-        )
-        .environment(\.keyboardKeyHeight, keyHeight)
-        .padding(4)
-        .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 8))
-        .task {
-            if page.rows.isEmpty && page.categories == nil { await symbolLibrary.reload().value }
+        } else if case .automaticNumeric(let form, let marks) = resolution {
+            let split = pageSplit(nil, widths: widths)
+            if form == .phoneDigitPad {
+                phoneDigitPad(usesASCIIPunctuation: marks == .ascii, split: split)
+            } else {
+                builtInRows(
+                    SymbolPageTable.numericRows(ascii: marks == .ascii), page: .numeric,
+                    usesASCIIPunctuation: marks == .ascii, split: split)
+            }
+        } else if isPhoneLayout || preferences.prefersCategorySymbolPage {
+            categoryPad(nil, split: pageSplit(nil, widths: widths), widths: widths)
+        } else {
+            builtInRows(
+                SymbolPageTable.symbolRows(ascii: usesASCIIPunctuation), page: .symbols,
+                usesASCIIPunctuation: usesASCIIPunctuation, split: pageSplit(nil, widths: widths))
         }
     }
 
-    /// The preview has no session, so it shows the idle state: Chinese columns with the Latin space
-    /// label, Return reading 换行 and every control enabled.
-    private func previewChromeState(_ page: KeyboardPageDefinition) -> KeyboardPageAuthoredState {
+    /// An automatic page draws no page object, so only an authored page's own split applies.
+    private func pageSplit(_ split: LayoutSplitConfiguration?, widths: KeyboardPreviewWidths) -> ActiveLayoutSplit? {
+        KeyboardPanelRules.activeSplit(
+            main: inheritedSplit, mainWidth: widths.mainSplit, showsMainLetters: false,
+            pageSplit: split, contentWidth: widths.content)
+    }
+
+    private var mainAreaHeight: CGFloat {
+        let keyHeight = preferences.keyHeight(compact: verticalSizeClass == .compact)
+        return 3 * (keyHeight + 4) - 4
+    }
+
+    private func panelPage(_ kind: KeyboardPageKind) -> KeyboardPage {
+        switch kind {
+        case .english: return .letters
+        case .numeric: return .numeric
+        case .symbols: return .symbols
+        }
+    }
+
+    private func rowPolicy(_ page: KeyboardPage, usesASCIIPunctuation: Bool) -> KeyboardControlPolicy {
+        KeyboardPanelRules.controlPolicy(
+            page: page, isEnglishMode: self.page.kind == .english, hasGlobe: showsGlobe,
+            usesASCIIPunctuation: usesASCIIPunctuation, phoneShellVisible: false,
+            usesFixedEditingRail: false, declaredTrailingReturn: false, showsCategorySymbolPage: false)
+    }
+
+    private func state(_ page: KeyboardPageDefinition) -> KeyboardPageAuthoredState {
         KeyboardPageAuthoredState(
-            page: page.kind == .english ? .letters : (page.kind == .numeric ? .numeric : .symbols),
-            kind: page.kind, isEnglishMode: page.kind == .english, shiftState: .off,
-            returnTitle: "换行", isReturnEnabled: true, symbolLocked: false, isComposing: false,
-            hasGlobe: true, isPhoneStyled: !(page.chrome?.trailing.isEmpty ?? true),
-            usesASCIIPunctuation: previewUsesASCIIPunctuation,
+            page: panelPage(page.kind), kind: page.kind, isEnglishMode: page.kind == .english,
+            shiftState: .off, returnTitle: "换行", isReturnEnabled: true, symbolLocked: false,
+            isComposing: false, hasGlobe: showsGlobe,
+            isPhoneStyled: !(page.chrome?.trailing.isEmpty ?? true),
+            usesASCIIPunctuation: usesASCIIPunctuation,
             usesCategorySymbolPage: page.symbolPresentation == .categorized)
     }
 
-    private func previewChromeActions() -> KeyboardPageAuthoredActions {
-        let select = { (path: KeyboardPageKeyPath) in _ = onSelectKey?(path) }
-        return KeyboardPageAuthoredActions(
+    private func actions(select: @escaping (KeyboardPageKeyPath) -> Void) -> KeyboardPageAuthoredActions {
+        KeyboardPageAuthoredActions(
             perform: { path, _, _ in select(path) },
             performShiftDoubleTap: { path in select(path) },
-            moveCursor: nil, systemKeyboardSwitch: nil, spaceLayoutName: nil, spaceHintName: nil,
-            spaceHintToken: nil)
+            moveCursor: nil, systemKeyboardSwitch: showsGlobe && !editing ? { _, _ in } : nil,
+            spaceLayoutName: nil, spaceHintName: nil, spaceHintToken: nil)
     }
 
-    /// Legacy pages (chrome == nil) keep the old row selection path; the editor materialises a page
-    /// before editing, so only read-only previews reach here with row callbacks nil.
-    private var legacySelection: ((LayoutKeyPath) -> Void)? {
-        guard let onSelectKey else { return nil }
-        return { path in
-            if case .row(let row, let key) = path { onSelectKey(.row(row, key: key)) }
-        }
+    // MARK: Authored chrome
+
+    /// A page with authored chrome is drawn by the same shell as the live keyboard, so the editor
+    /// sees exactly the geometry, rails and footer the keyboard will run.
+    private func authoredChromePreview(
+        _ page: KeyboardPageDefinition, split: ActiveLayoutSplit?, widths: KeyboardPreviewWidths
+    ) -> some View {
+        KeyboardAuthoredPageView(
+            page: page, split: split, state: state(page),
+            actions: actions { onSelectKey?($0) },
+            selectedPath: selectedPageKey, editorSelection: editing,
+            categoryMain: { _ in chromeCategoryMain(page, split: split, widths: widths) },
+            categoryLeading: { metrics in chromeCategoryLeading(page, metrics: metrics) })
     }
 
-    private func previewCategories(_ page: KeyboardPageDefinition) -> [SymbolPageTable.PhoneSymbolCategory] {
-        if let categories = page.categories {
-            return SymbolPageTable.authoredCategories(categories, recents: symbolLibrary.recents.map(\.text))
-        }
-        let catalog = symbolLibrary.catalog
-        return SymbolPageTable.phoneSymbolCategories(
-            ascii: previewUsesASCIIPunctuation, recents: symbolLibrary.recents.map(\.text),
-            library: catalog.orderedCategories.map {
-                .init(id: $0.id, title: $0.name, symbols: catalog.items(in: $0.id).map(\.text))
-            })
+    private func categories(_ page: KeyboardPageDefinition?) -> [SymbolPageTable.PhoneSymbolCategory] {
+        // Category content follows the input language; a preview shows Chinese input.
+        symbolLibrary.pageCategories(authored: page?.categories, ascii: false, showsGlobe: showsGlobe)
     }
 
     @ViewBuilder
-    private func previewCategoryMain(
-        _ page: KeyboardPageDefinition, metrics: KeyboardAuthoredPageMetrics
+    private func chromeCategoryMain(
+        _ page: KeyboardPageDefinition, split: ActiveLayoutSplit?, widths: KeyboardPreviewWidths
     ) -> some View {
-        let categories = previewCategories(page)
+        let categories = categories(page)
         if let open = categories.first(where: { $0.id == openCategoryID }) ?? categories.first {
-            // Same order as the runtime: category split overrides the page's split, which
-            // overrides the main layout's; activation is settled on the whole preview width once.
-            let pageSplit = LayoutSplitConfiguration.resolving(page: page.split, main: inheritedSplit)
-            let active =
-                LayoutSplitConfiguration
-                .resolving(page: open.split, main: pageSplit)?
-                .resolved(forWidth: Double(previewWidth))
-            KeyboardCategoryGrid(keys: open.keys, columns: open.columns, split: active) { key, index in
-                previewCategoryKey(page: page, open: open, key: key, index: index)
+            KeyboardCategoryGrid(
+                keys: open.keys, columns: open.columns,
+                split: ActiveLayoutSplit.resolving(nested: open.split, parent: split, width: widths.content)
+            ) { key, index in
+                chromeCategoryKey(page, open: open, key: key, index: index)
             }
             .id(open.id)
         }
     }
 
     @ViewBuilder
-    private func previewCategoryLeading(
+    private func chromeCategoryLeading(
         _ page: KeyboardPageDefinition, metrics: KeyboardAuthoredPageMetrics
     ) -> some View {
-        let categories = previewCategories(page)
+        let categories = categories(page)
         if let open = categories.first(where: { $0.id == openCategoryID }) ?? categories.first {
             KeyboardAuthoredCategoryRail(
                 categories: categories, open: open.id, mainHeight: CGFloat(metrics.rowsHeight),
@@ -246,232 +349,165 @@ public struct KeyboardPagePreviewView: View {
         }
     }
 
-    /// A category's authored content key uses the same faces and titleMode semantics as the live
-    /// keyboard; the editor keeps its own selection callback for category content.
-    private func previewCategoryKey(
-        page: KeyboardPageDefinition, open: SymbolPageTable.PhoneSymbolCategory, key: LayoutKey, index: Int
+    /// The live page draws category content through the authored key face too; tapping one selects
+    /// it in the category editor and does nothing elsewhere.
+    private func chromeCategoryKey(
+        _ page: KeyboardPageDefinition, open: SymbolPageTable.PhoneSymbolCategory, key: LayoutKey, index: Int
     ) -> some View {
-        // Category content keys are edited through the category editor's own callback. The page
-        // editor's top preview does not pass it, so tapping one there selects nothing.
         let path = KeyboardPageKeyPath.chrome(.bottom, key: 0)
-        let select = { (categoryID: String, item: Int, pagePath: KeyboardPageKeyPath) in
-            if let onSelectCategoryKey {
-                onSelectCategoryKey(categoryID, item)
-            }
-        }
         return KeyboardAuthoredPageKey(
-            key: key, path: path, state: previewChromeState(page),
-            actions: KeyboardPageAuthoredActions(
-                perform: { pagePath, _, _ in select(open.id, index, pagePath) },
-                performShiftDoubleTap: { pagePath in select(open.id, index, pagePath) },
-                moveCursor: nil, systemKeyboardSwitch: nil, spaceLayoutName: nil,
-                spaceHintName: nil, spaceHintToken: nil),
+            key: key, path: path, state: state(page),
+            actions: actions { _ in onSelectCategoryKey?(open.id, index) },
             actionTable: KeyboardPageAuthoredActionTable(singleKey: key, path: path),
-            selected: selectedCategoryKey?.0 == open.id && selectedCategoryKey?.1 == index,
-            editorSelection: onSelectCategoryKey != nil || onSelectKey != nil)
+            selected: isSelectedCategoryKey(open.id, index), editorSelection: editing)
     }
 
+    private func isSelectedCategoryKey(_ category: String, _ index: Int) -> Bool {
+        selectedCategoryKey?.0 == category && selectedCategoryKey?.1 == index
+    }
+
+    // MARK: Pages without authored chrome
+
+    /// A literal keeps the page key face (the long-press corner hint included); other actions use
+    /// the authored face, which draws the same native controls.
     @ViewBuilder
-    private func automaticNumericPreview(
-        form: KeyboardNumericForm, marks: KeyboardNumericMarks, pageSplit: LayoutSplitConfiguration?
+    private func pageKey(
+        _ key: LayoutKey, page: KeyboardPageDefinition, id: String,
+        select: @escaping () -> Void
     ) -> some View {
-        switch form {
-        case .rows:
-            automaticNumericRowsPreview(marks: marks, pageSplit: pageSplit)
-        case .phoneDigitPad:
-            KeyboardPhoneNumericPagePreview(marks: marks, split: pageSplit?.resolved(forWidth: Double(previewWidth)))
+        if key.action.type == .literal {
+            AlternateCharacterKey(
+                cap: KeyboardPanelRules.pageCap(
+                    key, id: id, kind: page.kind, alternate: false,
+                    usesASCIIPunctuation: usesASCIIPunctuation, shiftActive: false),
+                alternates: (key.longPress ?? []).enumerated().map { index, option in
+                    KeyboardPanelRules.pageCap(
+                        LayoutKey(label: option.label, action: option.action), id: "\(id)-option-\(index)",
+                        kind: page.kind, alternate: true, usesASCIIPunctuation: usesASCIIPunctuation,
+                        shiftActive: false)
+                },
+                showsKeyPreview: true
+            ) { _ in select() }
+        } else {
+            let path = KeyboardPageKeyPath.chrome(.bottom, key: 0)
+            KeyboardAuthoredPageKey(
+                key: key, path: path, state: state(page),
+                actions: actions { _ in select() },
+                actionTable: KeyboardPageAuthoredActionTable(singleKey: key, path: path),
+                editorSelection: editing)
         }
     }
 
-    /// The ten-column form a non-keypad layout shows; the preview shows the Chinese marks (the
-    /// running keyboard switches to the ASCII marks for English and ASCII fields).
-    private func automaticNumericRowsPreview(
-        marks: KeyboardNumericMarks, pageSplit: LayoutSplitConfiguration?
-    ) -> some View {
-        let resolved = marks == .ascii ? KeyboardPagePresets.numericEnglish : KeyboardPagePresets.numericChinese
-        return KeyboardPreviewView(layout: resolved.layoutDefinition.settingSplit(pageSplit), pageDefinition: resolved)
-    }
-}
-
-/// The phone keypad's 123 page: the digit grid, the punctuation rail, the editing rail and the
-/// bottom row that carries 0. An automatic 123 page shows this form on a phone main layout.
-struct KeyboardPhoneNumericPagePreview: View {
-    let marks: KeyboardNumericMarks
-    let split: ActiveLayoutSplit?
-
-    private var ascii: Bool { marks == .ascii }
-    private var digitRows: [[KeyCap]] {
-        let digits = SymbolPageTable.numericRows(ascii: ascii).first?.caps ?? []
-        return (0..<3).map { row in Array(digits.dropFirst(row * 3).prefix(3)) }
-    }
-    private var railCaps: [KeyCap] { SymbolPageTable.phoneNumericRail(ascii: ascii) }
-
-    var body: some View {
-        StablePhoneKeypadShell(
-            trailingSpansControlRow: true,
-            expandsForSplit: split != nil,
-            leading: { metrics in
-                VStack(spacing: CGFloat(metrics.spacing)) {
-                    ForEach(Array(railCaps.prefix(3).enumerated()), id: \.element.id) { _, cap in
-                        AlternateCharacterKey(
-                            cap: cap, alternates: [], phoneKey: true, phoneSideKey: true,
-                            titleSize: 19
-                        ) { _ in }
-                        .frame(height: CGFloat(metrics.rowHeight))
-                    }
-                }
+    private func rowsPage(_ page: KeyboardPageDefinition, split: ActiveLayoutSplit?) -> some View {
+        let keyHeight = preferences.keyHeight(compact: verticalSizeClass == .compact)
+        let overflows = CGFloat(page.rows.count) * (keyHeight + 4) - 4 > mainAreaHeight + 1
+        let rows = KeyboardPageRows(
+            page: page, split: split, showsGlobe: showsGlobe,
+            key: { key, row, index in
+                pageKey(key, page: page, id: "page-\(page.id)-\(row)-\(index)") {}
             },
-            main: { metrics in
-                VStack(spacing: CGFloat(metrics.spacing)) {
-                    ForEach(Array(digitRows.enumerated()), id: \.offset) { index, caps in
-                        WeightedKeyRow(caps: caps, split: split, rowIndex: index) { _ in }
-                            .frame(height: CGFloat(metrics.rowHeight))
-                    }
+            shift: { ShiftKey(state: .off, isEnglishMode: true, tap: {}, doubleTap: {}) },
+            delete: { RepeatingDeleteKey {} })
+        return VStack(spacing: 4) {
+            Group {
+                if overflows {
+                    ScrollView { VStack(spacing: 4) { rows } }.sharpCandidateScrollEdges()
+                } else {
+                    VStack(spacing: 4) { rows }
                 }
-            },
-            trailing: { metrics in
-                let slots = metrics.railSlots(.trailing, spans: PhoneKeypadRailPolicy.bundledTrailingSpans)
-                VStack(spacing: CGFloat(metrics.spacing)) {
-                    RepeatingDeleteKey {}
-                        .frame(height: CGFloat(slots[0].height))
-                    ControlKeyFace(text: "重输")
-                        .opacity(0.45)
-                        .frame(height: CGFloat(slots[1].height))
-                    ReturnKey(title: "换行") { _ in }
-                        .frame(height: CGFloat(slots[2].height))
-                }
-            },
-            bottom: { metrics in controlRow(metrics) }
-        )
-        .padding(4)
-        .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func controlRow(_ metrics: PhoneKeypadMetrics) -> some View {
-        let policy = KeyboardControlPolicy(
-            page: .numeric, isEnglishMode: ascii, hasGlobe: false, isPhoneLayout: true,
-            usesASCIIPunctuation: ascii, includesBottomEnter: false)
-        return ControlRow(
-            policy: policy, returnTitle: "换行", layoutName: nil, layoutHintName: nil, layoutHintToken: nil,
-            modeKey: AlternateCharacterKey(
-                cap: KeyCap(id: "preview-digit-mode", title: policy.languageTitle, action: .cycleLayout),
-                alternates: [], layoutPicker: true
-            ) { _ in },
-            systemKeyboardSwitch: nil, moveCursor: nil, onPage: { _ in }, onKey: { _ in },
-            phoneColumns: .init(rail: metrics.railWidth, digit: metrics.digitWidth),
-            split: split, splitRowIndex: PhoneKeypadMetrics.mainRowCount)
-    }
-}
-
-struct KeyboardCategoryPagePreview<Key: View, Footer: View>: View {
-    @Environment(\.keyboardAppearance) private var appearance
-    @StateObject private var library = SymbolLibraryModel(onInsert: { _ in false }, loadsImmediately: false)
-    @State private var selected: String?
-    @State private var previewWidth: CGFloat = 0
-    let page: KeyboardPageDefinition
-    let split: ActiveLayoutSplit?
-    @ViewBuilder var key: (LayoutKey, String, Int) -> Key
-    @ViewBuilder var footer: (PhoneKeypadMetrics, ActiveLayoutSplit?) -> Footer
-
-    private var categories: [SymbolPageTable.PhoneSymbolCategory] {
-        if let categories = page.categories {
-            return SymbolPageTable.authoredCategories(categories, recents: library.recents.map(\.text))
+            }
+            .frame(height: mainAreaHeight, alignment: .top)
+            KeyboardPreviewControlRow(
+                policy: rowPolicy(panelPage(page.kind), usesASCIIPunctuation: usesASCIIPunctuation),
+                showsGlobe: showsGlobe, split: split, splitRowIndex: page.rows.count)
         }
-        let catalog = library.catalog
-        return SymbolPageTable.phoneSymbolCategories(
-            ascii: false, recents: library.recents.map(\.text),
-            library: catalog.orderedCategories.map {
-                .init(id: $0.id, title: $0.name, symbols: catalog.items(in: $0.id).map(\.text))
+    }
+
+    // MARK: Built-in pages
+
+    private func builtInRows(
+        _ rows: [KeyboardRow], page: KeyboardPage, usesASCIIPunctuation: Bool, split: ActiveLayoutSplit?
+    ) -> some View {
+        VStack(spacing: 4) {
+            VStack(spacing: 4) {
+                KeyboardSymbolPageRows(rows: rows, split: split, onTap: { _ in }, delete: { RepeatingDeleteKey {} })
+            }
+            .frame(height: mainAreaHeight, alignment: .top)
+            KeyboardPreviewControlRow(
+                policy: rowPolicy(page, usesASCIIPunctuation: usesASCIIPunctuation),
+                showsGlobe: showsGlobe, split: split, splitRowIndex: rows.count)
+        }
+    }
+
+    /// A phone main layout is drawn as the bundled 9-key, whose editing rail spans the bottom row.
+    private func phoneDigitPad(usesASCIIPunctuation: Bool, split: ActiveLayoutSplit?) -> some View {
+        let policy = KeyboardPanelRules.controlPolicy(
+            page: .numeric, isEnglishMode: false, hasGlobe: showsGlobe,
+            usesASCIIPunctuation: usesASCIIPunctuation, phoneShellVisible: true, usesFixedEditingRail: true,
+            declaredTrailingReturn: false, showsCategorySymbolPage: false)
+        return KeyboardPhoneDigitPad(
+            usesASCIIPunctuation: usesASCIIPunctuation, split: split, trailingSpansControlRow: true,
+            onKey: { _ in }, expanded: { EmptyView() },
+            trailing: { metrics in KeyboardFixedEditingRail(previewMetrics: metrics) },
+            bottom: { metrics in
+                KeyboardPreviewControlRow(
+                    policy: policy, showsGlobe: showsGlobe,
+                    columns: .init(rail: metrics.railWidth, digit: metrics.digitWidth), split: split,
+                    splitRowIndex: PhoneKeypadMetrics.mainRowCount)
             })
     }
 
-    var body: some View {
-        let categories = categories
-        let open = categories.first { $0.id == selected } ?? categories[0]
-        let active = ActiveLayoutSplit.resolving(nested: open.split, parent: split, width: Double(previewWidth))
-        return StablePhoneKeypadShell(
-            trailingSpansControlRow: true, expandsForSplit: active != nil,
-            leading: { metrics in
-                let height = (CGFloat(metrics.mainHeight) - 12) / 3.5
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 4) {
-                        ForEach(categories, id: \.id) { category in
-                            Button {
-                                selected = category.id
-                            } label: {
-                                Text(category.title).font(appearance.font(KeyboardToolsStyle.categoryRailTitleSize))
-                                    .lineLimit(1).minimumScaleFactor(0.75)
-                                    .foregroundStyle(
-                                        category.id == open.id
-                                            ? appearance.accentForeground
-                                            : Color(uiColor: appearance.text(on: "control"))
-                                    )
-                                    .frame(maxWidth: .infinity).frame(height: height)
-                                    .background {
-                                        if category.id == open.id {
-                                            RoundedRectangle(cornerRadius: appearance.skin.keycap.cornerRadius)
-                                                .fill(appearance.color("key"))
-                                                .padding(.horizontal, appearance.skin.spacing.visualInsetX + 2)
-                                                .padding(.vertical, appearance.skin.spacing.visualInsetY + 2)
-                                        }
-                                    }
-                            }.buttonStyle(KeyboardPressStyle())
-                        }
-                    }
-                }.sharpCandidateScrollEdges().background(appearance.color("control"))
-            },
-            main: { _ in
-                if open.keys.isEmpty {
-                    Text("还没有符号。").font(.footnote).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    KeyboardCategoryGrid(keys: open.keys, columns: open.columns, split: active) { item, index in
-                        key(item, open.id, index)
-                    }.id(open.id)
-                }
-            },
-            trailing: { metrics in
-                let slots = metrics.railSlots(.trailing, spans: PhoneKeypadRailPolicy.bundledTrailingSpans)
-                VStack(spacing: CGFloat(metrics.spacing)) {
-                    RepeatingDeleteKey {}.frame(height: CGFloat(slots[0].height))
-                    ControlKeyFace(text: "重输").opacity(0.45).frame(height: CGFloat(slots[1].height))
-                    ReturnKey(title: "换行") { _ in }.frame(height: CGFloat(slots[2].height))
-                }
-            }, bottom: { metrics in footer(metrics, active?.withoutRowBreaks) }
-        )
-        .modifier(PreviewWidthProbe(width: $previewWidth))
-        .task { await library.reload().value }
-    }
-}
-
-struct KeyboardPageRows<Key: View, Shift: View, Delete: View>: View {
-    @Environment(\.keyboardKeyHeight) private var keyHeight
-    let page: KeyboardPageDefinition
-    let split: ActiveLayoutSplit?
-    var showsGlobe = true
-    @ViewBuilder var key: (LayoutKey, Int, Int) -> Key
-    @ViewBuilder var shift: () -> Shift
-    @ViewBuilder var delete: () -> Delete
-
-    var body: some View {
-        ForEach(page.rows.indices, id: \.self) { row in
-            GeometryReader { proxy in
-                let geometry = KeyboardPageRowGeometry(
-                    width: Double(proxy.size.width), page: page, row: row, split: split, showsGlobe: showsGlobe)
-                HStack(spacing: 4) {
-                    if geometry.showsShift { shift().frame(width: geometry.sideWidth, height: keyHeight) }
-                    HStack(spacing: 4) {
-                        ForEach(Array(geometry.keyIndices.enumerated()), id: \.element) { index, source in
-                            if index == geometry.splitIndex, geometry.gap > 0 {
-                                KeyboardSplitGap().frame(width: geometry.gap - 4, height: keyHeight)
+    @ViewBuilder
+    private func categoryPad(
+        _ page: KeyboardPageDefinition?, split: ActiveLayoutSplit?, widths: KeyboardPreviewWidths
+    ) -> some View {
+        let categories = categories(page)
+        if let open = categories.first(where: { $0.id == openCategoryID }) ?? categories.first {
+            let categorySplit = ActiveLayoutSplit.resolving(nested: open.split, parent: split, width: widths.content)
+            // A phone main layout is drawn as the bundled 9-key; an imported keypad's own rails
+            // are not known to a page preview.
+            let fixedRail = KeyboardPanelRules.usesFixedEditingRail(
+                showsCategorySymbolPage: true, hasAuthoredPage: page != nil,
+                mainIsPhoneKeypad: isPhoneLayout, mainIsBuiltinPhonePad: isPhoneLayout)
+            let policy = KeyboardPanelRules.controlPolicy(
+                page: .symbols, isEnglishMode: false, hasGlobe: showsGlobe,
+                usesASCIIPunctuation: usesASCIIPunctuation, phoneShellVisible: true,
+                usesFixedEditingRail: fixedRail, declaredTrailingReturn: false, showsCategorySymbolPage: true)
+            KeyboardCategorySymbolPad(
+                categories: categories, open: open, split: categorySplit, trailingSpansControlRow: fixedRail,
+                onSelectCategory: { openCategoryID = $0 },
+                key: { key, index in
+                    categoryKey(page, open: open, key: key, index: index)
+                        .overlay {
+                            if isSelectedCategoryKey(open.id, index) {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.accentColor, lineWidth: 2)
+                                    .allowsHitTesting(false)
                             }
-                            key(page.rows[row].keys[source], row, source)
-                                .frame(width: geometry.keyWidths[index], height: keyHeight)
                         }
-                    }.padding(.horizontal, geometry.inset).frame(width: geometry.rowWidth)
-                    if geometry.showsDelete { delete().frame(width: geometry.sideWidth, height: keyHeight) }
-                }
-            }.frame(height: keyHeight)
+                },
+                trailing: { metrics in
+                    if fixedRail { KeyboardFixedEditingRail(previewMetrics: metrics) }
+                },
+                bottom: { metrics in
+                    KeyboardPreviewControlRow(
+                        policy: policy, showsGlobe: showsGlobe,
+                        columns: fixedRail ? .init(rail: metrics.railWidth, digit: metrics.digitWidth) : nil,
+                        split: categorySplit?.withoutRowBreaks ?? split,
+                        splitRowIndex: page?.rows.count ?? PhoneKeypadMetrics.mainRowCount)
+                })
+        }
+    }
+
+    @ViewBuilder
+    private func categoryKey(
+        _ page: KeyboardPageDefinition?, open: SymbolPageTable.PhoneSymbolCategory, key: LayoutKey, index: Int
+    ) -> some View {
+        let select: () -> Void = { onSelectCategoryKey?(open.id, index) }
+        if let page, open.authoredKeys != nil {
+            pageKey(key, page: page, id: "category-\(open.id)-\(index)", select: select)
+        } else {
+            AlternateCharacterKey(cap: open.caps[index], alternates: [], showsKeyPreview: true) { _ in select() }
         }
     }
 }

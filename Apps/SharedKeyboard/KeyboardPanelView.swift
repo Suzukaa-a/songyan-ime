@@ -291,18 +291,11 @@ public struct KeyboardPanelView: View {
         }
     }
 
-    /// The cap this physical layout uses on a wide surface. The user's main split is a
-    /// width-independent fact resolved from the same active definition the panel draws:
-    /// when it really splits at the pre-rail width, keep the full surface instead of
-    /// silently cancelling the opt-in. Page splits never change this host-level width.
+    /// The main split comes from the same active definition the panel draws; page splits never
+    /// change this host-level width.
     private func wideMaximumContentWidth(rawWidth: Double) -> Double? {
-        guard rawWidth > KeyboardSurfaceWidth.phoneMaximum else { return nil }
-        if let split = activeDefinition?.split, split.isActive(width: rawWidth - 8) { return nil }
-        switch controller.layout {
-        case .phone9: return KeyboardWideContentPolicy.phoneNineMaximumContentWidth
-        case .merged14, .merged18: return KeyboardWideContentPolicy.mergedMaximumContentWidth
-        case .qwerty26: return nil
-        }
+        KeyboardPanelRules.wideMaximumContentWidth(
+            rawWidth: rawWidth, mainSplit: activeDefinition?.split, layout: controller.layout)
     }
 
     private var wideDockAlignment: Alignment {

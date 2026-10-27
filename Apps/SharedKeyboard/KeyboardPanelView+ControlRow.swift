@@ -31,18 +31,15 @@ extension KeyboardPanelView {
     /// imported phone keypad's (which keeps its declared rails), draw the fixed
     /// ⌫ / 重输 / ⏎ column and the phone bottom row (first key under the rail, wide space).
     var usesFixedEditingRail: Bool {
-        showsCategorySymbolPage
-            ? (!usesPhoneDefinition || isBuiltinPhonePad)
-            : (isBuiltinPhonePad && pageDefinition == nil)
+        KeyboardPanelRules.usesFixedEditingRail(
+            showsCategorySymbolPage: showsCategorySymbolPage, hasAuthoredPage: pageDefinition != nil,
+            mainIsPhoneKeypad: usesPhoneDefinition, mainIsBuiltinPhonePad: isBuiltinPhonePad)
     }
 
-    /// #+= opens the categorised grid on a phone keypad (its 123 page is a digit
-    /// pad, with no rows for a second page to share) or when the user chose it;
-    /// otherwise it is the row-shaped page that shares the 123 page's geometry.
     var showsCategorySymbolPage: Bool {
-        page == .symbols
-            && (pageDefinition?.symbolPresentation == .categorized
-                || (pageDefinition == nil && (usesPhoneDefinition || prefersCategorySymbolPage)))
+        KeyboardPanelRules.showsCategorySymbolPage(
+            page: page, authoredPage: pageDefinition, mainIsPhoneKeypad: usesPhoneDefinition,
+            prefersCategoryPage: prefersCategorySymbolPage)
     }
 
     func controlRow(columns: KeyboardControlPolicy.PhoneColumns?, splitOverride: ActiveLayoutSplit? = nil)
@@ -190,23 +187,16 @@ extension KeyboardPanelView {
     }
 
     var controlPolicy: KeyboardControlPolicy {
-        // Imported phone *letter* pages keep their declared bottom controls;
-        // 123 and #+= are the shared symbol pages with the ordinary controls.
-        // The phone treatment belongs to the *visible* physical shell. An
-        // English QWERTY letter page uses the shared symbol entry and bottom Return
-        // even when the selected Chinese definition happens to be a phone pad.
-        let phoneShellVisible =
-            usesStandardT9 || (pageDefinition == nil && usesPhoneDefinition && page != .letters)
-            || showsCategorySymbolPage
-        let trailingHasReturn =
-            !usesFixedEditingRail && phoneShellVisible
-            && t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter }
-        return KeyboardControlPolicy(
+        let showsCategorySymbolPage = showsCategorySymbolPage
+        return KeyboardPanelRules.controlPolicy(
             page: page, isEnglishMode: controller.isEnglishMode,
             hasGlobe: systemKeyboardSwitch != nil,
-            isPhoneLayout: phoneShellVisible,
             usesASCIIPunctuation: effectiveUsesASCIIPunctuation,
-            includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn),
-            usesCategorySymbolPage: showsCategorySymbolPage)
+            phoneShellVisible: KeyboardPanelRules.phoneShellVisible(
+                usesStandardT9: usesStandardT9, page: page, hasAuthoredPage: pageDefinition != nil,
+                mainIsPhoneKeypad: usesPhoneDefinition, showsCategorySymbolPage: showsCategorySymbolPage),
+            usesFixedEditingRail: usesFixedEditingRail,
+            declaredTrailingReturn: t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter },
+            showsCategorySymbolPage: showsCategorySymbolPage)
     }
 }

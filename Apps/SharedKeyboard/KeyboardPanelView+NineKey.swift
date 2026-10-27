@@ -45,7 +45,6 @@ extension KeyboardPanelView {
     /// Readings/spelling choices get a readable size instead of the 14pt control
     /// label size; long spellings still shrink to fit the rail width.
     private static let t9RailChoiceTitleSize: Double = 17
-    private static let t9QuickSymbolTitleSize: Double = 19
 
     /// Three fixed punctuation slots; only engine-backed reading choices scroll.
     private func t9LeadingSidebar(_ metrics: PhoneKeypadMetrics) -> some View {
@@ -61,10 +60,11 @@ extension KeyboardPanelView {
                 .sharpCandidateScrollEdges()
             } else {
                 // The first three type directly; from the fourth on, there is no long press here: tapping the main-area first key cycles through them.
-                fixedPhoneSymbolRail(
-                    SymbolPageTable.quickRail(
+                KeyboardPhoneSymbolRail(
+                    caps: SymbolPageTable.quickRail(
                         symbols: quickSymbols.symbols,
-                        ascii: controller.usesASCIIPunctuation), metrics: metrics)
+                        ascii: controller.usesASCIIPunctuation), metrics: metrics,
+                    onSelect: { handleKey($0.action) })
             }
         }
         .id(showsReadingChoices)
@@ -82,33 +82,6 @@ extension KeyboardPanelView {
         // must not re-read the shared quick-symbol store every time.
         .onAppear { quickSymbols.reload() }
         .onChange(of: hostBindingTick) { quickSymbols.reload() }
-    }
-
-    /// The three left-rail slots.
-    ///
-    /// `firstKeyAlternates` is for callers whose **only reachable path is still long press** (currently only the 123 page's
-    /// punctuation rail). T9 letter-page quick symbols are "first three direct + the rest cycled by tapping the main-area first key",
-    /// so they pass an empty array: no redundant long-press menu, and no visible-but-unreachable hint.
-    private func fixedPhoneSymbolRail(
-        _ caps: [KeyCap], metrics: PhoneKeypadMetrics,
-        firstKeyAlternates: [KeyCap] = []
-    ) -> some View {
-        VStack(spacing: CGFloat(metrics.spacing)) {
-            ForEach(Array(caps.prefix(3).enumerated()), id: \.element.id) { index, cap in
-                AlternateCharacterKey(
-                    cap: cap,
-                    alternates: index == 0 ? firstKeyAlternates : [],
-                    phoneKey: true, phoneSideKey: true,
-                    titleSize: Self.t9QuickSymbolTitleSize,
-                    onSelect: { handleKey($0.action) }
-                )
-                .frame(height: t9RailSlotHeight(metrics))
-                .accessibilityHint(
-                    index == 0 && !firstKeyAlternates.isEmpty
-                        ? "长按输入更多符号" : "")
-            }
-        }
-        .buttonStyle(KeyboardPressStyle())
     }
 
     /// One action owner for engine-backed spelling/undo, reused by the bundled
@@ -220,22 +193,10 @@ extension KeyboardPanelView {
         _ metrics: PhoneKeypadMetrics,
         position: LayoutAuxiliaryArea.Position
     ) -> some View {
-        let keys = t9AuxiliaryKeys(position)
-        let spans = PhoneKeypadMetrics.slotSpans(
-            keyCount: keys.count,
-            rowCount: PhoneKeypadMetrics.mainRowCount)
-        let slots = metrics.railSlots(position == .leading ? .leading : .trailing, spans: spans)
-        return ScrollView(.vertical) {
-            LazyVStack(spacing: CGFloat(metrics.spacing)) {
-                if position == .leading { t9ReadingChoices(metrics) }
-                ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
-                    definitionKey(key, id: "\(position.rawValue)-\(index)")
-                        .frame(height: CGFloat(slots[index].height))
-                }
-            }
-            .buttonStyle(KeyboardPressStyle())
-        }
-        .sharpCandidateScrollEdges()
+        KeyboardPhoneDeclaredRail(
+            keys: t9AuxiliaryKeys(position), position: position, metrics: metrics,
+            readings: { t9ReadingChoices(metrics) },
+            key: { key, index in definitionKey(key, id: "\(position.rawValue)-\(index)") })
     }
 
     /// The rail keys a phone keypad definition contributes on one side. This is used
@@ -301,41 +262,13 @@ extension KeyboardPanelView {
     /// A phone letter definition gets a phone digit pad on 123: 1–9 in the 3×3
     /// grid, 0 in the bottom utility slot, the page's punctuation in the rail.
     /// #+= stays the shared full symbol page.
-    private var phoneSymbolMainRows: [[KeyCap]] {
-        let digits = symbolRows.first?.caps ?? []
-        return (0..<3).map { row in
-            Array(digits.dropFirst(row * 3).prefix(3))
-        }
-    }
-
-    private var phoneSymbolRailCaps: [KeyCap] {
-        SymbolPageTable.phoneNumericRail(ascii: effectiveUsesASCIIPunctuation)
-    }
-
     var phoneSymbolKeypad: some View {
-        StablePhoneKeypadShell(
+        KeyboardPhoneDigitPad(
+            usesASCIIPunctuation: effectiveUsesASCIIPunctuation, split: activeSplit,
             trailingSpansControlRow: isBuiltinPhonePad,
-            expandsForSplit: activeSplit != nil,
-            leading: { metrics in
-                // The 123 punctuation rail keeps its original reachability: this page has no first-key cycling, so extra punctuation is still reached by long press.
-                fixedPhoneSymbolRail(
-                    phoneSymbolRailCaps, metrics: metrics,
-                    firstKeyAlternates: Array(phoneSymbolRailCaps.dropFirst(3)))
-            },
-            main: { metrics in
-                VStack(spacing: CGFloat(metrics.spacing)) {
-                    if showsAllCandidates && !controller.snapshot.candidates.isEmpty {
-                        expandedCandidates
-                    } else {
-                        ForEach(Array(phoneSymbolMainRows.enumerated()), id: \.offset) { index, caps in
-                            WeightedKeyRow(caps: caps, alternates: alternates, split: activeSplit, rowIndex: index) {
-                                handleKey($0.action)
-                            }
-                            .frame(height: CGFloat(metrics.rowHeight))
-                        }
-                    }
-                }
-            },
+            showsExpanded: showsAllCandidates && !controller.snapshot.candidates.isEmpty,
+            alternates: alternates, onKey: { handleKey($0.action) },
+            expanded: { expandedCandidates },
             trailing: { metrics in
                 if isBuiltinPhonePad { t9FixedEditingRail(metrics) } else { t9Rail(.trailing, metrics: metrics) }
             },
@@ -356,36 +289,22 @@ extension KeyboardPanelView {
         let categories = phoneSymbolCategories
         let open = categories.first { $0.id == phoneSymbolCategoryID } ?? categories[0]
         let categorySplit = resolvedCategorySplit(open.split)
-        return StablePhoneKeypadShell(
+        return KeyboardCategorySymbolPad(
+            categories: categories, open: open, split: categorySplit,
             trailingSpansControlRow: usesFixedEditingRail,
-            expandsForSplit: categorySplit != nil,
-            leading: { metrics in
-                phoneSymbolCategoryRail(categories, open: open.id, metrics: metrics)
+            onSelectCategory: { id in
+                emitKeyFeedback()
+                phoneSymbolCategoryID = id
             },
-            main: { metrics in
-                let keys = open.keys
-                if keys.isEmpty {
-                    Text("还没有符号。").font(.footnote).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            key: { key, index in
+                if open.authoredKeys != nil {
+                    authoredPageKey(
+                        key, id: "category-\(open.id)-\(index)", kind: .symbols,
+                        onSelect: { action, feedback in recordCategoryAction(action, emitFeedback: feedback) })
                 } else {
-                    KeyboardCategoryGrid(
-                        keys: keys, columns: open.columns, split: categorySplit,
-                        key: { key, index in
-                            if open.authoredKeys != nil {
-                                authoredPageKey(
-                                    key, id: "category-\(open.id)-\(index)", kind: .symbols,
-                                    onSelect: { action, feedback in recordCategoryAction(action, emitFeedback: feedback)
-                                    })
-                            } else {
-                                AlternateCharacterKey(cap: open.caps[index], alternates: [], showsKeyPreview: true) {
-                                    cap in
-                                    recordCategoryAction(cap.action)
-                                }
-                            }
-                        }
-                    )
-                    .id(open.id)
-                    .environment(\.keyboardKeyHeight, CGFloat(metrics.rowHeight))
+                    AlternateCharacterKey(cap: open.caps[index], alternates: [], showsKeyPreview: true) { cap in
+                        recordCategoryAction(cap.action)
+                    }
                 }
             },
             trailing: { metrics in
@@ -422,38 +341,10 @@ extension KeyboardPanelView {
     }
 
     var phoneSymbolCategories: [SymbolPageTable.PhoneSymbolCategory] {
-        if let categories = pageDefinition?.categories {
-            return SymbolPageTable.authoredCategories(
-                categories, recents: symbolLibrary.recents.map(\.text), showsGlobe: systemKeyboardSwitch != nil)
-        }
-        let catalog = symbolLibrary.catalog
-        return SymbolPageTable.phoneSymbolCategories(
-            // Category content follows the real input language; an explicit symbol toggle only
-            // changes explicitly paired keys and never replaces the category grid.
+        symbolLibrary.pageCategories(
+            authored: pageDefinition?.categories,
             ascii: controller.isEnglishMode || controller.usesASCIIPunctuation,
-            recents: symbolLibrary.recents.map(\.text),
-            library: catalog.orderedCategories.map { category in
-                SymbolPageTable.LibraryCategory(
-                    id: category.id, title: category.name,
-                    symbols: catalog.items(in: category.id).map(\.text))
-            })
-    }
-
-    /// Three and a half categories per main-area height, each taller than the minimum
-    /// touch target; the cut-off one shows the list scrolls to the rest. The open one
-    /// is marked, like the rail's applied reading choice. Category navigation is metadata,
-    /// never authored chrome: the shared view also backs a copied categorised page's shell.
-    private func phoneSymbolCategoryRail(
-        _ categories: [SymbolPageTable.PhoneSymbolCategory], open: String,
-        metrics: PhoneKeypadMetrics
-    ) -> some View {
-        KeyboardAuthoredCategoryRail(
-            categories: categories, open: open, mainHeight: CGFloat(metrics.mainHeight),
-            spacing: CGFloat(metrics.spacing),
-            onSelect: { id in
-                emitKeyFeedback()
-                phoneSymbolCategoryID = id
-            })
+            showsGlobe: systemKeyboardSwitch != nil)
     }
 
     /// Both rails go through the one policy: only the bundled T9 gets the
@@ -481,36 +372,14 @@ extension KeyboardPanelView {
         }
     }
 
-    /// The bundled T9's authored trailing column, as on the system / mainstream
-    /// pinyin 9-key pads: Delete (row 0), "重输" (row 1) and Return/Confirm across
-    /// row 2 and the control row, in the bottom-right corner.
-    ///
-    /// Design constraints:
-    ///  - No pinyin-cycle key on the right; real readings are picked directly in the left scrolling rail.
-    ///  - The bottom row does not repeat a Return/Confirm (the bundled 9-key's
-    ///    `KeyboardControlPolicy.includesBottomEnter` is false): confirm appears only once, here.
-    /// Only reachable for the bundled definition.
+    /// No pinyin-cycle key on the right: real readings are picked directly in the left scrolling rail.
+    /// Only reachable for the bundled definition and the categorised symbol page.
     private func t9FixedEditingRail(_ metrics: PhoneKeypadMetrics) -> some View {
-        let slots = metrics.railSlots(.trailing, spans: PhoneKeypadRailPolicy.bundledTrailingSpans)
-        return VStack(spacing: CGFloat(metrics.spacing)) {
-            RepeatingDeleteKey { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) }
-                .frame(height: CGFloat(slots[0].height))
-                .accessibilityLabel("删除")
-            AlternateCharacterKey(
-                cap: KeyCap(id: "t9-reset", title: "重输", action: .backspace),
-                alternates: [], visualRole: "control",
-                titleSize: appearance.controlTextSize
-            ) { _ in
-                keyFeedbackAfterEffect { _ = controller.discardComposition() }
-            }
-            .disabled(!controller.snapshot.isComposing)
-            .frame(height: CGFloat(slots[1].height))
-            .accessibilityLabel("重输")
-            .accessibilityHint("清空当前输入")
-            ReturnKey(title: controller.returnKeyTitle, isEnabled: controller.isReturnKeyEnabled) {
-                handleDefinitionAction($0.action)
-            }
-            .frame(height: CGFloat(slots[2].height))
-        }
+        KeyboardFixedEditingRail(
+            metrics: metrics, returnTitle: controller.returnKeyTitle,
+            isReturnEnabled: controller.isReturnKeyEnabled, isComposing: controller.snapshot.isComposing,
+            onDelete: { isRepeating in handleKey(.backspace, emitFeedback: !isRepeating) },
+            onReset: { keyFeedbackAfterEffect { _ = controller.discardComposition() } },
+            onReturn: { handleDefinitionAction($0.action) })
     }
 }

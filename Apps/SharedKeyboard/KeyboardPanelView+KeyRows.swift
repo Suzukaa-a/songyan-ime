@@ -43,25 +43,10 @@ extension KeyboardPanelView {
                 // and slide-off cancel stay exactly those of the key itself. The full
                 // #+= symbol page is shared even for a phone letter definition;
                 // compressing it into 3x3 hides too many direct-access symbols.
-                ForEach(Array(symbolRows.enumerated()), id: \.element.id) { index, row in
-                    GeometryReader { geometry in
-                        let metrics = StandardKeyRowGeometry(width: Double(geometry.size.width), split: activeSplit)
-                        HStack(spacing: 4) {
-                            WeightedKeyRow(
-                                caps: row.caps, alternates: alternates, showsKeyPreview: true,
-                                split: activeSplit, rowIndex: index,
-                                fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap)
-                            ) { handleKey($0.action) }
-                            .frame(
-                                width: index == 2
-                                    ? max(0, geometry.size.width - CGFloat(metrics.keyWidth) - 4) : geometry.size.width)
-                            if index == 2 {
-                                RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) }
-                                    .frame(width: CGFloat(metrics.keyWidth), height: keyHeight)
-                            }
-                        }
-                    }.frame(height: keyHeight)
-                }
+                KeyboardSymbolPageRows(
+                    rows: symbolRows, split: activeSplit, alternates: alternates,
+                    onTap: { handleKey($0.action) },
+                    delete: { RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) } })
             }
         }
     }
@@ -208,32 +193,16 @@ extension KeyboardPanelView {
     }
 
     private var standardQwertyKeypad: some View {
-        GeometryReader { geometry in
-            let metrics = StandardKeyRowGeometry(width: Double(geometry.size.width), split: activeSplit)
-            VStack(spacing: 4) {
-                ForEach(0..<3, id: \.self) { index in
-                    if index == 2 {
-                        HStack(spacing: 4) {
-                            ShiftKey(
-                                state: controller.shiftState, isEnglishMode: controller.isEnglishMode,
-                                tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
-                                doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } }
-                            ).frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
-                            standardQwertyRow(index, metrics: metrics)
-                            RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) }
-                                .frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
-                        }
-                    } else {
-                        standardQwertyRow(index, metrics: metrics)
-                    }
-                }
-            }
-        }.frame(height: keyHeight * 3 + 8)
-    }
-
-    /// Merged letter groups retain their wider editing controls.
-    func sharedDeleteWidth(for width: CGFloat) -> CGFloat {
-        max(56, (width - 32) / 10 * 1.8)
+        KeyboardStandardQwertyPad(
+            split: activeSplit,
+            row: { index, metrics in standardQwertyRow(index, metrics: metrics) },
+            shift: {
+                ShiftKey(
+                    state: controller.shiftState, isEnglishMode: controller.isEnglishMode,
+                    tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
+                    doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } })
+            },
+            delete: { RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) } })
     }
 
     @ViewBuilder
