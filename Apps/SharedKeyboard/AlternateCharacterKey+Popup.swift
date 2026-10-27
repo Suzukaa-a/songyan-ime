@@ -133,7 +133,13 @@ extension AlternateCharacterKey.CharacterButton {
         // About 5 rows visible, the rest scrolls; prefers expanding upward so the height does not take over the whole keyboard.
         let maxVisible = layoutPicker ? 5 : max(rows, 1)
         let above = keyFrame.minY - safe.minY - 6
-        let height = min(contentHeight, CGFloat(maxVisible) * rowHeight, max(above, rowHeight * 2), safe.height)
+        var height = min(contentHeight, CGFloat(maxVisible) * rowHeight, max(above, rowHeight * 2), safe.height)
+        if layoutPicker {
+            // A menu never shows a half row: it may cover a few points of the held key (the
+            // drag maps by position, not by hit) and otherwise shrinks to whole rows that scroll.
+            let fitting = max(1, (safe.height / rowHeight).rounded(.down))
+            height = min(contentHeight, CGFloat(maxVisible) * rowHeight, fitting * rowHeight)
+        }
         // An ordinary popup grows from the key toward the screen centre, so its
         // first option sits right above the finger: left-half keys open to the
         // right, right-half keys mirror and open to the left.
