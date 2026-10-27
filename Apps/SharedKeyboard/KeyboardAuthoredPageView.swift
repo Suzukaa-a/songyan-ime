@@ -455,9 +455,7 @@ struct KeyboardAuthoredPageFooter: View {
     }
 
     @ViewBuilder private func splitRow(width: Double, split: ActiveLayoutSplit) -> some View {
-        let boundary =
-            split.breakIndex(row: page.rows.count, keyCount: keys.count)
-            ?? keys.count
+        let boundary = split.breakIndex(row: page.rows.count, keyCount: keys.count)
         let left = keys.indices.filter { $0 < boundary }
         let right = keys.indices.filter { $0 >= boundary }
         if let spaceIndex, keys.filter({ $0.action.type == .space }).count == 1 {

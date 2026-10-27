@@ -234,7 +234,6 @@ public struct ShuangpinHintStore: Sendable {
         case .invalid(let reason): return "提示设置无法读取：\(reason)"
         case .duplicateID(let id): return "提示设置里有重复的预设标识：\(id)。"
         case .unknownID(let id): return "提示设置里找不到标识为 \(id) 的预设。"
-        case .lastEnabledLayout: return "提示设置无法读取。"
         }
     }
 }

@@ -140,7 +140,7 @@ struct AppearanceDetailView: View {
     @State private var confirmingDelete = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    private var layouts: [LayoutDefinition] { LayoutManager.shared.registry.enabledLayouts }
+    private var layouts: [LayoutDefinition] { LayoutManager.shared.registry.layouts }
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {

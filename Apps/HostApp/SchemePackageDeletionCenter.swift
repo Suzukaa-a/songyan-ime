@@ -133,7 +133,7 @@ extension SchemeImportCenter {
             return false
         }
         let saved = await LayoutManager.shared.pruneCompositions { !providers.contains($0) }
-        if !saved, let detail = LayoutManager.shared.lastError {
+        if !saved, let detail = LayoutManager.shared.lastSilentFailure {
             diagnostics.append("composition-cleanup-failed: \(detail)")
         }
         return saved

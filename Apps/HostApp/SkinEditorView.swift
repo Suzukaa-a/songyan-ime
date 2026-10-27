@@ -28,7 +28,7 @@ struct SkinEditorView: View {
         self.onSaved = onSaved
     }
     private var hasChanges: Bool { draft != original }
-    private var layouts: [LayoutDefinition] { LayoutManager.shared.registry.enabledLayouts }
+    private var layouts: [LayoutDefinition] { LayoutManager.shared.registry.layouts }
     var body: some View {
         NavigationStack {
             Form {

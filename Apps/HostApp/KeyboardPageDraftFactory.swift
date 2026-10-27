@@ -92,7 +92,7 @@ enum KeyboardPageDraftFactory {
     private static func numericCopyName(marks: KeyboardNumericMarks, form: KeyboardNumericForm) -> String {
         switch form {
         // The digit pad's keys are the same digits in both languages.
-        case .phoneDigitPad: return "数字盘 副本"
+        case .phoneDigitPad: return UserTerminology.phoneDigitPad + " 副本"
         case .rows: return (marks == .ascii ? "英文 123 副本" : "中文 123 副本")
         }
     }

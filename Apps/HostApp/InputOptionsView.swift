@@ -168,7 +168,7 @@ struct InputOptionsView: View {
         Section {
             ForEach(Self.wideDockLayouts, id: \.rawValue) { layout in
                 Picker(
-                    "\(layout.shortTitle)键盘",
+                    UserTerminology.layoutName(layout),
                     selection: Binding(
                         get: { (wideDockValues[layout.rawValue] ?? .center).rawValue },
                         set: { value in
@@ -185,9 +185,9 @@ struct InputOptionsView: View {
                 .accessibilityIdentifier("inputOptions.wideDock.\(layout.rawValue)")
             }
         } header: {
-            Text("大屏键盘位置")
+            Text("宽屏键盘位置")
         } footer: {
-            Text("键盘未拆分时，宽屏上不拉伸。9、14、18 键可分别靠左、居中或靠右，下次打开键盘时生效。")
+            Text("下次打开键盘时生效。")
         }
     }
 

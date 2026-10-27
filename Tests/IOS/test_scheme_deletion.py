@@ -166,7 +166,10 @@ extension SchemeImportCenter {
         // must report failure instead of treating the fallback as "nothing to clean".
         let saved = await SchemeImportCenter().reconcileCompositionsWithoutProvider()
         check(!saved, "cleanup must not report success when the catalog cannot be read")
-        check(LayoutManager.shared.lastError != nil, "the read error must survive the failed cleanup")
+        check(
+            LayoutManager.shared.lastSilentFailure != nil,
+            "the failed background cleanup must leave a diagnostic")
+        check(LayoutManager.shared.lastError != nil, "the failed cleanup must not clear the read error on screen")
         check(
             try Data(contentsOf: catalogFile) == corrupt,
             "a failed cleanup must not touch the catalog")
@@ -226,11 +229,11 @@ extension SchemeImportCenter {
             try Data(contentsOf: catalogFile) == corrupt,
             "a failed pairing save must not overwrite the damaged catalog")
 
-        // Enable/remove are writes too: they must not persist the fallback either.
-        await LayoutManager.shared.setEnabled(BuiltinLayouts.merged14.id, on: false)
+        // Adding and removing are writes too: they must not persist the fallback either.
+        await LayoutManager.shared.addBuiltin(BuiltinLayouts.merged14)
         check(
             try Data(contentsOf: catalogFile) == corrupt,
-            "a failed enable write must not overwrite the damaged catalog")
+            "a failed add must not overwrite the damaged catalog")
         await LayoutManager.shared.remove(BuiltinLayouts.phone9.id)
         check(
             try Data(contentsOf: catalogFile) == corrupt,

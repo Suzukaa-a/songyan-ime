@@ -16,7 +16,7 @@ enum LayoutMessageContext {
         case .layoutRemoval: return "键盘布局没有删除："
         case .pageRemoval: return "页面没有删除："
         case .pageCopy: return "页面没有复制成功："
-        case .imported: return "布局没有导入："
+        case .imported: return "键盘布局没有导入："
         case .page, .composition: return ""
         }
     }
@@ -27,7 +27,7 @@ enum LayoutMessageContext {
 /// Uses LayoutKit's LayoutStore + LayoutRegistry:
 ///  - the directory is resolved by RimePaths.layoutStoreDirectory() (App Group shared first, local fallback);
 ///  - every write goes through store.save (validated, atomic), with errors mapped to user-friendly text;
-///  - at least one enabled layout is kept (checked by LayoutRegistry; the UI only shows a hint);
+///  - bundled presets cannot be removed: they are the default main layouts (checked by LayoutRegistry);
 ///  - built-in layouts are always available (LayoutStore falls back to BuiltinLayouts on first read or corruption).
 ///
 /// Threading and disk discipline:
@@ -47,6 +47,8 @@ final class LayoutManager: ObservableObject {
     @Published private(set) var location: LayoutStoreLocation?
     @Published private(set) var lastError: String?
     @Published private(set) var isImporting = false
+    /// Why the last background write failed; never shown in the UI.
+    private(set) var lastSilentFailure: String?
 
     /// Resolved store; nil until the first background load finishes (nothing is written meanwhile).
     private var store: LayoutStore?
@@ -131,7 +133,7 @@ final class LayoutManager: ObservableObject {
                     return LayoutLoadOutcome(
                         directoryURL: location.url, isShared: location.isShared, store: store,
                         registry: builtinRegistry(),
-                        error: "读取布局目录失败：\(friendly(error))（已临时显示内置布局，未更改你的文件）")
+                        error: loadFailureMessage(error))
                 }
             }
         } catch {
@@ -140,7 +142,7 @@ final class LayoutManager: ObservableObject {
                 directoryURL: fallback.url, isShared: fallback.isShared,
                 store: LayoutStore(directoryURL: fallback.url),
                 registry: builtinRegistry(),
-                error: "读取布局目录失败：\(friendly(error))（已临时显示内置布局，未更改你的文件）")
+                error: loadFailureMessage(error))
         }
     }
 
@@ -160,8 +162,12 @@ final class LayoutManager: ObservableObject {
             return LayoutLoadOutcome(
                 directoryURL: resolved.url, isShared: resolved.isShared,
                 store: store, registry: current,
-                error: "读取失败：\(friendly(error))（当前内容可能不是最新）")
+                error: "键盘布局没有重新读取成功，显示的可能不是最新内容。" + friendly(error))
         }
+    }
+
+    private nonisolated static func loadFailureMessage(_ error: Error) -> String {
+        "键盘布局没有读取成功，现在先显示内置布局。" + friendly(error)
     }
 
     // MARK: - Operations (in memory, then validate + persist in background, replace cache only on success)
@@ -192,14 +198,21 @@ final class LayoutManager: ObservableObject {
     /// - Parameter requiredInputModeSwitchKeyValidation: runs inside the write slot against the
     ///   baseline actually being written (and the machine flag read on the configuration queue), so
     ///   the save keeps its FIFO order and never validates against a stale registry.
+    /// - Parameter reportsErrors: false for background reconciliation the user did not start. It
+    ///   neither shows nor clears `lastError`; the failure goes to `lastSilentFailure` instead.
     @discardableResult
     private func persist(
         context: LayoutMessageContext = .layout,
+        reportsErrors: Bool = true,
         requiredInputModeSwitchKeyValidation: ((LayoutRegistry, Bool) throws -> Void)? = nil,
         _ mutate: (inout LayoutRegistry) throws -> Void
     ) async -> Bool {
+        func report(_ message: String?) {
+            if reportsErrors { lastError = message } else if let message { lastSilentFailure = message }
+        }
         await acquireWriteSlot()
         defer { releaseWriteSlot() }
+        if !reportsErrors { lastSilentFailure = nil }
         // A queued write must retire reads only once it owns the slot; a reload
         // may also begin while store.save awaits the background queue.
         loadGate.invalidate()
@@ -215,7 +228,7 @@ final class LayoutManager: ObservableObject {
             baselineIsReadFromDisk = outcome.error == nil
         }
         guard let store else {
-            lastError = Self.storageNotReadyMessage(context)
+            report(Self.storageNotReadyMessage(context))
             return false
         }
         // The cached registry may be the built-in fallback (an earlier read failed), so read the
@@ -225,9 +238,9 @@ final class LayoutManager: ObservableObject {
             do {
                 registry = try await HostConfigIOQueue.async { try store.load() }
                 baselineIsReadFromDisk = true
-                lastError = nil
+                report(nil)
             } catch {
-                lastError = Self.friendly(error, context: context)
+                report(Self.friendly(error, context: context))
                 return false
             }
         }
@@ -240,7 +253,7 @@ final class LayoutManager: ObservableObject {
             try mutate(&updated)
             // No change, no write (avoids a pointless atomic write).
             if updated == registry {
-                lastError = nil
+                report(nil)
                 return true
             }
             // Persisting runs on the serial background queue; the main thread does not touch disk.
@@ -249,42 +262,16 @@ final class LayoutManager: ObservableObject {
             loadTask?.cancel()
             // store.save has already validated and written atomically; the cache is replaced only on success.
             registry = updated
-            lastError = nil
+            report(nil)
             return true
         } catch {
-            lastError = Self.friendly(error, context: context)
+            report(Self.friendly(error, context: context))
             return false
         }
     }
 
     private nonisolated static func storageNotReadyMessage(_ context: LayoutMessageContext) -> String {
-        context.prefix + "存储位置还没就绪，请稍后重试。"
-    }
-
-    /// Enable (appended to the end of the enabled list) / disable; disabling the last one is rejected by validation with a friendly notice.
-    func setEnabled(_ id: String, on: Bool) async {
-        await persist { reg in
-            var ids = reg.enabledIDs
-            if on {
-                if !ids.contains(id) { ids.append(id) }
-            } else {
-                ids.removeAll { $0 == id }
-            }
-            try reg.setEnabledIDs(ids)
-        }
-    }
-
-    /// Drag-reorder enabled layouts (order is the keyboard's switching order).
-    ///
-    /// The order is computed inside the `persist` closure from the registry at that time: if the first background load
-    /// has not landed, `persist` reads the disk baseline first, so reordering never overwrites custom layouts' enabled state with the built-in order.
-    func moveEnabled(from source: IndexSet, to destination: Int) async {
-        await persist { reg in
-            var ids = reg.enabledIDs
-            ids.move(fromOffsets: source, toOffset: destination)
-            guard ids != reg.enabledIDs else { return }
-            try reg.setEnabledIDs(ids)
-        }
+        context.prefix + "键盘布局还没读取完，请稍后再试。"
     }
 
     func remove(_ id: String) async {
@@ -293,10 +280,10 @@ final class LayoutManager: ObservableObject {
         }
     }
 
-    /// Re-adds a built-in layout to the directory (appended to the enabled list by default).
+    /// Stores a bundled preset an older catalog left out, so it can be edited like the others.
     func addBuiltin(_ layout: LayoutDefinition) async {
         guard let data = try? layout.encoded() else {
-            lastError = "内置布局编码失败"
+            lastError = "没能添加这个内置布局，请重试。"
             return
         }
         await persist { reg in
@@ -308,7 +295,7 @@ final class LayoutManager: ObservableObject {
     /// The MainActor owns the busy flag and scope lifetime; the queue performs all
     /// file inspection, bounded reading, decoding and validation before scope release.
     func readImport(_ url: URL) async throws -> LayoutDefinition {
-        guard !isImporting else { throw LayoutError.invalid("正在导入布局，请稍候…") }
+        guard !isImporting else { throw LayoutError.invalid("正在导入键盘布局，请稍候。") }
         isImporting = true
         let accessing = url.startAccessingSecurityScopedResource()
         defer {
@@ -344,7 +331,7 @@ final class LayoutManager: ObservableObject {
             } else if reg.layout(id: draft.id) != nil {
                 try reg.replace(draft)
             } else {
-                try reg.install(draft.encoded(), enable: false)
+                try reg.install(draft.encoded())
             }
         }
     }
@@ -386,9 +373,11 @@ final class LayoutManager: ObservableObject {
     /// input methods have no provider left. A failed save keeps the previous catalog and
     /// returns false, so this never reports success for a change that was not persisted;
     /// the next successful call recomputes the same result from the current installs.
+    /// It runs in the background (launch, scheme pages), so a failure is kept in
+    /// `lastSilentFailure` for the caller's diagnostics instead of surfacing as `lastError`.
     @discardableResult
     func pruneCompositions(where isObsoleteInputMethod: (String) -> Bool) async -> Bool {
-        await persist { $0.pruneCompositions(where: isObsoleteInputMethod) }
+        await persist(reportsErrors: false) { $0.pruneCompositions(where: isObsoleteInputMethod) }
     }
 
     /// Exports a single layout as JSON (to be edited externally and re-imported). Pure in-memory encoding, no disk access.

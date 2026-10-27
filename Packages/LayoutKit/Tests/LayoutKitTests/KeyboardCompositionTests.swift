@@ -67,6 +67,35 @@ final class KeyboardCompositionTests: XCTestCase {
         XCTAssertThrowsError(try registry.setComposition(missing, for: "other:qwerty26"))
     }
 
+    func testUsageListsTheKeyboardsWhosePairingReferencesALayoutOrPage() throws {
+        var registry = try LayoutRegistry()
+        let custom = KeyboardPagePresets.symbolsChinese.copy()
+        try registry.savePage(custom)
+        try registry.setComposition(
+            KeyboardComposition(mainLayoutID: BuiltinLayouts.qwerty26.id, symbolPageID: custom.id),
+            for: "b:method:qwerty26")
+        try registry.setComposition(
+            KeyboardComposition(mainLayoutID: BuiltinLayouts.qwerty26.id), for: "a:qwerty26")
+        XCTAssertEqual(
+            registry.keyboards(usingLayout: BuiltinLayouts.qwerty26.id).map(\.rawValue),
+            ["a:qwerty26", "b:method:qwerty26"])
+        XCTAssertEqual(registry.keyboards(usingPage: custom.id).map(\.inputMethodID), ["b:method"])
+        XCTAssertEqual(registry.keyboards(usingLayout: BuiltinLayouts.phone9.id), [])
+    }
+
+    func testKeyboardsWithoutASavedPairingUseTheirDefaultLayout() throws {
+        var registry = try LayoutRegistry()
+        try registry.setComposition(
+            KeyboardComposition(mainLayoutID: BuiltinLayouts.qwerty26.id), for: "a:qwerty26")
+        let nine = try XCTUnwrap(KeyboardCompositionKey("c:phone9"))
+        let twenty6 = try XCTUnwrap(KeyboardCompositionKey("b:qwerty26"))
+        XCTAssertEqual(registry.keyboards(usingLayout: BuiltinLayouts.phone9.id), [])
+        XCTAssertEqual(registry.keyboards(usingLayout: BuiltinLayouts.phone9.id, among: [nine, twenty6]), [nine])
+        XCTAssertEqual(
+            registry.keyboards(usingLayout: BuiltinLayouts.qwerty26.id, among: [nine, twenty6]).map(\.rawValue),
+            ["a:qwerty26", "b:qwerty26"])
+    }
+
     func testSymbolBrowsersRemainSelectableAndCopiesRetainTheirPresentation() throws {
         let registry = try LayoutRegistry()
         XCTAssertEqual(registry.page(id: KeyboardPagePresets.symbolsSystem.id)?.symbolPresentation, .automatic)
@@ -97,7 +126,7 @@ final class KeyboardCompositionTests: XCTestCase {
         let layout = LayoutDefinition(
             id: "bound", name: "我的布局", input: .init(schemaID: "my_method"),
             rows: BuiltinLayouts.qwerty26.rows)
-        try registry.install(layout.encoded(), enable: false)
+        try registry.install(layout.encoded())
         let composition = KeyboardComposition(mainLayoutID: layout.id)
         XCTAssertNoThrow(try registry.setComposition(composition, for: "my_method:qwerty26"))
         XCTAssertThrowsError(try registry.setComposition(composition, for: "other:qwerty26"))

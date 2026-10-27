@@ -206,13 +206,13 @@ final class KeyboardPageChromeTests: XCTestCase {
 
         let preset = KeyboardPagePresets.numericKeypad
         XCTAssertEqual(preset.numericPresentation, .keypad)
-        XCTAssertEqual(preset.name, "数字盘 123")
+        XCTAssertEqual(preset.name, "数字九宫格")
         try preset.validate()
         XCTAssertTrue(KeyboardPagePresets.all.contains { $0.id == preset.id })
         XCTAssertEqual(KeyboardPagePresets.mergingInto([]).filter { $0.id == preset.id }.count, 1)
 
         // An explicit keypad pairs with any main layout, never only the phone shell.
-        var registry = try LayoutRegistry(layouts: [BuiltinLayouts.qwerty26], enabledIDs: [BuiltinLayouts.qwerty26.id])
+        var registry = try LayoutRegistry(layouts: [BuiltinLayouts.qwerty26])
         try registry.setComposition(
             KeyboardComposition(mainLayoutID: BuiltinLayouts.qwerty26.id, numericPageID: preset.id),
             for: "quanpin:qwerty26")

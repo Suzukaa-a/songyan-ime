@@ -98,8 +98,8 @@ enum RimePaths {
         globePage.name = "有地球页"
 
         var seed = try LayoutRegistry()
-        try seed.install(noGlobeLayout.encoded(), enable: true)
-        try seed.install(globeLayout.encoded(), enable: true)
+        try seed.install(noGlobeLayout.encoded())
+        try seed.install(globeLayout.encoded())
         try seed.savePage(noGlobePage)
         try seed.savePage(globePage)
         try LayoutStore(directoryURL: catalog).save(seed)

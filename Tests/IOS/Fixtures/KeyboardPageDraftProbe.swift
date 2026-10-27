@@ -19,22 +19,6 @@ enum KeyboardPageDraftProbe {
     /* PRODUCTION_EDITABLE_DRAFT_FUNCTION */
 }
 
-/// The real face-update members of LayoutKeyFields, injected below, exercised as data.
-struct KeyFaceProbeSupport {
-    let key: LayoutKey
-    var allowsTitleMode = true
-
-    private var isFunctionKey: Bool { key.action.type != .code && key.action.type != .literal }
-
-    /* PRODUCTION_SUPPORTS_LIVE_TITLE */
-
-    /* PRODUCTION_DISPLAYED_TITLE_MODE */
-
-    /* PRODUCTION_UPDATING_ACTION */
-
-    /* PRODUCTION_UPDATING_LABEL */
-}
-
 @main
 struct Probe {
     static var failures: [String] = []
@@ -110,69 +94,6 @@ struct Probe {
         check(symbolsDraft.defaultSymbolMarks == .ascii, "editing keeps an explicit symbol branch")
         let followDraft = try await KeyboardPageDraftProbe.editableDraft(KeyboardPagePresets.numericAutomatic)
         check(followDraft.defaultSymbolMarks == nil, "editing a follow-input page keeps nil")
-
-        // Editing a legacy fixed literal must keep its author label face, not promote it.
-        let fixed = KeyFaceProbeSupport(key: LayoutKey(label: "笑脸", action: .init(.literal, value: "☺")))
-        check(!fixed.supportsLiveTitle, "fixed literal keeps its author label without a face picker")
-        let pairedKey = fixed.updatingAction(LayoutAction(.literal, value: "☺", asciiValue: ":)"))
-        check(pairedKey.titleMode == nil, "first pairing keeps the legacy nil title mode")
-        let paired = KeyFaceProbeSupport(key: pairedKey)
-        check(paired.displayedTitleMode == .custom, "paired legacy literal displays custom")
-        check(paired.supportsLiveTitle, "paired literal exposes the face picker")
-        let clearedKey = paired.updatingAction(LayoutAction(.literal, value: "☺"))
-        check(clearedKey.titleMode == nil, "clearing the pair keeps nil")
-        let custom = KeyFaceProbeSupport(key: pairedKey.settingTitleMode(.custom))
-        let clearedCustom = custom.updatingAction(LayoutAction(.literal, value: "☺"))
-        check(clearedCustom.titleMode == .custom, "clearing the pair keeps an authored custom face")
-        let repaired = KeyFaceProbeSupport(key: clearedCustom).updatingAction(
-            LayoutAction(.literal, value: "☺", asciiValue: ":)"))
-        check(repaired.titleMode == .custom, "re-pairing keeps custom instead of promoting automatic")
-        let fromFunction = KeyFaceProbeSupport(
-            key: LayoutKey(label: "中英", action: .languageSwitch(), titleMode: .automatic))
-        let switched = fromFunction.updatingAction(LayoutAction(.literal, value: "。"))
-        check(switched.titleMode == nil, "switching a function key to fixed literal clears the live face")
-        let backToFunction = KeyFaceProbeSupport(key: fixed.key).updatingAction(.languageSwitch())
-        check(backToFunction.titleMode == .automatic, "switching a literal to a function follows the live face")
-
-        // New built-in rows carry an explicit automatic face on digits: renaming must actually
-        // switch to the author's custom face instead of being reset to automatic.
-        let digitKey = LayoutKey(
-            label: "1", width: 2, action: .init(.literal, value: "1"),
-            longPress: [LayoutOption(label: "一", action: .init(.literal, value: "一"))],
-            titleMode: .automatic)
-        let digit = KeyFaceProbeSupport(key: digitKey)
-        check(digit.supportsLiveTitle, "automatic literal digit exposes the face picker")
-        check(digit.displayedTitleMode == .automatic, "new digit starts on the live face")
-        let renamedDigit = digit.updatingLabel("RootLabel")
-        check(renamedDigit.label == "RootLabel", "renaming a digit keeps the author text")
-        check(renamedDigit.titleMode == .custom, "renaming a digit really switches to custom")
-        check(renamedDigit.action.value == "1", "renaming a digit keeps the action value")
-        check(renamedDigit.width == 2, "renaming a digit keeps the width")
-        check(renamedDigit.longPress?.first?.label == "一", "renaming a digit keeps long press")
-
-        // A paired literal that was on the live face, then cleared, must still allow a face rename.
-        let pairedAutomatic = LayoutKey(
-            label: "，", width: 2.5,
-            action: .init(.literal, value: "，", asciiValue: ","),
-            longPress: [LayoutOption(label: "长按", action: .init(.literal, value: "逗号"))],
-            titleMode: .automatic)
-        let clearedAutomatic = KeyFaceProbeSupport(key: pairedAutomatic).updatingAction(
-            LayoutAction(.literal, value: "，"))
-        check(clearedAutomatic.titleMode == .automatic, "clearing a pair keeps its automatic face")
-        let clearedFace = KeyFaceProbeSupport(key: clearedAutomatic)
-        check(clearedFace.supportsLiveTitle, "cleared pair still exposes the face picker")
-        let renamedCleared = clearedFace.updatingLabel("RootLabel")
-        check(renamedCleared.label == "RootLabel", "renaming a cleared pair keeps the text")
-        check(renamedCleared.titleMode == .custom, "renaming a cleared pair switches to custom")
-        check(renamedCleared.action.value == "，", "renaming a cleared pair keeps its value")
-        check(renamedCleared.width == 2.5, "renaming a cleared pair keeps its width")
-
-        // A legacy fixed literal without any title mode still edits its text as before.
-        let legacyFixed = KeyFaceProbeSupport(key: LayoutKey(label: "☺", action: .init(.literal, value: "☺")))
-        check(!legacyFixed.supportsLiveTitle, "legacy fixed literal keeps no face picker")
-        let renamedLegacy = legacyFixed.updatingLabel("作者笑脸")
-        check(renamedLegacy.label == "作者笑脸", "legacy fixed literal keeps its text")
-        check(renamedLegacy.titleMode == nil, "legacy fixed literal keeps its legacy title mode")
 
         if failures.isEmpty {
             print("keyboard-page-drafts: ok")

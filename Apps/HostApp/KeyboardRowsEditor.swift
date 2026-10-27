@@ -1,10 +1,12 @@
 import LayoutKit
 import SwiftUI
 
-/// Shared structural editor for main layouts and direct-input pages.
+/// Shared structural editor for main layouts and direct-input pages: rows and their keys. The
+/// selected key's own actions live in `SelectedRowKeyActions`, next to its fields.
 struct KeyboardRowsEditor: View {
     @Binding var rows: [LayoutRow]
     @Binding var selected: LayoutKeyPath
+    @State private var pendingRowRemoval: Int?
     private let rowKeyLimit = LayoutResourceBudget.keysPerRegion
 
     var body: some View {
@@ -27,8 +29,7 @@ struct KeyboardRowsEditor: View {
                         }
                         .disabled(row == rows.count - 1).accessibilityLabel("下移这一行")
                         Button(role: .destructive) {
-                            rows.remove(at: row)
-                            selected = .row(0, key: 0)
+                            pendingRowRemoval = row
                         } label: {
                             Image(systemName: "trash")
                         }
@@ -37,9 +38,10 @@ struct KeyboardRowsEditor: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: 6) {
                             ForEach(rows[row].keys.indices, id: \.self) { index in
-                                Button(rows[row].keys[index].label) { selected = .row(row, key: index) }
-                                    .buttonStyle(.bordered)
-                                    .tint(selected == .row(row, key: index) ? .accentColor : .secondary)
+                                KeyChip(
+                                    label: rows[row].keys[index].label,
+                                    isSelected: selected == .row(row, key: index)
+                                ) { selected = .row(row, key: index) }
                             }
                             Button {
                                 appendKey(row)
@@ -60,6 +62,46 @@ struct KeyboardRowsEditor: View {
             .disabled(rows.count >= LayoutResourceBudget.rows)
         }
         .buttonStyle(.borderless)
+        .confirmationDialog(
+            pendingRowRemoval.map { "删除第 \($0 + 1) 行？" } ?? "",
+            isPresented: Binding(get: { pendingRowRemoval != nil }, set: { if !$0 { pendingRowRemoval = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("删除这一行", role: .destructive) {
+                guard let row = pendingRowRemoval, rows.indices.contains(row), rows.count > 1 else { return }
+                pendingRowRemoval = nil
+                rows.remove(at: row)
+                selected = .row(0, key: 0)
+            }
+        } message: {
+            if let row = pendingRowRemoval, rows.indices.contains(row) {
+                Text("这一行的 \(rows[row].keys.count) 个按键会一起删除。")
+            }
+        }
+    }
+
+    private var newKey: LayoutKey { LayoutKey(label: "新键", action: .init(.literal, value: "。"), titleMode: nil) }
+
+    private func appendKey(_ row: Int) {
+        var keys = rows[row].keys
+        keys.append(newKey)
+        rows[row] = LayoutRow(keys: keys)
+        selected = .row(row, key: keys.count - 1)
+    }
+
+    private func moveRow(_ row: Int, by offset: Int) {
+        rows.swapAt(row, row + offset)
+        selected = .row(row + offset, key: 0)
+    }
+}
+
+/// Order, copy and delete for the selected row key. Sits right under the key's fields.
+struct SelectedRowKeyActions: View {
+    @Binding var rows: [LayoutRow]
+    @Binding var selected: LayoutKeyPath
+    private let rowKeyLimit = LayoutResourceBudget.keysPerRegion
+
+    var body: some View {
         if case .row(let row, let index) = selected,
             rows.indices.contains(row), rows[row].keys.indices.contains(index)
         {
@@ -100,23 +142,13 @@ struct KeyboardRowsEditor: View {
         }
     }
 
-    private var newKey: LayoutKey { LayoutKey(label: "新键", action: .init(.literal, value: "。"), titleMode: nil) }
-    private func appendKey(_ row: Int) {
-        var keys = rows[row].keys
-        keys.append(newKey)
-        rows[row] = LayoutRow(keys: keys)
-        selected = .row(row, key: keys.count - 1)
-    }
-    private func moveRow(_ row: Int, by offset: Int) {
-        rows.swapAt(row, row + offset)
-        selected = .row(row + offset, key: 0)
-    }
     private func moveKey(_ row: Int, _ index: Int, by offset: Int) {
         var keys = rows[row].keys
         keys.swapAt(index, index + offset)
         rows[row] = LayoutRow(keys: keys)
         selected = .row(row, key: index + offset)
     }
+
     private func transferKey(_ row: Int, _ index: Int, to target: Int) {
         var source = rows[row].keys
         let key = source.remove(at: index)
@@ -128,13 +160,27 @@ struct KeyboardRowsEditor: View {
     }
 }
 
+/// One selectable key in a structural list.
+struct KeyChip: View {
+    let label: String
+    let isSelected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        Button(label, action: select)
+            .buttonStyle(.bordered)
+            .tint(isSelected ? .accentColor : .secondary)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 struct KeyboardSplitEditor: View {
     let rows: [LayoutRow]
-    /// Optional row names; the page editor labels its authored footer row "页底".
+    /// Optional row names; the page editor names its authored footer row.
     var rowTitles: [String] = []
     @Binding var split: LayoutSplitConfiguration?
     var allowsInheritance = false
-    var inheritanceTitle = "跟随主布局开关与间距"
+    var inheritanceTitle = "和主键盘一样拆分"
     /// No stored split means the split is off, never the initializer's default-on value.
     private var configuration: LayoutSplitConfiguration { split ?? LayoutSplitConfiguration(activation: .off) }
 
@@ -213,15 +259,13 @@ struct KeyboardSplitEditor: View {
     }
 
     static func adjusted(_ split: LayoutSplitConfiguration?, rows: [LayoutRow]) -> LayoutSplitConfiguration? {
-        guard var split else { return nil }
-        split.rowBreaks = rows.indices.map { row in
-            split.breakIndex(row: row, keyCount: rows[row].keys.count)
-        }
-        return split
+        split?.adjusted(to: rows)
     }
 }
 
-/// One authored function-key region. Empty arrays are deliberate: a deleted key stays deleted.
+/// Lists and adds the authored function keys. Empty arrays are deliberate: a deleted key stays
+/// deleted. Ordering, copying and deleting the selected key live in the page editor's
+/// "按键位置" section, next to the key's fields.
 struct KeyboardChromeKeysEditor: View {
     @Binding var chrome: KeyboardPageChrome
     @Binding var selected: KeyboardPageKeyPath
@@ -229,21 +273,28 @@ struct KeyboardChromeKeysEditor: View {
     var allowsLeading = true
 
     var body: some View {
-        Section("页底按键") {
-            chips(region: .bottom)
+        Section("底行按键") {
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) {
+                    chips(region: .bottom)
+                    addButton(.bottom, label: "添加底行按键")
+                }
+            }
         }
         Section("右侧栏") {
-            rail(region: .trailing)
+            chips(region: .trailing)
+            addButton(.trailing, label: "添加按键")
         }
         if allowsLeading {
             Section("左侧栏") {
-                rail(region: .leading)
+                chips(region: .leading)
+                addButton(.leading, label: "添加按键")
             }
         }
         if !chrome.trailing.isEmpty || (allowsLeading && !chrome.leading.isEmpty) {
             Section {
                 if !chrome.trailing.isEmpty {
-                    Toggle("右侧栏延伸到页底", isOn: $chrome.trailingSpansBottom)
+                    Toggle("右侧栏延伸到底行", isOn: $chrome.trailingSpansBottom)
                     OptionalWidthField(title: "右侧栏宽度", placeholder: "跟随键盘", value: $chrome.trailingWidth)
                 }
                 if allowsLeading && !chrome.leading.isEmpty {
@@ -257,63 +308,32 @@ struct KeyboardChromeKeysEditor: View {
         }
     }
 
-    @ViewBuilder
     private func chips(region: KeyboardPageChrome.Region) -> some View {
         let keys = chrome.keys(in: region)
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(keys.indices, id: \.self) { index in
-                    Button(keys[index].label) { selected = .chrome(region, key: index) }
-                        .buttonStyle(.bordered)
-                        .tint(selected == .chrome(region, key: index) ? .accentColor : .secondary)
-                }
-                Button {
-                    append(region)
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .disabled(keys.count >= LayoutResourceBudget.keysPerRegion)
-                .accessibilityLabel("添加页底按键")
+        return ForEach(keys.indices, id: \.self) { index in
+            KeyChip(label: keys[index].label, isSelected: selected == .chrome(region, key: index)) {
+                selected = .chrome(region, key: index)
             }
-        }
-        if case .chrome(let selectedRegion, let index) = selected,
-            selectedRegion == region, keys.indices.contains(index)
-        {
-            Button("删除选中按键", role: .destructive) { remove(region, index) }
         }
     }
 
     @ViewBuilder
-    private func rail(region: KeyboardPageChrome.Region) -> some View {
-        let keys = chrome.keys(in: region)
-        ForEach(keys.indices, id: \.self) { index in
-            HStack {
-                Button(keys[index].label) { selected = .chrome(region, key: index) }
-                    .buttonStyle(.bordered)
-                    .tint(selected == .chrome(region, key: index) ? .accentColor : .secondary)
-                Spacer()
-                Button {
-                    move(region, index, by: -1)
-                } label: {
-                    Image(systemName: "arrow.up")
-                }
-                .disabled(index == 0).accessibilityLabel("上移这个按键")
-                Button {
-                    move(region, index, by: 1)
-                } label: {
-                    Image(systemName: "arrow.down")
-                }
-                .disabled(index == keys.count - 1).accessibilityLabel("下移这个按键")
-                Button(role: .destructive) {
-                    remove(region, index)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .accessibilityLabel("删除这个按键")
+    private func addButton(_ region: KeyboardPageChrome.Region, label: String) -> some View {
+        let full = chrome.keys(in: region).count >= LayoutResourceBudget.keysPerRegion
+        if region == .bottom {
+            Button {
+                append(region)
+            } label: {
+                Image(systemName: "plus")
             }
+            .buttonStyle(.borderless)
+            .disabled(full)
+            .accessibilityLabel(label)
+        } else {
+            Button(label, systemImage: "plus") { append(region) }
+                .buttonStyle(.borderless)
+                .disabled(full)
         }
-        Button("添加按键", systemImage: "plus") { append(region) }
-            .disabled(keys.count >= LayoutResourceBudget.keysPerRegion)
     }
 
     /// Rail keys size by relative height; the footer sizes by relative width.
@@ -327,54 +347,21 @@ struct KeyboardChromeKeysEditor: View {
     }
 
     private func append(_ region: KeyboardPageChrome.Region) {
-        var keys = chrome.keys(in: region)
-        guard keys.count < LayoutResourceBudget.keysPerRegion else { return }
-        keys.append(newKey(region))
-        setKeys(keys, in: region)
+        let keys = chrome.keys(in: region) + [newKey(region)]
+        guard keys.count <= LayoutResourceBudget.keysPerRegion else { return }
+        chrome = chrome.settingKeys(keys, in: region)
         selected = .chrome(region, key: keys.count - 1)
-    }
-
-    private func remove(_ region: KeyboardPageChrome.Region, _ index: Int) {
-        var keys = chrome.keys(in: region)
-        guard keys.indices.contains(index) else { return }
-        keys.remove(at: index)
-        setKeys(keys, in: region)
-        if keys.isEmpty {
-            if !chrome.bottom.isEmpty {
-                selected = .chrome(.bottom, key: chrome.bottom.count - 1)
-            } else if !chrome.trailing.isEmpty {
-                selected = .chrome(.trailing, key: chrome.trailing.count - 1)
-            } else if !chrome.leading.isEmpty {
-                selected = .chrome(.leading, key: chrome.leading.count - 1)
-            }
-        } else {
-            selected = .chrome(region, key: min(index, keys.count - 1))
-        }
-    }
-
-    private func move(_ region: KeyboardPageChrome.Region, _ index: Int, by offset: Int) {
-        var keys = chrome.keys(in: region)
-        let target = index + offset
-        guard keys.indices.contains(index), keys.indices.contains(target) else { return }
-        keys.swapAt(index, target)
-        setKeys(keys, in: region)
-        selected = .chrome(region, key: target)
-    }
-
-    private func setKeys(_ keys: [LayoutKey], in region: KeyboardPageChrome.Region) {
-        switch region {
-        case .bottom: chrome.bottom = keys
-        case .leading: chrome.leading = keys
-        case .trailing: chrome.trailing = keys
-        }
     }
 }
 
 /// Width text that is currently not a positive number. A form holding one must not save: the
 /// field keeps its old value while invalid, so saving would silently write what is not shown.
-final class WidthFieldValidity: ObservableObject, @unchecked Sendable {
+@MainActor
+final class WidthFieldValidity: ObservableObject {
     @Published private(set) var invalidCount = 0
     private var fields: Set<UUID> = []
+
+    nonisolated init() {}
 
     var isInvalid: Bool { invalidCount > 0 }
 
@@ -400,12 +387,14 @@ extension EnvironmentValues {
     }
 }
 
-/// Optional point or relative size: empty means the running keyboard decides.
+/// Optional point or relative size: empty means the running keyboard decides. Reads and writes
+/// numbers in the user's locale, so a comma decimal separator works where the keypad offers one.
 struct OptionalWidthField: View {
     let title: String
     var placeholder = "自动"
     @Binding var value: Double?
     @Environment(\.widthFieldValidity) private var validity: WidthFieldValidity
+    @Environment(\.locale) private var locale
     @State private var fieldID = UUID()
     @State private var text = ""
     @State private var invalid = false
@@ -424,7 +413,7 @@ struct OptionalWidthField: View {
                     }
             }
             if invalid {
-                Text("请填写大于 0 的数字，留空则自动。").font(.footnote).foregroundStyle(.red)
+                Text("请填写大于 0 的数字，或者留空。").font(.footnote).foregroundStyle(.red)
             }
         }
         .onAppear { text = value.map(format) ?? "" }
@@ -438,7 +427,13 @@ struct OptionalWidthField: View {
 
     private func format(_ number: Double) -> String {
         if number == number.rounded(), number.magnitude < 1e15 { return String(Int(number)) }
-        return String(number)
+        return String(number).replacingOccurrences(of: ".", with: locale.decimalSeparator ?? ".")
+    }
+
+    /// Widths never carry grouping, so either decimal mark is read as the decimal point: the
+    /// locale's keypad may offer "," and a hardware keyboard may type ".".
+    private func parse(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: "."))
     }
 
     private func apply(_ newValue: String) {
@@ -448,7 +443,7 @@ struct OptionalWidthField: View {
             mark(false)
             return
         }
-        if let number = Double(trimmed), number.isFinite, number > 0 {
+        if let number = parse(trimmed), number.isFinite, number > 0 {
             value = number
             mark(false)
         } else {

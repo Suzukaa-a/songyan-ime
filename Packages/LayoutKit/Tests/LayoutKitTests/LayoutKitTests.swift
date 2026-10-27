@@ -4,9 +4,8 @@ import XCTest
 @testable import LayoutKit
 
 final class LayoutKitTests: XCTestCase {
-    func testCopyAndReplacePreserveEnabledOrderAndFailureSnapshot() throws {
+    func testCopyAndReplacePreserveOrderAndFailureSnapshot() throws {
         var registry = try LayoutRegistry()
-        try registry.setEnabledIDs(["phone9"])
         let original = try XCTUnwrap(registry.layout(id: "phone9"))
         let path = LayoutKeyPath.auxiliary(0, key: 0)
         let key = try XCTUnwrap(original.key(at: path))
@@ -16,14 +15,13 @@ final class LayoutKitTests: XCTestCase {
                 label: key.label, secondaryLabel: "问号", width: 1.5, action: key.action,
                 longPress: [.init(label: "？", action: .init(.literal, value: "？"))]))
         try registry.replace(edited)
-        XCTAssertEqual(registry.enabledIDs, ["phone9"])
         XCTAssertEqual(registry.layouts.map(\.id), BuiltinLayouts.all.map(\.id))
         XCTAssertEqual(try LayoutDefinition.decode(edited.encoded()), edited)
         let copy = try registry.copy(edited)
         XCTAssertNotEqual(copy.id, original.id)
         XCTAssertEqual(copy.rows, edited.rows)
         XCTAssertEqual(copy.auxiliaryAreas, edited.auxiliaryAreas)
-        XCTAssertEqual(registry.enabledIDs, ["phone9"])
+        XCTAssertEqual(registry.layouts.map(\.id), BuiltinLayouts.all.map(\.id) + [copy.id])
         let snapshot = registry
         let invalid = edited.replacingKey(at: path, with: .init(label: "坏", action: .init(.code, value: "abc")))
         XCTAssertThrowsError(try registry.replace(invalid))
@@ -32,26 +30,42 @@ final class LayoutKitTests: XCTestCase {
         XCTAssertThrowsError(try registry.replace(edited.copy()))
         XCTAssertEqual(registry, snapshot)
         try registry.install(copy.renamed("导入替换").encoded(), replaceExisting: true)
-        XCTAssertEqual(
-            registry.enabledIDs, ["phone9"], "importing the same ID must not silently enable a disabled layout")
+        XCTAssertEqual(registry.layout(id: copy.id)?.name, "导入替换", "a same-ID import replaces in place")
+        XCTAssertEqual(registry.layouts.last?.id, copy.id)
     }
 
-    func testImportOrderAndLastLayoutProtection() throws {
+    func testImportOrderAndBundledPresetsStay() throws {
         var registry = try LayoutRegistry()
         let custom = LayoutDefinition(
             id: "DIY / a", name: "DIY", input: .init(schemaID: "installed_schema"),
             rows: BuiltinLayouts.qwerty26.rows)
         try registry.install(custom.encoded())
-        XCTAssertEqual(registry.enabledIDs.last, custom.id)
+        XCTAssertEqual(registry.layouts.last?.id, custom.id)
         XCTAssertThrowsError(try registry.install(custom.encoded()))
-        try registry.setEnabledIDs([custom.id, "qwerty26"])
-        XCTAssertEqual(registry.enabledLayouts.map(\.id), [custom.id, "qwerty26"])
         try registry.remove(id: custom.id)
-        XCTAssertThrowsError(try registry.remove(id: "qwerty26"))
-        XCTAssertThrowsError(try registry.setEnabledIDs([]))
-        XCTAssertThrowsError(try registry.setEnabledIDs(["missing"]))
-        XCTAssertEqual(registry.enabledIDs, ["qwerty26"])
+        XCTAssertNil(registry.layout(id: custom.id))
+        XCTAssertThrowsError(try registry.remove(id: "qwerty26"), "bundled presets are the default main layouts")
         XCTAssertEqual(registry.usableLayouts { $0.id == "qwerty26" }.map(\.id), ["qwerty26"])
+    }
+
+    func testDefaultMainLayoutPrefersTheBoundLayoutThenThePreset() throws {
+        func bound(_ id: String, to schemaID: String?) -> LayoutDefinition {
+            LayoutDefinition(
+                id: id, name: id, input: .init(schemaID: schemaID, builtinLayout: .qwerty26),
+                rows: BuiltinLayouts.qwerty26.rows)
+        }
+        var registry = try LayoutRegistry(layouts: [BuiltinLayouts.merged14])
+        let key = KeyboardCompositionKey(inputMethodID: "luna_pinyin", layout: .qwerty26)
+        XCTAssertEqual(registry.defaultMainLayoutID(for: key), "qwerty26", "a preset missing from the catalog")
+        XCTAssertEqual(registry.resolvedLayout(id: "qwerty26")?.id, "qwerty26")
+        try registry.install(bound("mine", to: nil).encoded())
+        XCTAssertEqual(registry.defaultMainLayoutID(for: key), "qwerty26", "an unbound copy needs a pairing")
+        try registry.install(bound("luna-b", to: "luna_pinyin").encoded())
+        try registry.install(bound("luna-a", to: "luna_pinyin").encoded())
+        XCTAssertEqual(registry.defaultMainLayoutID(for: key), "luna-a", "the smallest ID, not catalog order")
+        XCTAssertEqual(registry.defaultMainLayoutID(for: .init(inputMethodID: "other", layout: .qwerty26)), "qwerty26")
+        XCTAssertEqual(
+            Set(registry.mainLayoutCandidates(for: key).map(\.id)), ["qwerty26", "mine", "luna-a", "luna-b"])
     }
 
     func testRejectInvalidActionsIncludingAlternates() throws {
@@ -159,7 +173,6 @@ final class LayoutKitTests: XCTestCase {
         let store = LayoutStore(directoryURL: directory)
         var registry = try store.load()
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-        try registry.setEnabledIDs(["phone9", "qwerty26"])
         try store.save(registry)
         XCTAssertEqual(try store.load(), registry)
         let replacement = BuiltinLayouts.phone9.renamed("我的九键")
@@ -178,7 +191,7 @@ final class LayoutKitTests: XCTestCase {
             rows: BuiltinLayouts.qwerty26.rows)
         try custom.encoded().write(to: source)
         let imported = try store.importLayout(from: source)
-        XCTAssertEqual(imported.enabledIDs, ["phone9", "qwerty26", "custom"])
+        XCTAssertEqual(imported.layouts.last?.id, "custom")
         try Data("{}".utf8).write(to: source)
         XCTAssertThrowsError(try store.importLayout(from: source))
         XCTAssertEqual(try store.load(), imported)

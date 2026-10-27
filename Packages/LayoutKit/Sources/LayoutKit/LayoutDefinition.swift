@@ -415,13 +415,11 @@ public enum LayoutError: Error, LocalizedError, Equatable {
     case invalid(String)
     case duplicateID(String)
     case unknownID(String)
-    case lastEnabledLayout
     public var errorDescription: String? {
         switch self {
         case .invalid(let message): return message
         case .duplicateID: return "已经有一个相同的键盘布局，请选择替换，或者另存为副本。"
         case .unknownID: return "找不到这个键盘布局，它可能已经被删除。"
-        case .lastEnabledLayout: return "请至少保留一个启用的布局。请先启用其他布局，再停用或移除当前布局。"
         }
     }
 }

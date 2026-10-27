@@ -72,12 +72,7 @@ extension KeyboardPanelView {
         let isSupported = { (definition: LayoutDefinition) in
             supports(definition, combinations: lazyCombinations)
         }
-        var usable = layoutRegistry?.usableLayouts(where: isSupported) ?? BuiltinLayouts.all.filter(isSupported)
-        if let id = selectedComposition?.mainLayoutID, let selected = layoutRegistry?.layout(id: id),
-            isSupported(selected), !usable.contains(where: { $0.id == id })
-        {
-            usable.append(selected)
-        }
+        let usable = layoutRegistry?.usableLayouts(where: isSupported) ?? BuiltinLayouts.all.filter(isSupported)
         let selectable = usable.filter { definition in
             guard let bound = definition.input.schemaID else { return true }
             let source = controller.session.resourceSet?.sourceSchemaID(bound) ?? bound

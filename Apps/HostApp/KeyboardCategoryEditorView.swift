@@ -1,14 +1,17 @@
+import KeyboardCore
 import LayoutKit
 import SwiftUI
 
 struct KeyboardCategoryEditorView: View {
     @Binding var categories: [KeyboardPageCategory]
     var inheritedSplit: LayoutSplitConfiguration?
+    var mainLayout: KeyboardLayoutKind?
     @State private var selectedID: String?
     @State private var selectedKey = 0
     @State private var recentKeys: [LayoutKey] = []
     @State private var loadingRecents = false
     @State private var recentError: String?
+    @State private var confirmingCategoryRemoval = false
 
     private var selectedIndex: Int? {
         categories.firstIndex { $0.id == selectedID } ?? categories.indices.first
@@ -66,7 +69,7 @@ struct KeyboardCategoryEditorView: View {
                         adjustSplit(index)
                     })
             ) {
-                Text("自定按键").tag(KeyboardPageCategory.Source.fixed)
+                Text("自定义按键").tag(KeyboardPageCategory.Source.fixed)
                 Text("最近使用").tag(KeyboardPageCategory.Source.recent)
             }
             Stepper(
@@ -85,18 +88,29 @@ struct KeyboardCategoryEditorView: View {
                 selectedID = copy.id
                 selectedKey = 0
             }.disabled(categories.count >= LayoutResourceBudget.pageCategories)
+            Button("删除分类", role: .destructive) { confirmingCategoryRemoval = true }
+                .disabled(categories.count == 1)
+        }
+        .confirmationDialog(
+            "删除「\(categories[index].name)」？", isPresented: $confirmingCategoryRemoval, titleVisibility: .visible
+        ) {
             Button("删除分类", role: .destructive) {
+                guard categories.indices.contains(index), categories.count > 1 else { return }
                 categories.remove(at: index)
                 selectedID = categories.first?.id
                 selectedKey = 0
-            }.disabled(categories.count == 1)
+            }
+        } message: {
+            if categories.indices.contains(index), categories[index].source != .recent {
+                Text("分类里的 \(categories[index].keys.count) 个按键会一起删除。")
+            }
         }
         let category = categories[index]
         KeyboardSplitEditor(
             rows: splitRows(category),
             split: Binding(
                 get: { categories[index].split }, set: { categories[index].split = $0 }),
-            allowsInheritance: true, inheritanceTitle: "跟随页面开关与间距")
+            allowsInheritance: true, inheritanceTitle: "和整页一样拆分")
         if category.source == .recent {
             recentPreview(category)
                 .task { await loadRecents() }
@@ -137,7 +151,8 @@ struct KeyboardCategoryEditorView: View {
         }.buttonStyle(.borderless)
         if category.keys.indices.contains(selectedKey) {
             LayoutKeyFields(
-                key: category.keys[selectedKey], allowsCode: false, allowsTitleMode: true
+                key: category.keys[selectedKey], allowsCode: false, allowsTitleMode: true,
+                allowsFunctionActions: false
             ) { key in
                 categories[index].keys[selectedKey] = key
             }.id("\(category.id)-\(selectedKey)")
@@ -149,7 +164,8 @@ struct KeyboardCategoryEditorView: View {
             id: "preview-\(category.id)", name: category.name, kind: .symbols, rows: [],
             split: inheritedSplit, symbolPresentation: .categorized, categories: [category])
         return KeyboardPagePreviewView(
-            page: page, onSelectCategoryKey: selectable ? { _, key in selectedKey = key } : nil,
+            page: page, mainLayout: mainLayout, skin: AppearanceManager.shared.applied.skin,
+            onSelectCategoryKey: selectable ? { _, key in selectedKey = key } : nil,
             selectedCategoryKey: selectable ? (category.id, selectedKey) : nil)
     }
 

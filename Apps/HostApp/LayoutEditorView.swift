@@ -1,3 +1,4 @@
+import KeyboardCore
 import LayoutKit
 import SwiftUI
 import UIKit
@@ -14,9 +15,12 @@ struct LayoutEditorView: View {
     @StateObject private var widthValidity = WidthFieldValidity()
     /// Layout at open time: used to detect unsaved changes (confirm before cancel/swipe-down dismissal).
     private let original: LayoutDefinition
+    /// Receives what was written: the edited layout, or the new copy from 另存为副本.
+    private let onSaved: ((LayoutDefinition) -> Void)?
 
-    init(layout: LayoutDefinition) {
+    init(layout: LayoutDefinition, onSaved: ((LayoutDefinition) -> Void)? = nil) {
         original = layout
+        self.onSaved = onSaved
         _draft = State(initialValue: layout)
     }
     private var hasChanges: Bool { draft != original }
@@ -54,42 +58,24 @@ struct LayoutEditorView: View {
             Section("点键编辑") {
                 KeyboardPreviewView(layout: draft, onSelectKey: { selected = $0 })
             }
-            KeyboardSplitEditor(
-                rows: draft.rows, split: Binding(get: { draft.split }, set: { draft = replacingSplit($0) }))
-            KeyboardRowsEditor(
-                rows: Binding(get: { draft.rows }, set: { draft = replacingRows($0) }), selected: $selected)
-            Section("选择键位") {
-                Picker("键位", selection: $selected) {
-                    ForEach(draft.rows.indices, id: \.self) { row in
-                        ForEach(draft.rows[row].keys.indices, id: \.self) { index in
-                            Text("第 \(row + 1) 行 · \(index + 1) · \(draft.rows[row].keys[index].label)")
-                                .tag(LayoutKeyPath.row(row, key: index))
-                        }
-                    }
-                    ForEach((draft.auxiliaryAreas ?? []).indices, id: \.self) { area in
-                        if let keys = draft.auxiliaryAreas?[area].keys, !keys.isEmpty {
-                            ForEach(keys.indices, id: \.self) { index in
-                                Text("辅助区 \(area + 1) · \(index + 1) · \(keys[index].label)")
-                                    .tag(LayoutKeyPath.auxiliary(area, key: index))
-                            }
-                        }
-                    }
-                }
-            }
+            // The selected key's fields sit right under the preview that selects it.
             if let key = draft.key(at: selected) {
-                // The setteable list now contains page-level actions, and the runtime definition keys
-                // already honour custom titles, so a main-layout function key can show its own title.
+                // Main-layout function keys draw custom titles at runtime too.
                 LayoutKeyFields(key: key, allowsTitleMode: true) { updated in
                     draft = draft.replacingKey(at: selected, with: updated)
                 }
                 .id(selected)
             }
+            SelectedRowKeyActions(rows: rowsBinding, selected: $selected)
             if !draft.hasInputModeSwitchKey {
                 Section {
-                    Button("添加地球键", systemImage: "globe") { addInputModeSwitchKey() }
+                    Button("添加\(UserTerminology.globeKey)", systemImage: "globe") { addInputModeSwitchKey() }
                         .disabled((draft.rows.last?.keys.count ?? 0) >= LayoutResourceBudget.keysPerRegion)
                 }
             }
+            KeyboardRowsEditor(rows: rowsBinding, selected: $selected)
+            KeyboardSplitEditor(
+                rows: draft.rows, split: Binding(get: { draft.split }, set: { draft = replacingSplit($0) }))
             Section {
                 Button("另存为副本") { save(asCopy: true) }
             }
@@ -117,17 +103,23 @@ struct LayoutEditorView: View {
             Button("继续编辑", role: .cancel) {}
         }
         .interactiveDismissDisabled(hasChanges || saving)
-        .alert("无法保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+        .alert(
+            UserTerminology.keyboardLayout, isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+        ) {
             Button("好", role: .cancel) {}
         } message: {
             Text(error ?? "")
         }
     }
 
+    private var rowsBinding: Binding<[LayoutRow]> {
+        Binding(get: { draft.rows }, set: { draft = replacingRows($0) })
+    }
+
     private func save(asCopy: Bool) {
         guard !saving else { return }
         guard !widthValidity.isInvalid else {
-            error = "有宽度还没填对：请把标红处改成大于 0 的数字，或留空自动。"
+            error = "有按键宽度没填对，请改成大于 0 的数字，或者留空。"
             return
         }
         saving = true
@@ -135,9 +127,10 @@ struct LayoutEditorView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         Task { @MainActor in
             await Task.yield()
-            let snapshot = draft
+            let snapshot = asCopy ? draft.copy() : draft
             defer { saving = false }
-            if await manager.saveDraft(snapshot, asCopy: asCopy) {
+            if await manager.saveDraft(snapshot) {
+                onSaved?(snapshot)
                 dismiss()
             } else {
                 error = manager.lastError
@@ -172,13 +165,6 @@ struct LayoutEditorView: View {
             auxiliaryAreas: draft.auxiliaryAreas, note: draft.note,
             longPressDelay: draft.longPressDelay, candidateArea: draft.candidateArea, split: split)
     }
-
-    static func compatibility(_ layout: LayoutDefinition) -> String {
-        if layout.input.schemaID != nil {
-            return "这个键盘布局暂不可用，可继续编辑或导出。"
-        }
-        return "可编辑按键、行、宽度与长按。"
-    }
 }
 
 struct LayoutKeyFields: View {
@@ -187,63 +173,25 @@ struct LayoutKeyFields: View {
     /// Page function keys can follow the live keyboard state instead of a fixed title.
     var allowsTitleMode = false
     /// Row and footer keys size by relative width; rail keys size by relative height.
-    var widthLabel = "相对宽度"
+    var widthLabel = "宽度比例"
+    /// Category keys only type text, so their action list leaves out every function key.
+    var allowsFunctionActions = true
     let update: (LayoutKey) -> Void
 
-    private var isFunctionKey: Bool { key.action.type != .code && key.action.type != .literal }
-
-    /// Literal keys with a live face (a paired branch, or an explicit title mode carried by new
-    /// built-in rows) get the same follow-function/custom choice as page function keys. A legacy
-    /// fixed literal with no title mode never had one.
-    private var supportsLiveTitle: Bool {
-        if isFunctionKey { return true }
-        guard key.action.type == .literal else { return false }
-        return key.action.asciiValue != nil || key.titleMode != nil
-    }
-
-    /// A legacy space key without a title mode always shows its stored label; showing
-    /// "跟随功能" for it would promise a live title it never had. Other implicit nil cases
-    /// (enter, globe, backspace, shift) keep following the live function title.
-    private var displayedTitleMode: LayoutKeyTitleMode {
-        if key.titleMode == nil, key.action.type == .space || key.action.asciiValue != nil {
-            return .custom
-        }
-        return key.titleMode ?? .automatic
-    }
-
-    /// Editing a title switches a page function key from the live title to the author's own.
-    /// Character keys and page rows keep their existing title semantics.
-    private func updatingLabel(_ text: String) -> LayoutKey {
-        let titled = key.title(text)
-        return allowsTitleMode && supportsLiveTitle ? titled : titled.settingTitleMode(key.titleMode)
-    }
-
-    /// A character key carries no title class; switching back to a function key restores the live
-    /// title. Literal edits keep the face the key already had: pairing a legacy fixed key must not
-    /// promote its author label into a live title.
-    private func updatingAction(_ action: LayoutAction) -> LayoutKey {
-        let updated = key.settingAction(action)
-        guard allowsTitleMode else { return updated }
-        if action.type == .code { return updated.settingTitleMode(nil) }
-        if action.type == .literal {
-            // A function key switched into literal starts as fixed text; editing an existing
-            // literal (including adding or clearing its ASCII value) keeps its stored face.
-            if key.action.type != .literal { return updated.settingTitleMode(nil) }
-            return updated.settingTitleMode(key.titleMode)
-        }
-        return updated.settingTitleMode(key.titleMode ?? .automatic)
-    }
-
     var body: some View {
-        Section("选中键 · \(key.label)") {
-            TextField("主标题", text: Binding(get: { key.label }, set: { update(updatingLabel($0)) }))
-                .textInputAutocapitalization(.never).autocorrectionDisabled()
-                .accessibilityIdentifier("layoutEditor.key.label")
-            if allowsTitleMode && supportsLiveTitle {
+        Section("所选按键 · \(key.label)") {
+            TextField(
+                "主标题",
+                text: Binding(
+                    get: { key.label }, set: { update(key.editingLabel($0, allowsTitleMode: allowsTitleMode)) })
+            )
+            .textInputAutocapitalization(.never).autocorrectionDisabled()
+            .accessibilityIdentifier("layoutEditor.key.label")
+            if allowsTitleMode && key.supportsLiveTitle {
                 Picker(
-                    "标题显示",
+                    "标题内容",
                     selection: Binding(
-                        get: { displayedTitleMode },
+                        get: { key.displayedTitleMode },
                         set: { update(key.settingTitleMode($0)) })
                 ) {
                     Text("跟随功能").tag(LayoutKeyTitleMode.automatic)
@@ -261,8 +209,10 @@ struct LayoutKeyFields: View {
             OptionalWidthField(
                 title: widthLabel,
                 value: Binding(get: { key.width }, set: { update(key.settingWidth($0)) }))
-            LayoutActionFields(action: key.action, allowsCode: allowsCode) { action in
-                update(updatingAction(action))
+            LayoutActionFields(
+                action: key.action, allowsCode: allowsCode, allowsFunctionActions: allowsFunctionActions
+            ) { action in
+                update(key.editingAction(action, allowsTitleMode: allowsTitleMode))
             }
         }
         Section {
@@ -318,7 +268,7 @@ struct LayoutKeyFields: View {
                         })
                 )
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
-                LayoutActionFields(action: option.action, allowsCode: allowsCode) { action in
+                LayoutActionFields(action: option.action, allowsCode: allowsCode, title: "选中后") { action in
                     replaceOption(index, with: LayoutOption(label: option.label, action: action))
                 }
                 HStack {
@@ -351,27 +301,36 @@ struct LayoutKeyFields: View {
 private struct LayoutActionFields: View {
     let action: LayoutAction
     var allowsCode = true
+    var allowsFunctionActions = true
+    /// What the picker is called: a key does it on tap, a long-press option once chosen.
+    var title = "轻点后"
     let update: (LayoutAction) -> Void
 
     private var kinds: [LayoutAction.Kind] {
-        [
-            .code, .literal, .space, .enter, .backspace, .globe, .modeSwitch, .shift, .pageSwitch,
-            .languageSwitch, .symbolLock, .clearInput,
-        ]
+        var kinds: [LayoutAction.Kind] = allowsCode ? [.code, .literal] : [.literal]
+        if allowsFunctionActions {
+            kinds += [
+                .space, .enter, .backspace, .globe, .modeSwitch, .shift, .pageSwitch, .languageSwitch, .symbolLock,
+                .clearInput,
+            ]
+        }
+        // A stored action outside the offered list stays visible as the current choice.
+        if !kinds.contains(action.type) { kinds.append(action.type) }
+        return kinds
     }
 
-    private func title(_ kind: LayoutAction.Kind) -> String {
+    private func actionTitle(_ kind: LayoutAction.Kind) -> String {
         switch kind {
         case .code: return "输入字母"
         case .literal: return "输入文字"
         case .space: return "空格"
         case .enter: return "回车"
         case .backspace: return "退格"
-        case .globe: return "切换键盘"
+        case .globe: return UserTerminology.globeKey
         case .modeSwitch: return "切换键盘布局"
         case .shift: return "大小写"
         case .pageSwitch: return "切换页面"
-        case .languageSwitch: return "语言与返回"
+        case .languageSwitch: return UserTerminology.languageKey
         case .symbolLock: return "符号锁定"
         case .clearInput: return "重输"
         }
@@ -389,11 +348,11 @@ private struct LayoutActionFields: View {
 
     var body: some View {
         Picker(
-            "动作",
+            title,
             selection: Binding(get: { action.type }, set: { update(defaultAction($0)) })
         ) {
-            ForEach(kinds.filter { allowsCode || $0 != .code }, id: \.self) { kind in
-                Text(title(kind)).tag(kind)
+            ForEach(kinds, id: \.self) { kind in
+                Text(actionTitle(kind)).tag(kind)
             }
         }
         if action.type == .languageSwitch {
@@ -405,7 +364,7 @@ private struct LayoutActionFields: View {
             ) {
                 Text("跟随页面").tag(Optional<LayoutAction.LanguageSwitchBehavior>.none)
                 Text("切换中英符号").tag(Optional(LayoutAction.LanguageSwitchBehavior.symbols))
-                Text("返回主键盘").tag(Optional(LayoutAction.LanguageSwitchBehavior.letters))
+                Text("回到字母页").tag(Optional(LayoutAction.LanguageSwitchBehavior.letters))
             }
         }
         if action.type == .pageSwitch {
@@ -415,9 +374,9 @@ private struct LayoutActionFields: View {
                     get: { action.pageSwitchTarget ?? .numeric },
                     set: { update(.pageSwitch($0)) })
             ) {
-                Text("文字").tag(LayoutAction.PageTarget.letters)
-                Text("123").tag(LayoutAction.PageTarget.numeric)
-                Text("符号").tag(LayoutAction.PageTarget.symbols)
+                Text("字母页").tag(LayoutAction.PageTarget.letters)
+                Text("123 页").tag(LayoutAction.PageTarget.numeric)
+                Text("符号页").tag(LayoutAction.PageTarget.symbols)
             }
         }
         if action.type == .code {

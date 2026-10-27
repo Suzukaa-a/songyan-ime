@@ -15,7 +15,6 @@ struct UserKeyboardManagementView: View {
     @State private var hasEditedSelection = false
     @State private var confirmingDiscard = false
     @State private var isSaving = false
-    @State private var inputMethodID = ""
     @State private var configuringKeyboard: UserKeyboard?
     @ObservedObject private var layoutManager = LayoutManager.shared
 
@@ -31,35 +30,25 @@ struct UserKeyboardManagementView: View {
         List {
             statusSection
             if case .ready = center.phase {
-                if !groups.isEmpty {
+                // Sits at the top, next to the disabled Save button it explains.
+                if needsOneKeyboard {
                     Section {
-                        Picker(UserTerminology.inputMethod, selection: $inputMethodID) {
-                            ForEach(groups, id: \.id) { group in Text(group.name).tag(group.id) }
-                        }
-                        .disabled(isBusy)
+                        Label(UserTerminology.userKeyboardSaveNeedsOne, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.orange)
                     }
                 }
-                if let group = groups.first(where: { $0.id == inputMethodID }) {
-                    Section("键盘布局") {
+                // Every input method keeps its own section, so a checked keyboard is never hidden.
+                ForEach(groups, id: \.id) { group in
+                    Section(group.name) {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
                             ForEach(group.items) { item in keyboardCard(item, inputMethod: group.name) }
                         }
                         .padding(.vertical, 6)
                     }
                 }
-                Section {
-                    NavigationLink("页面库") { KeyboardPageManagementView() }
-                    NavigationLink("自定义键盘布局") { LayoutManagementView() }
-                }
                 if groups.isEmpty {
                     Section { Text(UserTerminology.userKeyboardEmptyHint).foregroundStyle(.secondary) }
                 } else {
-                    if needsOneKeyboard {
-                        Section {
-                            Label(UserTerminology.userKeyboardSaveNeedsOne, systemImage: "exclamationmark.circle")
-                                .foregroundStyle(.orange)
-                        }
-                    }
                     Section {
                         Text(UserTerminology.userKeyboardFootnote)
                             .font(.footnote).foregroundStyle(.secondary)
@@ -75,7 +64,9 @@ struct UserKeyboardManagementView: View {
                 set: { if !$0 { configuringKeyboard = nil } }
             )
         ) {
-            if let configuringKeyboard { KeyboardCompositionView(keyboard: configuringKeyboard) }
+            if let configuringKeyboard {
+                KeyboardCompositionView(keyboard: configuringKeyboard, keyboardNames: keyboardNames)
+            }
         }
         // With unsaved changes, going back directly (discarding the draft) is not allowed: becomes "Cancel" with a second confirmation.
         .navigationBarBackButtonHidden(hasChanges || isSaving || center.busyKeyboardID != nil)
@@ -247,24 +238,40 @@ struct UserKeyboardManagementView: View {
 
     private var isBusy: Bool { isSaving || center.busyKeyboardID != nil }
 
+    private var keyboardNames: KeyboardNames {
+        let publishedIDs = Set(center.publishedKeyboards.map(\.id))
+        return KeyboardNames(
+            known: Dictionary(items.map { ($0.id, $0.keyboard.title) }, uniquingKeysWith: { first, _ in first }),
+            active: items.filter { publishedIDs.contains($0.id) || selectedIDs.contains($0.id) }
+                .map { $0.keyboard.compositionKey })
+    }
+
     /// The card body toggles the pair in the draft; the footer is either 正在使用 or a separate "Use" button.
     private func keyboardCard(_ item: Item, inputMethod: String) -> some View {
         let selected = selectedIDs.contains(item.id)
         let inUse = center.currentKeyboardID == item.id
         let name = UserTerminology.userKeyboardToggleLabel(inputMethod: inputMethod, layout: item.layout)
+        let main = mainLayout(for: item)
+        // The card names the keyboard shape; a paired custom main layout is named under it.
+        let customMain = main.id == BuiltinLayouts.preset(for: item.layout.builtinLayout).id ? nil : main.name
         return VStack(alignment: .leading, spacing: 8) {
             Button {
                 binding(for: item.id).wrappedValue.toggle()
             } label: {
                 VStack(alignment: .leading, spacing: 10) {
-                    UserKeyboardMiniature(definition: mainLayout(for: item))
+                    UserKeyboardMiniature(definition: main)
                         .frame(height: 64)
                         .accessibilityHidden(true)
                     HStack(alignment: .firstTextBaseline) {
-                        Text(UserTerminology.layoutName(item.layout))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(UserTerminology.layoutName(item.layout))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
+                            if let customMain {
+                                Text(customMain).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 4)
                         Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selected ? Color.accentColor : Color.secondary)
@@ -275,7 +282,7 @@ struct UserKeyboardManagementView: View {
             .buttonStyle(.plain)
             .disabled(isBusy || !center.supportsManagement)
             .accessibilityIdentifier("userKeyboard.card." + item.id)
-            .accessibilityLabel(name)
+            .accessibilityLabel(customMain.map { "\(name)，\($0)" } ?? name)
             .accessibilityValue(
                 selected ? UserTerminology.userKeyboardSelected : UserTerminology.userKeyboardNotSelected
             )
@@ -298,12 +305,13 @@ struct UserKeyboardManagementView: View {
             Button {
                 configuringKeyboard = item.keyboard
             } label: {
-                Label("页面搭配", systemImage: "square.stack.3d.up")
+                Label(UserTerminology.pageComposition, systemImage: "square.stack.3d.up")
                     .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
             .font(.subheadline)
             .accessibilityIdentifier("userKeyboard.pages." + item.id)
+            .accessibilityLabel("\(name)的\(UserTerminology.pageComposition)")
             .disabled(isBusy)
         }
         .padding(12)
@@ -320,9 +328,9 @@ struct UserKeyboardManagementView: View {
     }
 
     private func mainLayout(for item: Item) -> LayoutDefinition {
-        let composition = layoutManager.registry.composition(for: item.id, defaultMainLayoutID: item.layout.rawValue)
-        return layoutManager.registry.layout(id: composition.mainLayoutID)
-            ?? BuiltinLayouts.all.first { $0.id == item.layout.rawValue } ?? BuiltinLayouts.qwerty26
+        let registry = layoutManager.registry
+        return registry.resolvedLayout(id: registry.composition(for: item.keyboard.compositionKey).mainLayoutID)
+            ?? BuiltinLayouts.preset(for: item.layout.builtinLayout)
     }
 
     private func binding(for id: String) -> Binding<Bool> {
@@ -343,10 +351,6 @@ struct UserKeyboardManagementView: View {
         baselineIDs = ids
         hasEditedSelection = false
         initialized = true
-        if !groups.contains(where: { $0.id == inputMethodID }) {
-            inputMethodID =
-                items.first(where: { $0.id == center.currentKeyboardID })?.inputMethodID ?? groups.first?.id ?? ""
-        }
     }
 
     @MainActor

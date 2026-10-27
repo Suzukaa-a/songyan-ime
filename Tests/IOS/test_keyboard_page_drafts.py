@@ -1,11 +1,10 @@
-"""Real draft factory copies and key-face edits preserve author data."""
+"""Real draft factory copies preserve author data. Key-face edits are LayoutKit XCTests."""
 import sys
 import unittest
 
 from swift_probe import ROOT, production_modules, run, scratch_directory
 
 FACTORY = ROOT / "Apps/HostApp/KeyboardPageDraftFactory.swift"
-EDITOR = ROOT / "Apps/HostApp/LayoutEditorView.swift"
 FIXTURE = ROOT / "Tests/IOS/Fixtures/KeyboardPageDraftProbe.swift"
 
 
@@ -23,23 +22,16 @@ def swift_declaration(source, opener):
     raise AssertionError("unterminated declaration: " + opener[:60])
 
 
-def generated_fixture(factory_source, editor_source):
+def generated_fixture(factory_source):
     markers = {
-        "/* PRODUCTION_COPY_FUNCTION */": (factory_source, "    static func copy("),
-        "/* PRODUCTION_EDITABLE_DRAFT_FUNCTION */": (factory_source, "    static func editableDraft("),
-        "/* PRODUCTION_SUPPORTS_LIVE_TITLE */": (editor_source, "    private var supportsLiveTitle"),
-        "/* PRODUCTION_DISPLAYED_TITLE_MODE */": (editor_source, "    private var displayedTitleMode"),
-        "/* PRODUCTION_UPDATING_ACTION */": (editor_source, "    private func updatingAction("),
-        "/* PRODUCTION_UPDATING_LABEL */": (editor_source, "    private func updatingLabel("),
+        "/* PRODUCTION_COPY_FUNCTION */": "    static func copy(",
+        "/* PRODUCTION_EDITABLE_DRAFT_FUNCTION */": "    static func editableDraft(",
     }
     generated = FIXTURE.read_text(encoding="utf-8")
-    for marker, (source, opener) in markers.items():
+    for marker, opener in markers.items():
         if generated.count(marker) != 1:
             raise AssertionError("fixture must carry exactly one " + marker)
-        declaration = swift_declaration(source, opener)
-        if opener.startswith("    private "):
-            declaration = declaration.replace("    private ", "    ", 1)
-        generated = generated.replace(marker, declaration)
+        generated = generated.replace(marker, swift_declaration(factory_source, opener))
     return generated
 
 
@@ -49,10 +41,7 @@ class KeyboardPageDraftTests(unittest.TestCase):
         with scratch_directory("keyboard-page-drafts") as directory:
             modules = production_modules()
             fixture = directory / "KeyboardPageDraftProbe.swift"
-            fixture.write_text(
-                generated_fixture(
-                    FACTORY.read_text(encoding="utf-8"), EDITOR.read_text(encoding="utf-8")),
-                encoding="utf-8")
+            fixture.write_text(generated_fixture(FACTORY.read_text(encoding="utf-8")), encoding="utf-8")
             binary = directory / "probe"
             run([
                 "xcrun", "swiftc", "-swift-version", "5", "-parse-as-library",

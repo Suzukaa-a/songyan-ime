@@ -430,9 +430,12 @@ final class UserKeyboardTests: XCTestCase {
         XCTAssertFalse(UserTerminology.userKeyboardHowToStart.contains(UserTerminology.inputMethod))
         // Footnote: "Save", "Use", and how it relates to the in-keyboard long-press list.
         let footnote = UserTerminology.userKeyboardFootnote
-        for part in ["「保存」", "「使用」", "长按中英键"] {
+        for part in ["轻点「保存」", "「使用」", "长按中英键"] {
             XCTAssertTrue(footnote.contains(part), part)
         }
+        XCTAssertNil(UserTerminology.usedByKeyboards([]))
+        XCTAssertEqual(UserTerminology.usedByKeyboards(["小鹤 · 26 键"]), "正在被「小鹤 · 26 键」使用")
+        XCTAssertEqual(UserTerminology.usedByKeyboards(["A", "B", "C"]), "正在被「A」等 3 个键盘使用")
 
         let plain = [
             UserTerminology.userKeyboardNoSource, UserTerminology.userKeyboardHowToStart,

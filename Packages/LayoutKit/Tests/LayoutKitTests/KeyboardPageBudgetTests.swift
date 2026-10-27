@@ -44,17 +44,18 @@ final class KeyboardPageBudgetTests: XCTestCase {
         let options = (0..<LayoutResourceBudget.alternatesPerKey).map {
             LayoutOption(label: "o\($0)", action: .init(.literal, value: "o\($0)"))
         }
-        let alternatePages = (0..<(LayoutResourceBudget.catalogAlternates / (LayoutResourceBudget.keysPerRegion * 16))).map {
-            index in
-            KeyboardPageDefinition(
-                id: "user.alternates.\(index)", name: "长按页", kind: .numeric,
-                rows: [
-                    LayoutRow(
-                        keys: (0..<LayoutResourceBudget.keysPerRegion).map {
-                            LayoutKey(label: "k\($0)", action: .init(.literal, value: "k"), longPress: options)
-                        })
-                ])
-        }
+        let alternatePages = (0..<(LayoutResourceBudget.catalogAlternates / (LayoutResourceBudget.keysPerRegion * 16)))
+            .map {
+                index in
+                KeyboardPageDefinition(
+                    id: "user.alternates.\(index)", name: "长按页", kind: .numeric,
+                    rows: [
+                        LayoutRow(
+                            keys: (0..<LayoutResourceBudget.keysPerRegion).map {
+                                LayoutKey(label: "k\($0)", action: .init(.literal, value: "k"), longPress: options)
+                            })
+                    ])
+            }
         var full = try LayoutRegistry(pages: alternatePages + KeyboardPagePresets.all)
         var withAlternate = KeyboardPagePresets.numericChinese
         withAlternate.rows[0] = LayoutRow(
@@ -94,7 +95,8 @@ final class KeyboardPageBudgetTests: XCTestCase {
         XCTAssertThrowsError(try page.validate(), "a function key is a key too")
 
         var longText = KeyboardPagePresets.numericChinese.materialized()
-        longText.chrome?.bottom[0] = LayoutKey(label: String(repeating: "x", count: 300), action: .init(.languageSwitch))
+        longText.chrome?.bottom[0] = LayoutKey(
+            label: String(repeating: "x", count: 300), action: .init(.languageSwitch))
         XCTAssertThrowsError(try longText.validate())
 
         var hugeRegion = KeyboardPagePresets.numericChinese.materialized()

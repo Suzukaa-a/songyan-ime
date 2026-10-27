@@ -73,7 +73,7 @@ public enum KeyboardPagePresets {
     public static let numericKeypad: KeyboardPageDefinition = {
         var page = numericAutomatic.materialized(numericForm: .phoneDigitPad)
         page.id = "page.numeric.keypad"
-        page.name = "数字盘 123"
+        page.name = "数字九宫格"
         return page
     }()
     public static let numericChinese = KeyboardPageDefinition(

@@ -170,7 +170,7 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     /// page a second time.
     func validatedUsage() throws -> LayoutResourceBudget.Usage {
         guard numericPresentation == nil || kind == .numeric else {
-            throw LayoutError.invalid("只有 123 页可以选择「自动」或「数字盘」，请重新选择页面。")
+            throw LayoutError.invalid("只有 123 页可以选择「自动」或「数字九宫格」，请重新选择页面。")
         }
         guard kind == .symbols || (symbolPresentation == nil && categories == nil) else {
             throw LayoutError.invalid("分类浏览只适用于符号页，请重新选择页面。")
@@ -201,7 +201,7 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
                 // Native controls are drawn around these rows; authored pages (chrome != nil) may
                 // keep a deliberately empty key area instead.
                 guard numericPresentation == nil else {
-                    throw LayoutError.invalid("这个数字盘页面没有按键，请复制「数字盘 123」后再编辑。")
+                    throw LayoutError.invalid("这个数字九宫格没有按键，请复制「数字九宫格」页面后再编辑。")
                 }
                 guard !rows.isEmpty, rows.allSatisfy({ !$0.keys.isEmpty }) else {
                     throw LayoutError.invalid("请至少保留一行，每行至少保留一个按键。")

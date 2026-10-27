@@ -116,7 +116,13 @@ extension KeyboardPanelView {
         pairedPage(for: pairedPageMemoKey).missingSwitchEntry
     }
 
-    var preferredDefinitionID: String? { selectedComposition?.mainLayoutID ?? localLayoutID ?? selectedLayoutID }
+    /// The saved pairing's main layout, else the same default the host app shows for this keyboard.
+    var preferredDefinitionID: String? {
+        if let id = selectedComposition?.mainLayoutID { return id }
+        guard let builtin = LayoutInput.Builtin(rawValue: controller.layout.rawValue) else { return nil }
+        let key = KeyboardCompositionKey(inputMethodID: controller.selectedSchemaID, layout: builtin)
+        return layoutRegistry?.defaultMainLayoutID(for: key) ?? BuiltinLayouts.preset(for: builtin).id
+    }
 
     /// The authored page to draw, or nil when the built-in page area draws this page.
     var pageDefinition: KeyboardPageDefinition? { pageResolution.page }

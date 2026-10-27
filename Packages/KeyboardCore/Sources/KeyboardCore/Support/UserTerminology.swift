@@ -36,6 +36,27 @@ public enum UserTerminology: Sendable {
     public static let grammarModel = "语法模型"
     /// A set of added "input method + keyboard layout" combinations (managed in the main app, switched by long-press in the keyboard).
     public static let userKeyboard = "我的键盘"
+    /// The main layout plus the 123, symbol and ABC pages one keyboard in 我的键盘 uses.
+    public static let pageComposition = "页面搭配"
+    /// The layout a keyboard opens on; the pages are reached from it.
+    public static let mainLayout = "主布局"
+    /// Every 123, symbol and ABC page the user can pair with a keyboard.
+    public static let pageLibrary = "页面库"
+    /// The phone-style 1–9 digit grid.
+    public static let phoneDigitPad = "数字九宫格"
+    /// The key that switches between Chinese and English (long-press switches keyboards).
+    public static let languageKey = "中英键"
+    /// The key that opens the system keyboard list.
+    public static let globeKey = "地球键"
+
+    /// Shown where a layout or page cannot be deleted because a keyboard's 页面搭配 uses it.
+    /// `keyboards` are display names; with more than one only the first is named.
+    public static func usedByKeyboards(_ keyboards: [String]) -> String? {
+        guard let first = keyboards.first else { return nil }
+        return keyboards.count == 1
+            ? "正在被「\(first)」使用"
+            : "正在被「\(first)」等 \(keyboards.count) 个键盘使用"
+    }
 
     // MARK: - Status (identical wording in Host and keyboard)
 
@@ -172,7 +193,7 @@ public enum UserTerminology: Sendable {
 
     /// Management page footnote: what the toggles and "Use" do, and how they relate to the in-keyboard switch list.
     public static let userKeyboardFootnote =
-        "勾选后点「保存」加入键盘，长按中英键可切换；轻点「\(startUsing)」立即换用。"
+        "勾选后轻点「保存」加入键盘，长按\(languageKey)可切换；轻点「\(startUsing)」立即换用。"
 
     /// Saving in progress.
     public static let userKeyboardSaving = "正在保存键盘…"

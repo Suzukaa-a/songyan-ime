@@ -66,7 +66,7 @@ enum RimePaths {
             _ = try await manager.readImport(source)
             fatalError("duplicate import accepted")
         } catch let error as LayoutError {
-            precondition(error == .invalid("正在导入布局，请稍候…"))
+            precondition(error == .invalid("正在导入键盘布局，请稍候。"))
         }
         precondition(manager.isImporting, "duplicate request cleared active import")
         precondition(SecurityScopeProbe.active == 1 && SecurityScopeProbe.starts == 1 && SecurityScopeProbe.stops == 0)

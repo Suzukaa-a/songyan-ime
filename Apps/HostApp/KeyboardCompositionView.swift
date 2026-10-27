@@ -2,43 +2,87 @@ import KeyboardCore
 import LayoutKit
 import SwiftUI
 
+extension KeyboardLayoutKind {
+    /// Every keyboard shape has a bundled main layout of the same shape.
+    var builtinLayout: LayoutInput.Builtin {
+        switch self {
+        case .qwerty26: return .qwerty26
+        case .merged14: return .merged14
+        case .merged18: return .merged18
+        case .phone9: return .phone9
+        }
+    }
+
+    init(_ builtin: LayoutInput.Builtin) {
+        switch builtin {
+        case .qwerty26: self = .qwerty26
+        case .merged14: self = .merged14
+        case .merged18: self = .merged18
+        case .phone9: self = .phone9
+        }
+    }
+}
+
+extension UserKeyboard {
+    var compositionKey: KeyboardCompositionKey {
+        KeyboardCompositionKey(inputMethodID: inputMethodID, layout: layout.builtinLayout)
+    }
+}
+
+/// Names the keyboards a layout or page is paired with. 我的键盘 knows the names of its keyboards;
+/// any other keyboard is named from its input method and shape.
+struct KeyboardNames {
+    var known: [String: String] = [:]
+    /// The keyboards in 我的键盘 (saved or selected); a layout they open on counts as used even
+    /// when they have no saved pairing.
+    var active: [KeyboardCompositionKey] = []
+
+    func title(_ key: KeyboardCompositionKey) -> String {
+        if let name = known[key.rawValue] { return name }
+        let layout = UserTerminology.layoutName(KeyboardLayoutKind(key.layout))
+        guard let method = UserTerminology.inputMethodName(schemaID: key.inputMethodID, schemas: nil) else {
+            return layout
+        }
+        return "\(method) · \(layout)"
+    }
+
+    /// "正在被「…」使用", or nil when no keyboard uses it.
+    func usage(_ keys: [KeyboardCompositionKey]) -> String? {
+        UserTerminology.usedByKeyboards(keys.map(title))
+    }
+}
+
 struct KeyboardCompositionView: View {
     let keyboard: UserKeyboard
+    let keyboardNames: KeyboardNames
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var manager = LayoutManager.shared
     @State private var draft: KeyboardComposition
     @State private var baseline: KeyboardComposition
     @State private var editingPage: KeyboardPageDefinition?
     @State private var editingMain: LayoutDefinition?
-    @State private var copiedMainID: String?
     @State private var saving = false
     @State private var preparingPage = false
     @State private var initialized = false
-    @State private var error: String?
+    @State private var alert: CompositionAlert?
     @State private var confirmingDiscard = false
 
-    init(keyboard: UserKeyboard) {
+    private struct CompositionAlert {
+        let title: String
+        let message: String
+    }
+
+    init(keyboard: UserKeyboard, keyboardNames: KeyboardNames = KeyboardNames()) {
         self.keyboard = keyboard
-        let registry = LayoutManager.shared.registry
-        let defaultID =
-            registry.layouts.first {
-                $0.supportsComposition(
-                    inputMethodID: keyboard.inputMethodID,
-                    layout: LayoutInput.Builtin(rawValue: keyboard.layout.rawValue)!)
-            }?.id ?? keyboard.layout.rawValue
-        let composition = registry.composition(for: keyboard.id, defaultMainLayoutID: defaultID)
+        self.keyboardNames = keyboardNames
+        let composition = LayoutManager.shared.registry.composition(for: keyboard.compositionKey)
         _draft = State(initialValue: composition)
         _baseline = State(initialValue: composition)
     }
 
-    private var layouts: [LayoutDefinition] {
-        manager.registry.layouts.filter {
-            $0.supportsComposition(
-                inputMethodID: keyboard.inputMethodID, layout: LayoutInput.Builtin(rawValue: keyboard.layout.rawValue)!)
-        }
-    }
+    private var layouts: [LayoutDefinition] { manager.registry.mainLayoutCandidates(for: keyboard.compositionKey) }
 
-    private var mainLayout: LayoutDefinition? { manager.registry.layout(id: draft.mainLayoutID) }
+    private var mainLayout: LayoutDefinition? { manager.registry.resolvedLayout(id: draft.mainLayoutID) }
 
     /// An automatic page previews against the selected main layout, so a phone keypad previews its
     /// digit pad instead of a row page it will never show.
@@ -54,46 +98,36 @@ struct KeyboardCompositionView: View {
                 if !initialized { ProgressView("正在读取布局…") }
                 if let message = manager.lastError { Text(message).foregroundStyle(.orange) }
             }
-            Section("主布局") {
-                Picker("键盘布局", selection: $draft.mainLayoutID) {
+            Section(UserTerminology.mainLayout) {
+                Picker(UserTerminology.keyboardLayout, selection: $draft.mainLayoutID) {
                     ForEach(layouts) { layout in Text(layout.name).tag(layout.id) }
                 }
-                if let layout = manager.registry.layout(id: draft.mainLayoutID) {
-                    KeyboardPreviewView(layout: layout, onSelectKey: { _ in editingMain = layout })
-                    Button("编辑主布局") { editingMain = layout }
-                    Button("复制并编辑主布局") {
-                        let copy = layout.copy()
-                        copiedMainID = copy.id
-                        editingMain = copy
-                    }
+                if let layout = mainLayout {
+                    KeyboardPreviewView(layout: layout, skin: AppearanceManager.shared.applied.skin)
+                    Button("编辑\(UserTerminology.mainLayout)") { editingMain = layout }
+                    Button("复制并编辑\(UserTerminology.mainLayout)") { editingMain = layout.copy() }
                 } else {
-                    Text("请先添加主布局。").foregroundStyle(.secondary)
-                    NavigationLink("管理键盘布局") { LayoutManagementView() }
+                    Text("没有适合这个键盘的布局，请在下方「\(UserTerminology.keyboardLayout)」中添加。")
+                        .foregroundStyle(.secondary)
                 }
             }
             ForEach(KeyboardPageKind.allCases, id: \.self) { kind in
                 pageSection(kind)
             }
             Section {
-                NavigationLink("页面库") { KeyboardPageManagementView() }
-                NavigationLink("管理键盘布局") { LayoutManagementView() }
+                NavigationLink(UserTerminology.pageLibrary) { KeyboardPageManagementView(keyboardNames: keyboardNames) }
+                NavigationLink(UserTerminology.keyboardLayout) { LayoutManagementView(keyboardNames: keyboardNames) }
             }
         }
         .disabled(saving || preparingPage || !initialized)
         .onReceive(manager.$registry) { registry in
             guard !initialized, manager.location != nil else { return }
-            let defaultID =
-                registry.layouts.first {
-                    $0.supportsComposition(
-                        inputMethodID: keyboard.inputMethodID,
-                        layout: LayoutInput.Builtin(rawValue: keyboard.layout.rawValue)!)
-                }?.id ?? keyboard.layout.rawValue
-            let composition = registry.composition(for: keyboard.id, defaultMainLayoutID: defaultID)
+            let composition = registry.composition(for: keyboard.compositionKey)
             draft = composition
             baseline = composition
             initialized = true
         }
-        .navigationTitle("页面搭配")
+        .navigationTitle(UserTerminology.pageComposition)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(draft != baseline || saving)
         .interactiveDismissDisabled(draft != baseline || saving)
@@ -116,26 +150,27 @@ struct KeyboardCompositionView: View {
         .sheet(item: $editingPage) { page in
             NavigationStack {
                 KeyboardPageEditorView(
-                    page: page, inheritedSplit: manager.registry.layout(id: draft.mainLayoutID)?.split,
-                    isPhoneLayout: mainLayoutIsPhoneKeypad
+                    page: page, inheritedSplit: mainLayout?.split, isPhoneLayout: mainLayoutIsPhoneKeypad,
+                    mainLayout: keyboard.layout
                 ) { saved in draft.setPageID(saved.id, for: saved.kind) }
             }
         }
-        .sheet(
-            item: $editingMain,
-            onDismiss: {
-                if let id = copiedMainID, manager.registry.layout(id: id) != nil { draft.mainLayoutID = id }
-                copiedMainID = nil
+        .sheet(item: $editingMain) { layout in
+            NavigationStack {
+                // A saved copy (from either copy button) becomes this keyboard's main layout.
+                LayoutEditorView(layout: layout) { saved in draft.mainLayoutID = saved.id }
             }
-        ) { layout in NavigationStack { LayoutEditorView(layout: layout) } }
+        }
         .confirmationDialog("放弃未保存的更改？", isPresented: $confirmingDiscard, titleVisibility: .visible) {
             Button("放弃更改", role: .destructive) { dismiss() }
             Button("继续编辑", role: .cancel) {}
         }
-        .alert("搭配没有保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-            Button("好", role: .cancel) { error = nil }
+        .alert(
+            alert?.title ?? "", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })
+        ) {
+            Button("好", role: .cancel) { alert = nil }
         } message: {
-            Text(error ?? "")
+            Text(alert?.message ?? "")
         }
     }
 
@@ -147,7 +182,8 @@ struct KeyboardCompositionView: View {
             }
             if let page = manager.registry.page(id: draft.pageID(for: kind)) {
                 KeyboardPagePreviewView(
-                    page: page, inheritedSplit: mainLayout?.split, isPhoneLayout: mainLayoutIsPhoneKeypad)
+                    page: page, inheritedSplit: mainLayout?.split, isPhoneLayout: mainLayoutIsPhoneKeypad,
+                    mainLayout: keyboard.layout, skin: AppearanceManager.shared.applied.skin)
                 if let note = pageNote(page) {
                     Text(note).font(.footnote).foregroundStyle(.secondary)
                 }
@@ -159,7 +195,7 @@ struct KeyboardCompositionView: View {
                         // A phone main layout's automatic page is a digit pad: its keys do not
                         // depend on the punctuation width, so one copy is enough.
                         if mainNumericForm == .phoneDigitPad {
-                            Button("复制数字九宫格") {
+                            Button("复制\(UserTerminology.phoneDigitPad)") {
                                 copyPage(page, numericMarks: .chinese, numericForm: .phoneDigitPad)
                             }
                         } else {
@@ -179,29 +215,26 @@ struct KeyboardCompositionView: View {
                 } else {
                     Button("复制并编辑页面") { copyPage(page) }
                 }
-                if preparingPage { ProgressView("正在读取分类…") }
+                if preparingPage { ProgressView("正在准备页面…") }
             }
         }
     }
 
     /// One line about what a page follows or how it pairs; nil when the page draws its own content.
     private func pageNote(_ page: KeyboardPageDefinition) -> String? {
-        if page.numericPresentation == .keypad {
-            return "数字九宫格可以搭配任何主布局。"
-        }
         let resolution = KeyboardPageResolver.resolve(
             page: page, kind: page.kind,
             input: .init(
                 usesASCIIPunctuation: false, mainLayoutIsPhoneKeypad: mainLayoutIsPhoneKeypad))
         switch resolution {
         case .automaticNumeric(.phoneDigitPad, _):
-            return "123 页是数字九宫格。"
+            return "123 页是\(UserTerminology.phoneDigitPad)。"
         case .automaticNumeric(.rows, _):
             return "标点跟着中英文切换。"
         case .automaticSymbolPage:
             // A phone keypad always opens the category browser, so only other layouts need the
             // reminder that the preference decides between the two symbol presentations.
-            return mainLayoutIsPhoneKeypad ? nil : "按「输入选项」里的符号样式。"
+            return mainLayoutIsPhoneKeypad ? nil : "样式在「输入选项」中设置。"
         default:
             return nil
         }
@@ -218,7 +251,7 @@ struct KeyboardCompositionView: View {
                 editingPage = try await KeyboardPageDraftFactory.copy(
                     page, presentation: presentation, numericMarks: numericMarks, numericForm: numericForm)
             } catch let failure {
-                error = LayoutManager.friendly(failure, context: .pageCopy)
+                alert = CompositionAlert(title: "页面没有复制成功", message: LayoutManager.friendly(failure))
             }
         }
     }
@@ -234,7 +267,7 @@ struct KeyboardCompositionView: View {
                 editingPage = try await KeyboardPageDraftFactory.editableDraft(
                     page, numericForm: mainNumericForm)
             } catch {
-                self.error = "分类没有读取成功，请重试。"
+                alert = CompositionAlert(title: "页面没有打开", message: "分类没有读取成功，请重试。")
             }
         }
     }
@@ -249,7 +282,8 @@ struct KeyboardCompositionView: View {
                 baseline = snapshot
                 dismiss()
             } else {
-                error = manager.lastError
+                alert = CompositionAlert(
+                    title: "\(UserTerminology.pageComposition)没有保存", message: manager.lastError ?? "")
                 manager.clearError()
             }
         }

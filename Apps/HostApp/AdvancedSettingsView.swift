@@ -22,11 +22,6 @@ struct AdvancedSettingsView: View {
     var body: some View {
         List {
             Section {
-                NavigationLink("自定义键盘布局") { LayoutManagementView() }
-                    .accessibilityIdentifier("advanced.customLayouts")
-            }
-
-            Section {
                 NavigationLink("扩展功能") { LuaComponentsView() }
                     .accessibilityIdentifier("advanced.extensions")
             }

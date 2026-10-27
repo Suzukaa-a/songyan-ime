@@ -4,7 +4,8 @@ import XCTest
 
 /// `layouts-before-pages.json` was written by `LayoutStore.save` of the release before pages,
 /// pairings and splits existed: the four built-ins (stored merged14/merged18 included), an edited
-/// 14-key copy and a layout bound to one input method, with a reordered enabled list.
+/// 14-key copy and a layout bound to one input method, with the enabled list that release kept
+/// (now ignored on load and dropped on the next save).
 final class LayoutCatalogFormatTests: XCTestCase {
     private let copyID = "0a8d7d3a-4d0f-4398-9151-412e0a584584"
 
@@ -24,7 +25,6 @@ final class LayoutCatalogFormatTests: XCTestCase {
         let registry = try fixtureStore().load()
         XCTAssertEqual(
             registry.layouts.map(\.id), ["qwerty26", "merged14", "merged18", "phone9", copyID, "luna-26"])
-        XCTAssertEqual(registry.enabledIDs, ["merged18", copyID, "merged14", "qwerty26", "luna-26"])
         XCTAssertEqual(registry.pages, KeyboardPagePresets.all)
         XCTAssertTrue(registry.compositions.isEmpty)
 
@@ -48,12 +48,19 @@ final class LayoutCatalogFormatTests: XCTestCase {
         let store = try fixtureStore()
         var registry = try store.load()
         let key = KeyboardCompositionKey(inputMethodID: "luna_pinyin", layout: .merged14)
-        // The first enabled layout of the keyboard's shape, as the keyboard itself picks.
-        XCTAssertEqual(registry.defaultMainLayoutID(for: key), copyID)
+        // The old enabled list put the unbound 14-key copy first; it no longer decides anything.
+        // An unbound copy is used only once chosen in a pairing.
+        XCTAssertEqual(registry.defaultMainLayoutID(for: key), "merged14")
+        // The layout bound to this input method and shape wins over the bundled preset.
         XCTAssertEqual(
-            registry.defaultMainLayoutID(for: .init(inputMethodID: "luna_pinyin", layout: .qwerty26)), "qwerty26")
+            registry.defaultMainLayoutID(for: .init(inputMethodID: "luna_pinyin", layout: .qwerty26)), "luna-26")
+        XCTAssertEqual(
+            registry.defaultMainLayoutID(for: .init(inputMethodID: "other", layout: .qwerty26)), "qwerty26")
         try registry.setComposition(registry.composition(for: key), for: key.rawValue)
         try store.save(registry)
         XCTAssertEqual(try store.load(), registry)
+        let saved = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: store.catalogURL)) as? [String: Any])
+        XCTAssertNil(saved["enabledIDs"], "the old enabled list is dropped on save")
     }
 }

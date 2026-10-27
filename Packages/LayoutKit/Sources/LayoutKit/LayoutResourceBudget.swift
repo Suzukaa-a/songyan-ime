@@ -144,10 +144,10 @@ public enum LayoutResourceBudget {
         _ registry: LayoutRegistry, layoutUsage: Usage, userPageCount: Int, userPageUsage: Usage
     ) throws {
         try check(
-            registry.layouts.count <= layouts && registry.enabledIDs.count <= layouts,
+            registry.layouts.count <= layouts,
             "最多 \(layouts) 个键盘布局，请先删掉不用的布局。")
         try check(userPageCount <= pages, "最多 \(pages) 个页面，请先删掉不用的页面。")
-        try check(registry.compositions.count <= compositions, "搭配已经存满 \(compositions) 个，没法再保存新的搭配。")
+        try check(registry.compositions.count <= compositions, "页面搭配最多保存 \(compositions) 个，已经存满了。")
         let catalogFull = "所有布局和页面加起来内容太多了，请先删掉一些不用的布局或页面。"
         try check(
             layoutUsage.keys <= catalogKeys && layoutUsage.alternates <= catalogAlternates
@@ -155,9 +155,6 @@ public enum LayoutResourceBudget {
         try check(
             userPageUsage.keys <= categorizedCatalogKeys && userPageUsage.alternates <= catalogAlternates
                 && userPageUsage.textBytes <= catalogTextBytes, catalogFull)
-        for id in registry.enabledIDs {
-            try check(id.utf8.count <= nameBytes, "启用列表里有一项过长，请移出后重新加入。")
-        }
     }
 
     /// Reads a user-imported layout file: regular files only (symlinks followed), capped at `maximumBytes`.

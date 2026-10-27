@@ -1,3 +1,4 @@
+import KeyboardCore
 import LayoutKit
 import SwiftUI
 import UIKit
@@ -19,18 +20,22 @@ struct KeyboardPageEditorView: View {
     var onSaved: ((KeyboardPageDefinition) -> Void)?
     let inheritedSplit: LayoutSplitConfiguration?
     let isPhoneLayout: Bool
+    /// The shape of the keyboard this page is paired with, so the preview takes its width.
+    let mainLayout: KeyboardLayoutKind?
 
     init(
         page: KeyboardPageDefinition, inheritedSplit: LayoutSplitConfiguration? = nil,
-        isPhoneLayout: Bool = false, onSaved: ((KeyboardPageDefinition) -> Void)? = nil
+        isPhoneLayout: Bool = false, mainLayout: KeyboardLayoutKind? = nil,
+        onSaved: ((KeyboardPageDefinition) -> Void)? = nil
     ) {
         let materialized = page.materialized()
         original = materialized
         _draft = State(initialValue: materialized)
-        _selected = State(initialValue: Self.initialSelection(materialized))
+        _selected = State(initialValue: materialized.firstKeyPath ?? .row(0, key: 0))
         self.onSaved = onSaved
         self.inheritedSplit = inheritedSplit
         self.isPhoneLayout = isPhoneLayout
+        self.mainLayout = mainLayout
     }
 
     private var categorized: Bool { draft.symbolPresentation == .categorized }
@@ -39,18 +44,6 @@ struct KeyboardPageEditorView: View {
     private var showsInitialSymbolChoice: Bool {
         if draft.kind == .numeric { return true }
         return draft.kind == .symbols && draft.symbolPresentation != .categorized
-    }
-
-    /// A categorised page has no rows, so start on its first authored function key instead.
-    private static func initialSelection(_ page: KeyboardPageDefinition) -> KeyboardPageKeyPath {
-        if let first = page.rows.first, !first.keys.isEmpty { return .row(0, key: 0) }
-        if let chrome = page.chrome {
-            for region in [KeyboardPageChrome.Region.bottom, .trailing, .leading]
-            where !chrome.keys(in: region).isEmpty {
-                return .chrome(region, key: 0)
-            }
-        }
-        return .row(0, key: 0)
     }
 
     var body: some View {
@@ -75,49 +68,43 @@ struct KeyboardPageEditorView: View {
             Section("预览") {
                 KeyboardPagePreviewView(
                     page: draft, inheritedSplit: inheritedSplit, isPhoneLayout: isPhoneLayout,
+                    mainLayout: mainLayout, skin: AppearanceManager.shared.applied.skin,
                     onSelectKey: { selected = $0 },
                     selectedPageKey: selected)
+            }
+            // The selected key's fields and position sit right under the preview that selects it.
+            selectedKeyFields
+            if !categorized {
+                SelectedRowKeyActions(rows: rowsBinding, selected: selectedRowBinding)
+            }
+            if draft.key(at: selected) != nil {
+                keyPositionSection
+            }
+            if draft.chrome != nil, !draft.hasInputModeSwitchKey {
+                Section {
+                    Button("添加\(UserTerminology.globeKey)", systemImage: "globe") { addInputModeSwitchKey() }
+                        .disabled(!draft.canAppendKey(to: .chrome(.bottom)))
+                }
             }
             if categorized {
                 KeyboardCategoryEditorView(
                     categories: Binding(get: { draft.categories ?? [] }, set: { draft.categories = $0 }),
-                    inheritedSplit: .resolving(page: draft.split, main: inheritedSplit))
+                    inheritedSplit: .resolving(page: draft.split, main: inheritedSplit), mainLayout: mainLayout)
             } else {
-                KeyboardRowsEditor(
-                    rows: Binding(
-                        get: { draft.rows },
-                        set: { rows in
-                            draft.rows = rows
-                            draft = draft.settingSplit(
-                                KeyboardSplitEditor.adjusted(draft.split, rows: splitEditorRows))
-                        }), selected: selectedRowBinding)
+                KeyboardRowsEditor(rows: rowsBinding, selected: selectedRowBinding)
             }
-            // The footer cut lives at index rows.count, so its authored row joins the cut list.
-            KeyboardSplitEditor(
-                rows: splitEditorRows, rowTitles: splitEditorRowTitles,
-                split: Binding(get: { draft.split }, set: { draft = draft.settingSplit($0) }),
-                allowsInheritance: true)
             if draft.chrome != nil {
                 KeyboardChromeKeysEditor(
                     chrome: Binding(
                         get: { draft.chrome ?? KeyboardPageChrome() },
-                        set: { chrome in
-                            draft = draft.settingChrome(chrome)
-                            draft = draft.settingSplit(
-                                KeyboardSplitEditor.adjusted(draft.split, rows: splitEditorRows))
-                        }),
+                        set: { chrome in draft = draft.settingChrome(chrome).settingSplitAdjusted(draft.split) }),
                     selected: $selected, allowsLeading: !categorized)
             }
-            if draft.chrome != nil, !draft.hasInputModeSwitchKey {
-                Section {
-                    Button("添加地球键", systemImage: "globe") { addInputModeSwitchKey() }
-                        .disabled((draft.chrome?.bottom.count ?? 0) >= LayoutResourceBudget.keysPerRegion)
-                }
-            }
-            selectedKeyFields
-            if draft.key(at: selected) != nil {
-                keyPositionSection
-            }
+            // The footer cut lives at index rows.count, so its authored row joins the cut list.
+            KeyboardSplitEditor(
+                rows: draft.splitRows, rowTitles: splitEditorRowTitles,
+                split: Binding(get: { draft.split }, set: { draft = draft.settingSplit($0) }),
+                allowsInheritance: true)
         }
         .disabled(saving)
         .environment(\.widthFieldValidity, widthValidity)
@@ -144,30 +131,28 @@ struct KeyboardPageEditorView: View {
         }
     }
 
-    /// Content rows plus the authored footer row, so a stored footer cut is preserved and editable.
-    private var splitEditorRows: [LayoutRow] { Self.splitRows(of: draft) }
-
-    private static func splitRows(of page: KeyboardPageDefinition) -> [LayoutRow] {
-        guard let bottom = page.chrome?.bottom, !bottom.isEmpty else { return page.rows }
-        return page.rows + [LayoutRow(keys: bottom)]
+    private var rowsBinding: Binding<[LayoutRow]> {
+        Binding(
+            get: { draft.rows },
+            set: { rows in
+                draft.rows = rows
+                draft = draft.settingSplitAdjusted(draft.split)
+            })
     }
 
     private var splitEditorRowTitles: [String] {
         var titles = draft.rows.indices.map { "第 \($0 + 1) 行" }
-        if let bottom = draft.chrome?.bottom, !bottom.isEmpty { titles.append("页底") }
+        if let bottom = draft.chrome?.bottom, !bottom.isEmpty { titles.append("底行") }
         return titles
     }
 
     /// Adds the globe key the machine may require, at the footer's leftmost slot. Never automatic:
     /// the save gate reports the missing key and the author decides.
     private func addInputModeSwitchKey() {
-        guard var chrome = draft.chrome,
-            chrome.bottom.count < LayoutResourceBudget.keysPerRegion
-        else { return }
-        chrome.bottom.insert(
-            LayoutKey(label: "🌐", action: LayoutAction(.globe), titleMode: .automatic), at: 0)
-        draft = draft.settingChrome(chrome)
-        adjustSplitForChrome()
+        guard let chrome = draft.chrome, draft.canAppendKey(to: .chrome(.bottom)) else { return }
+        let globe = LayoutKey(label: "🌐", action: LayoutAction(.globe), titleMode: .automatic)
+        draft = draft.settingChrome(chrome.settingKeys([globe] + chrome.bottom, in: .bottom))
+            .settingSplitAdjusted(draft.split)
         selected = .chrome(.bottom, key: 0)
     }
 
@@ -177,7 +162,7 @@ struct KeyboardPageEditorView: View {
         Binding(
             get: {
                 if case .row(let row, let key) = selected { return .row(row, key: key) }
-                return .row(0, key: 0)
+                return .row(-1, key: -1)
             },
             set: { path in
                 if case .row(let row, let key) = path { selected = .row(row, key: key) }
@@ -189,7 +174,7 @@ struct KeyboardPageEditorView: View {
         if let key = draft.key(at: selected) {
             LayoutKeyFields(
                 key: key, allowsCode: false, allowsTitleMode: true,
-                widthLabel: isRailSelection ? "相对高度" : "相对宽度"
+                widthLabel: isRailSelection ? "高度比例" : "宽度比例"
             ) { updated in
                 draft = draft.replacingKey(at: selected, with: updated)
             }
@@ -197,32 +182,36 @@ struct KeyboardPageEditorView: View {
         }
     }
 
+    /// One place for ordering, copying, deleting and moving the selected key between areas.
     @ViewBuilder
     private var keyPositionSection: some View {
+        let current = selected.region
+        let targets = draft.editableKeyRegions.filter { $0 != current }
         Section("按键位置") {
-            if let region = selectedChromeRegion, let index = selectedChromeIndex {
-                let keys = draft.chrome?.keys(in: region) ?? []
+            if case .chrome(let region, let index) = selected {
+                let count = draft.chrome?.keys(in: region).count ?? 0
                 HStack {
-                    Button(isRail(region) ? "上移" : "前移") { moveChromeKey(region, index: index, by: -1) }
+                    Button(isRail(region) ? "上移" : "前移") { apply(draft.reorderingChromeKey(at: selected, by: -1)) }
                         .disabled(index == 0)
                     Spacer()
-                    Button(isRail(region) ? "下移" : "后移") { moveChromeKey(region, index: index, by: 1) }
-                        .disabled(index >= keys.count - 1)
+                    Button(isRail(region) ? "下移" : "后移") { apply(draft.reorderingChromeKey(at: selected, by: 1)) }
+                        .disabled(index >= count - 1)
                 }
-                Button("复制按键") { duplicateChromeKey(region, index: index) }
-                Button("删除按键", role: .destructive) { removeChromeKey(region, index: index) }
+                Button("复制按键") { apply(draft.duplicatingChromeKey(at: selected)) }
+                    .disabled(!draft.canAppendKey(to: current))
+                Button("删除按键", role: .destructive) { removeSelectedChromeKey() }
             }
-            if let current = selectedRegion {
+            if !targets.isEmpty {
                 Menu("移到其他区域") {
-                    ForEach(transferTargets.filter { $0 != current }, id: \.self) { target in
-                        Button(target.title) { transferSelected(to: target) }
-                            .disabled(!canTransfer(to: target))
+                    ForEach(targets, id: \.self) { target in
+                        Button(title(target)) { apply(draft.movingKey(at: selected, to: target)) }
+                            .disabled(!draft.canMoveKey(at: selected, to: target))
                     }
                 }
                 Menu("复制到其他区域") {
-                    ForEach(transferTargets.filter { $0 != current }, id: \.self) { target in
-                        Button(target.title) { copySelected(to: target) }
-                            .disabled(!canCopy(to: target))
+                    ForEach(targets, id: \.self) { target in
+                        Button(title(target)) { apply(draft.copyingKey(at: selected, to: target)) }
+                            .disabled(!draft.canCopyKey(at: selected, to: target))
                     }
                 }
             }
@@ -230,244 +219,41 @@ struct KeyboardPageEditorView: View {
         .buttonStyle(.borderless)
     }
 
+    private func title(_ region: KeyboardPageKeyRegion) -> String {
+        switch region {
+        case .rows: return "按键区"
+        case .chrome(.bottom): return "底行"
+        case .chrome(.leading): return "左侧栏"
+        case .chrome(.trailing): return "右侧栏"
+        }
+    }
+
     private var isRailSelection: Bool {
-        guard let region = selectedChromeRegion else { return false }
+        guard case .chrome(let region, _) = selected else { return false }
         return isRail(region)
-    }
-
-    private var selectedChromeRegion: KeyboardPageChrome.Region? {
-        if case .chrome(let region, _) = selected { return region }
-        return nil
-    }
-
-    private var selectedChromeIndex: Int? {
-        if case .chrome(_, let index) = selected { return index }
-        return nil
     }
 
     private func isRail(_ region: KeyboardPageChrome.Region) -> Bool {
         region == .leading || region == .trailing
     }
 
-    // MARK: - Cross-region move and copy
-
-    /// Regions a key can be moved between. A categorised page has no row area and its left rail is
-    /// category navigation, so only the footer and the right rail are authored there.
-    private enum PageKeyRegion: Hashable {
-        case rows
-        case chrome(KeyboardPageChrome.Region)
-
-        var title: String {
-            switch self {
-            case .rows: return "主按键区"
-            case .chrome(.bottom): return "页底"
-            case .chrome(.leading): return "左侧栏"
-            case .chrome(.trailing): return "右侧栏"
-            }
-        }
+    private func apply(_ edit: (page: KeyboardPageDefinition, path: KeyboardPageKeyPath)?) {
+        guard let edit else { return }
+        draft = edit.page
+        selected = edit.path
     }
 
-    private var selectedRegion: PageKeyRegion? {
-        switch selected {
-        case .row: return .rows
-        case .chrome(let region, _): return .chrome(region)
-        }
-    }
-
-    private var transferTargets: [PageKeyRegion] {
-        var targets: [PageKeyRegion] = []
-        if !categorized { targets.append(.rows) }
-        targets.append(.chrome(.bottom))
-        if !categorized { targets.append(.chrome(.leading)) }
-        targets.append(.chrome(.trailing))
-        return targets
-    }
-
-    /// Whether the selected key can leave its current region at all (the last key of the only row
-    /// cannot: a page keeps at least one content row).
-    private func canRemoveSelectedKey() -> Bool {
-        switch selected {
-        case .chrome:
-            return draft.key(at: selected) != nil
-        case .row(let row, let index):
-            guard draft.rows.indices.contains(row), draft.rows[row].keys.indices.contains(index) else {
-                return false
-            }
-            return draft.rows[row].keys.count > 1 || draft.rows.count > 1
-        }
-    }
-
-    /// Whether the key can be appended to the target region; checked before any removal so a move
-    /// that cannot finish never loses the key.
-    private func canAppend(to target: PageKeyRegion) -> Bool {
-        switch target {
-        case .rows:
-            guard let last = draft.rows.last else { return false }
-            return last.keys.count < LayoutResourceBudget.keysPerRegion
-        case .chrome(let region):
-            return !chromeIsFull(region)
-        }
-    }
-
-    private func canTransfer(to target: PageKeyRegion) -> Bool {
-        target != selectedRegion && canRemoveSelectedKey() && canAppend(to: target)
-    }
-
-    private func canCopy(to target: PageKeyRegion) -> Bool {
-        target != selectedRegion && canAppend(to: target)
-    }
-
-    private func transferSelected(to target: PageKeyRegion) {
-        guard canTransfer(to: target), let key = draft.key(at: selected) else { return }
-        // Remove and insert on a copy; the draft changes only when both halves succeeded.
-        guard let removed = Self.removingKey(at: selected, from: draft) else { return }
-        var updated = removed
-        guard let movedPath = Self.append(key, to: target, page: &updated) else { return }
+    private func removeSelectedChromeKey() {
+        guard case .chrome = selected, let updated = draft.removingKey(at: selected) else { return }
         draft = updated
-        selected = movedPath
-    }
-
-    private func copySelected(to target: PageKeyRegion) {
-        guard canCopy(to: target), let key = draft.key(at: selected) else { return }
-        var updated = draft
-        guard let copiedPath = Self.append(key, to: target, page: &updated) else { return }
-        draft = updated
-        selected = copiedPath
-    }
-
-    private static func removingKey(
-        at path: KeyboardPageKeyPath, from page: KeyboardPageDefinition
-    ) -> KeyboardPageDefinition? {
-        var updated = page
-        switch path {
-        case .chrome(let region, let index):
-            guard var chrome = updated.chrome else { return nil }
-            var keys = chrome.keys(in: region)
-            guard keys.indices.contains(index) else { return nil }
-            keys.remove(at: index)
-            set(keys, in: region, chrome: &chrome)
-            updated.chrome = chrome
-        case .row(let row, let index):
-            guard updated.rows.indices.contains(row), updated.rows[row].keys.indices.contains(index) else {
-                return nil
-            }
-            if updated.rows[row].keys.count == 1 {
-                // A row with its last key would become an empty row, so the row goes with the key.
-                guard updated.rows.count > 1 else { return nil }
-                updated.rows.remove(at: row)
-            } else {
-                var keys = updated.rows[row].keys
-                keys.remove(at: index)
-                updated.rows[row] = LayoutRow(keys: keys)
-            }
-        }
-        updated.split = KeyboardSplitEditor.adjusted(updated.split, rows: splitRows(of: updated))
-        return updated
-    }
-
-    @discardableResult
-    private static func append(
-        _ key: LayoutKey, to target: PageKeyRegion, page: inout KeyboardPageDefinition
-    ) -> KeyboardPageKeyPath? {
-        switch target {
-        case .rows:
-            guard !page.rows.isEmpty else { return nil }
-            let row = page.rows.count - 1
-            var keys = page.rows[row].keys
-            guard keys.count < LayoutResourceBudget.keysPerRegion else { return nil }
-            keys.append(key)
-            page.rows[row] = LayoutRow(keys: keys)
-            page.split = KeyboardSplitEditor.adjusted(page.split, rows: splitRows(of: page))
-            return .row(row, key: keys.count - 1)
-        case .chrome(let region):
-            guard var chrome = page.chrome else { return nil }
-            var keys = chrome.keys(in: region)
-            guard keys.count < LayoutResourceBudget.keysPerRegion else { return nil }
-            keys.append(key)
-            set(keys, in: region, chrome: &chrome)
-            page.chrome = chrome
-            page.split = KeyboardSplitEditor.adjusted(page.split, rows: splitRows(of: page))
-            return .chrome(region, key: keys.count - 1)
-        }
-    }
-
-    private func adjustSplitForChrome() {
-        draft = draft.settingSplit(KeyboardSplitEditor.adjusted(draft.split, rows: splitEditorRows))
-    }
-
-    private func chromeIsFull(_ region: KeyboardPageChrome.Region) -> Bool {
-        (draft.chrome?.keys(in: region).count ?? 0) >= LayoutResourceBudget.keysPerRegion
-    }
-
-    private static func set(
-        _ keys: [LayoutKey], in region: KeyboardPageChrome.Region, chrome: inout KeyboardPageChrome
-    ) {
-        switch region {
-        case .bottom: chrome.bottom = keys
-        case .leading: chrome.leading = keys
-        case .trailing: chrome.trailing = keys
-        }
-    }
-
-    private func normalizeSelection() {
-        if draft.key(at: selected) != nil { return }
-        if !categorized, let first = draft.rows.first, !first.keys.isEmpty {
-            selected = .row(0, key: 0)
-            return
-        }
-        if let chrome = draft.chrome {
-            for region in [KeyboardPageChrome.Region.bottom, .trailing, .leading]
-            where !chrome.keys(in: region).isEmpty {
-                selected = .chrome(region, key: 0)
-                return
-            }
-        }
-    }
-
-    // MARK: - Chrome key order
-
-    private func moveChromeKey(_ region: KeyboardPageChrome.Region, index: Int, by offset: Int) {
-        guard var chrome = draft.chrome else { return }
-        var keys = chrome.keys(in: region)
-        let target = index + offset
-        guard keys.indices.contains(index), keys.indices.contains(target) else { return }
-        keys.swapAt(index, target)
-        Self.set(keys, in: region, chrome: &chrome)
-        draft = draft.settingChrome(chrome)
-        selected = .chrome(region, key: target)
-    }
-
-    private func duplicateChromeKey(_ region: KeyboardPageChrome.Region, index: Int) {
-        guard !chromeIsFull(region), var chrome = draft.chrome else { return }
-        var keys = chrome.keys(in: region)
-        guard keys.indices.contains(index) else { return }
-        keys.insert(keys[index], at: index + 1)
-        Self.set(keys, in: region, chrome: &chrome)
-        draft = draft.settingChrome(chrome)
-        adjustSplitForChrome()
-        selected = .chrome(region, key: index + 1)
-    }
-
-    private func removeChromeKey(_ region: KeyboardPageChrome.Region, index: Int) {
-        guard var chrome = draft.chrome else { return }
-        var keys = chrome.keys(in: region)
-        guard keys.indices.contains(index) else { return }
-        keys.remove(at: index)
-        Self.set(keys, in: region, chrome: &chrome)
-        draft = draft.settingChrome(chrome)
-        adjustSplitForChrome()
-        if keys.isEmpty {
-            normalizeSelection()
-        } else {
-            selected = .chrome(region, key: min(index, keys.count - 1))
-        }
+        if let next = updated.selectionAfterRemoving(selected) { selected = next }
     }
 
     // MARK: - Save
 
     private func save() {
         guard !widthValidity.isInvalid else {
-            error = "有宽度还没填对：请把标红处改成大于 0 的数字，或留空自动。"
+            error = "有按键宽度没填对，请改成大于 0 的数字，或者留空。"
             return
         }
         saving = true

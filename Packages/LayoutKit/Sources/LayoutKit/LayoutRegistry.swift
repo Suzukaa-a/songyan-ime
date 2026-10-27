@@ -1,18 +1,16 @@
 import Foundation
 
-/// Value-type snapshot. Ordering enabledIDs also orders the keyboard's layout switcher.
+/// Value-type snapshot of the layout catalog: layouts, pages and each keyboard's pairing.
 public struct LayoutRegistry: Codable, Equatable, Sendable {
     public private(set) var layouts: [LayoutDefinition]
-    public private(set) var enabledIDs: [String]
     public private(set) var pages: [KeyboardPageDefinition]
     public private(set) var compositions: [String: KeyboardComposition]
 
-    private enum CodingKeys: String, CodingKey { case layouts, enabledIDs, pages, pageOrder, compositions }
+    private enum CodingKeys: String, CodingKey { case layouts, pages, pageOrder, compositions }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         layouts = try values.decode([LayoutDefinition].self, forKey: .layouts)
-        enabledIDs = try values.decode([String].self, forKey: .enabledIDs)
         // Pages, their order and pairings are absent from catalogs written before pages existed.
         let storedPages = try values.decodeIfPresent([KeyboardPageDefinition].self, forKey: .pages) ?? []
         // Saves omit unchanged built-in pages, and a release may add one; the default pairings
@@ -48,7 +46,6 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(layouts, forKey: .layouts)
-        try values.encode(enabledIDs, forKey: .enabledIDs)
         // Code-owned presets are restored by `mergingInto` on decode. Omitting the unchanged ones
         // keeps a full catalog under the byte cap when a release adds presets; a user-modified
         // stored preset still goes on the wire so that edit survives.
@@ -57,17 +54,12 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         try values.encode(compositions, forKey: .compositions)
     }
 
-    public var enabledLayouts: [LayoutDefinition] {
-        enabledIDs.compactMap { id in layouts.first { $0.id == id } }
-    }
-
     public init(
-        layouts: [LayoutDefinition] = BuiltinLayouts.all, enabledIDs: [String]? = nil,
+        layouts: [LayoutDefinition] = BuiltinLayouts.all,
         pages: [KeyboardPageDefinition] = KeyboardPagePresets.all,
         compositions: [String: KeyboardComposition] = [:]
     ) throws {
         self.layouts = layouts
-        self.enabledIDs = enabledIDs ?? layouts.map { $0.id }
         self.pages = pages
         self.compositions = compositions
         try validate()
@@ -75,10 +67,42 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
 
     public func layout(id: String) -> LayoutDefinition? { layouts.first { $0.id == id } }
 
+    /// The stored layout, or the bundled preset with this ID that an older catalog left out.
+    /// Bundled presets are always available as main layouts.
+    public func resolvedLayout(id: String) -> LayoutDefinition? {
+        layout(id: id) ?? BuiltinLayouts.all.first { $0.id == id }
+    }
+
+    /// Every layout `isSupported` accepts, plus the bundled presets an older catalog left out.
+    public func usableLayouts(where isSupported: (LayoutDefinition) -> Bool) -> [LayoutDefinition] {
+        let missing = BuiltinLayouts.all.filter { preset in !layouts.contains { $0.id == preset.id } }
+        return (layouts + missing).filter(isSupported)
+    }
+
+    /// The layouts 页面搭配 offers as this keyboard's main layout.
+    public func mainLayoutCandidates(for key: KeyboardCompositionKey) -> [LayoutDefinition] {
+        usableLayouts { $0.supportsComposition(inputMethodID: key.inputMethodID, layout: key.layout) }
+    }
+
     public func page(id: String) -> KeyboardPageDefinition? { pages.first { $0.id == id } }
 
-    public func composition(for keyboardID: String, defaultMainLayoutID: String) -> KeyboardComposition {
-        compositions[keyboardID] ?? KeyboardComposition(mainLayoutID: defaultMainLayoutID)
+    /// Keyboards that use this layout as the main layout, in a stable order: every saved pairing,
+    /// plus each of `keyboards` whose effective pairing (saved or default) names it. A keyboard
+    /// without a saved pairing still uses its default layout.
+    public func keyboards(usingLayout id: String, among keyboards: [KeyboardCompositionKey] = [])
+        -> [KeyboardCompositionKey]
+    {
+        var raw = Set(compositions.filter { $0.value.mainLayoutID == id }.keys)
+        for key in keyboards where composition(for: key).mainLayoutID == id { raw.insert(key.rawValue) }
+        return raw.sorted().compactMap(KeyboardCompositionKey.init)
+    }
+
+    /// Keyboards whose saved pairing uses this page, in a stable order.
+    public func keyboards(usingPage id: String) -> [KeyboardCompositionKey] {
+        let using = compositions.filter { _, composition in
+            KeyboardPageKind.allCases.contains { composition.pageID(for: $0) == id }
+        }
+        return using.keys.sorted().compactMap(KeyboardCompositionKey.init)
     }
 
     /// The saved pairing, or the default one built on `defaultMainLayoutID(for:)`.
@@ -86,17 +110,13 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         compositions[key.rawValue] ?? KeyboardComposition(mainLayoutID: defaultMainLayoutID(for: key))
     }
 
-    /// The main layout a keyboard uses while it has no saved pairing. Mirrors the extension's
-    /// fallback when the session has no explicit choice: the first enabled layout built for this
-    /// keyboard's shape that the input method may use, then the first enabled layout that only
-    /// names the input method, then the bundled layout of that shape.
+    /// The main layout of a keyboard without a saved pairing; the host and the keyboard both
+    /// resolve it here. A layout of this shape bound to this input method wins (the smallest ID
+    /// when there are several, so catalog order never decides); otherwise the bundled preset of
+    /// the shape. Unbound user copies are used only once chosen in a pairing.
     public func defaultMainLayoutID(for key: KeyboardCompositionKey) -> String {
-        let candidates = enabledLayouts.filter {
-            $0.supportsComposition(inputMethodID: key.inputMethodID, layout: key.layout)
-        }
-        return candidates.first { $0.input.builtinLayout == key.layout }?.id
-            ?? candidates.first { $0.input.builtinLayout == nil }?.id
-            ?? BuiltinLayouts.preset(for: key.layout).id
+        layouts.filter { $0.input.schemaID == key.inputMethodID && $0.input.builtinLayout == key.layout }
+            .map(\.id).min() ?? BuiltinLayouts.preset(for: key.layout).id
     }
 
     public mutating func savePage(_ page: KeyboardPageDefinition) throws {
@@ -116,7 +136,7 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
             !compositions.values.contains(where: {
                 $0.symbolPageID == id || $0.numericPageID == id || $0.englishPageID == id
             })
-        else { throw LayoutError.invalid("这个页面正在搭配使用，请先更换页面。") }
+        else { throw LayoutError.invalid("这个页面正在被键盘使用，请先在「页面搭配」里换成别的页面。") }
         guard !KeyboardPagePresets.all.contains(where: { $0.id == id }) else {
             throw LayoutError.invalid("预设页面请先复制，再编辑副本。")
         }
@@ -142,7 +162,7 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
         self = candidate
     }
 
-    /// Replace in place, including the last enabled layout, preserving all ordering/state.
+    /// Replace in place, preserving the catalog order.
     public mutating func replace(_ definition: LayoutDefinition) throws {
         try definition.validate()
         guard let index = layouts.firstIndex(where: { $0.id == definition.id }) else {
@@ -155,22 +175,16 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
     }
 
     @discardableResult
-    public mutating func copy(
-        _ definition: LayoutDefinition, name: String? = nil,
-        enable: Bool = false
-    ) throws -> LayoutDefinition {
+    public mutating func copy(_ definition: LayoutDefinition, name: String? = nil) throws -> LayoutDefinition {
         try definition.validate()
         let copy = definition.copy(name: name)
-        try install(copy.encoded(), enable: enable)
+        try install(copy.encoded())
         return copy
     }
 
-    /// New IDs may be enabled on install; same-ID imports preserve existing enable state/order.
+    /// New IDs are appended; a same-ID import replaces in place only when asked.
     @discardableResult
-    public mutating func install(
-        _ data: Data, replaceExisting: Bool = false,
-        enable: Bool = true
-    ) throws -> LayoutDefinition {
+    public mutating func install(_ data: Data, replaceExisting: Bool = false) throws -> LayoutDefinition {
         let definition = try LayoutDefinition.decode(data)
         var candidate = self
         if let index = candidate.layouts.firstIndex(where: { $0.id == definition.id }) {
@@ -178,7 +192,6 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
             candidate.layouts[index] = definition
         } else {
             candidate.layouts.append(definition)
-            if enable { candidate.enabledIDs.append(definition.id) }
         }
         try candidate.validate()
         self = candidate
@@ -187,38 +200,20 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
 
     public mutating func remove(id: String) throws {
         guard layout(id: id) != nil else { throw LayoutError.unknownID(id) }
-        guard enabledIDs != [id] else { throw LayoutError.lastEnabledLayout }
+        // Bundled presets are the default main layouts, so they stay; an edit can be reset instead.
+        guard !BuiltinLayouts.all.contains(where: { $0.id == id }) else {
+            throw LayoutError.invalid("内置布局不能删除，可以复制一份再修改。")
+        }
         guard !compositions.values.contains(where: { $0.mainLayoutID == id }) else {
-            throw LayoutError.invalid("这个布局正在搭配使用，请先更换主布局。")
+            throw LayoutError.invalid("这个键盘布局正在被键盘使用，请先在「页面搭配」里换一个主布局。")
         }
         layouts.removeAll { $0.id == id }
-        enabledIDs.removeAll { $0 == id }
-    }
-
-    /// Enables/disables and reorders in a single operation; rejects unknown or repeated IDs.
-    public mutating func setEnabledIDs(_ ids: [String]) throws {
-        var candidate = self
-        candidate.enabledIDs = ids
-        try candidate.validate()
-        self = candidate
-    }
-
-    /// Host supplies actual resource/engine compatibility. If enabled layouts are unavailable,
-    /// use a compatible bundled layout transiently without rewriting the user's preferences.
-    /// An empty result means no supported schema exists; the host must present recovery UI.
-    public func usableLayouts(where isSupported: (LayoutDefinition) -> Bool) -> [LayoutDefinition] {
-        let supported = enabledLayouts.filter(isSupported)
-        if !supported.isEmpty { return supported }
-        return BuiltinLayouts.all.first(where: isSupported).map { [$0] } ?? []
     }
 
     /// Every layout and page is validated exactly once; the catalog totals reuse those results.
     /// The extension runs this on every load.
     public func validate() throws {
-        guard !enabledIDs.isEmpty else { throw LayoutError.lastEnabledLayout }
-        guard Set(layouts.map(\.id)).count == layouts.count,
-            Set(enabledIDs).count == enabledIDs.count
-        else {
+        guard Set(layouts.map(\.id)).count == layouts.count else {
             throw LayoutError.invalid("布局列表里有重复的布局，请删掉其中一个后重试。")
         }
         guard Set(pages.map(\.id)).count == pages.count else {
@@ -240,21 +235,20 @@ public struct LayoutRegistry: Codable, Equatable, Sendable {
             self, layoutUsage: layoutUsage, userPageCount: userPageCount, userPageUsage: userPageUsage)
         for (keyboardID, composition) in compositions {
             guard keyboardID.utf8.count <= 512, let key = KeyboardCompositionKey(keyboardID) else {
-                throw LayoutError.invalid("找不到要搭配的键盘，请重新选择。")
+                throw LayoutError.invalid("「页面搭配」里有一个键盘找不到了，请重新选择键盘。")
             }
-            guard let main = layout(id: composition.mainLayoutID) else {
-                throw LayoutError.invalid("搭配的键盘布局已经不存在，请重新选择键盘布局。")
+            guard let main = resolvedLayout(id: composition.mainLayoutID) else {
+                throw LayoutError.invalid("「页面搭配」选的主布局已经不存在，请重新选择。")
             }
             guard main.supportsComposition(inputMethodID: key.inputMethodID, layout: key.layout) else {
                 throw LayoutError.invalid("这个键盘布局不适用于当前输入方式，请换一个键盘布局。")
             }
             for kind in KeyboardPageKind.allCases {
                 guard page(id: composition.pageID(for: kind))?.kind == kind else {
-                    throw LayoutError.invalid("搭配的页面已经不存在，请重新选择页面。")
+                    throw LayoutError.invalid("「页面搭配」选的页面已经不存在，请重新选择。")
                 }
             }
         }
-        for id in enabledIDs where layout(id: id) == nil { throw LayoutError.unknownID(id) }
     }
 }
 
