@@ -48,18 +48,14 @@ enum CompactAdapterDeployment {
         guard generatorIsCurrent(build: build),
             Set(try registeredRequests(build: build)) == Set(tasks)
         else { return false }
-        let resources = KeyboardResourceSet(
-            id: "preparation-check", name: "",
-            sharedDirectory: resourceURL, userDirectory: userDataURL, layoutEntries: [],
-            prebuiltDirectory: build, schemas: enabledSchemas)
         return requested.allSatisfy { keyboard in
             guard enabledSchemas.contains(where: { $0.id == keyboard.schemaID }),
-                combinationAvailable(
+                let engineID = availableEngineSchemaID(
                     resourceURL: resourceURL, userDataURL: userDataURL,
                     enabledSchemas: enabledSchemas, requested: keyboard)
             else { return false }
-            let engineID = resources.logicalSchemaID(keyboard.schemaID, layout: keyboard.layout)
-            return FileManager.default.fileExists(atPath: build.appendingPathComponent(engineID + ".schema.yaml").path)
+            return FileManager.default.fileExists(
+                atPath: InstalledPackageLayout.compiledSchemaURL(build: build, id: engineID).path)
         }
     }
 
@@ -104,7 +100,7 @@ enum CompactAdapterDeployment {
             try Task.checkCancellation()
             let requestedLayouts = layoutsBySource[source] ?? []
             guard !requestedLayouts.isEmpty else { continue }
-            let compiled = try Data(contentsOf: build.appendingPathComponent(source + ".schema.yaml"))
+            let compiled = try Data(contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: source))
             switch try CompactSchemaAdapter.adaptability(compiled: compiled, sourceID: source) {
             case .unsupported:
                 continue
@@ -176,8 +172,11 @@ enum CompactAdapterDeployment {
                     let data = try plan.companion(fold: fold)
                 else { continue }
                 let target = CompactSchemaAdapter.identifier(sourceID: source, fold: fold)
-                let generated = userDataURL.appendingPathComponent(target + ".schema.yaml")
-                guard !fm.fileExists(atPath: resourceURL.appendingPathComponent(target + ".schema.yaml").path) else {
+                let generated = userDataURL.appendingPathComponent(InstalledPackageLayout.schemaFile(target))
+                guard
+                    !fm.fileExists(
+                        atPath: resourceURL.appendingPathComponent(InstalledPackageLayout.schemaFile(target)).path)
+                else {
                     throw RecipeInstallError.deployment("生成的键盘适配名称与已有输入方式冲突：\(target)")
                 }
                 try data.write(to: generated, options: .atomic)
@@ -243,9 +242,21 @@ enum CompactAdapterDeployment {
         enabledSchemas: [KeyboardSchemaDescriptor],
         requested: PublishedKeyboard
     ) -> Bool {
+        availableEngineSchemaID(
+            resourceURL: resourceURL, userDataURL: userDataURL, enabledSchemas: enabledSchemas, requested: requested)
+            != nil
+    }
+
+    /// The engine schema that runs an available requested combination; nil when it is unavailable.
+    static func availableEngineSchemaID(
+        resourceURL: URL, userDataURL: URL,
+        enabledSchemas: [KeyboardSchemaDescriptor],
+        requested: PublishedKeyboard
+    ) -> String? {
         let build = userDataURL.appendingPathComponent("build")
         var bindings: [KeyboardResourceSet.LayoutEntry] = []
-        if let data = try? Data(contentsOf: resourceURL.appendingPathComponent("keyboard-package.json")),
+        if let data = try? Data(
+            contentsOf: resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardPackageFile)),
             let declaration = try? JSONDecoder().decode(SchemePackageDeclaration.self, from: data)
         {
             bindings = declaration.bindings.compactMap { binding in
@@ -258,8 +269,8 @@ enum CompactAdapterDeployment {
             sharedDirectory: resourceURL, userDirectory: userDataURL,
             layoutEntries: bindings, prebuiltDirectory: build,
             schemas: enabledSchemas, selectedSchemaID: requested.schemaID)
-        return set.availableCombinations.contains {
+        return set.availableCombinations.first {
             $0.schemaID == requested.schemaID && $0.layout == requested.layout
-        }
+        }?.engineSchemaID
     }
 }

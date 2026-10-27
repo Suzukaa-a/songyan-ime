@@ -96,8 +96,7 @@ enum DictionaryDeployVerifier {
             for source in sources {
                 let code = source == BuiltinTemplateSchemas.flypy ? "nihc" : "nihao"
                 for layout in KeyboardLayoutKind.allCases {
-                    let schema = set.logicalSchemaID(source, layout: layout)
-                    guard layout == .qwerty26 || schema != source else {
+                    guard let schema = set.engineSchemaID(source: source, layout: layout) else {
                         throw RecipeInstallError.deployment("没能为「\(source)」生成\(layout.userTitle)")
                     }
                     let typed = layout.compactFold.map { fold in String(code.map { fold.map[$0] ?? $0 }) } ?? code

@@ -72,7 +72,7 @@ final class SharedLayoutSchemeTests: XCTestCase {
         XCTAssertEqual(ready.preferredLayout, .qwerty26)
         XCTAssertEqual(ready.availableLayouts, [.qwerty26])
         XCTAssertEqual(ready.schemaID(for: .qwerty26), "my_double_pinyin")
-        XCTAssertEqual(ready.logicalSchemaID("my_double_pinyin", layout: .qwerty26), "my_double_pinyin")
+        XCTAssertEqual(ready.engineSchemaID(source: "my_double_pinyin", layout: .qwerty26), "my_double_pinyin")
         XCTAssertTrue(ready.keyboardChoices(for: "another_source").isEmpty)
         try FileManager.default.removeItem(at: root.appendingPathComponent("my_double_pinyin.schema.yaml"))
         XCTAssertTrue(

@@ -43,31 +43,35 @@ public struct KeyboardResourceSet: Equatable, Sendable {
                 // and only structurally runnable ones appear (a compact layout must have a
                 // generated adapter or an author binding; never fall back to the source's 26-key).
                 // Implicit alphabet inference for 26-key is also turned off (not added = not offered).
+                guard
+                    let route = Self.engineRoute(
+                        source: source, layout: layout, adapters: encodingAdapters, bindings: layoutEntries)
+                else { continue }
                 if let published = publishedKeyboards {
-                    guard published.contains(PublishedKeyboard(schemaID: source, layout: layout)),
-                        let engine = structurallyRunnableEngineSchema(source: source, layout: layout)
-                    else { continue }
+                    guard published.contains(PublishedKeyboard(schemaID: source, layout: layout)) else { continue }
                     // A published item represents the source input method; the generated
                     // adapter's internal schema name is not a second user-facing input method
                     // name. Always use the source's human name (may be empty).
                     result.append(
                         .init(
-                            schemaID: source, engineSchemaID: engine, layout: layout,
+                            schemaID: source, engineSchemaID: route.schemaID(source: source), layout: layout,
                             name: sourceName))
                     continue
                 }
-                if let adapter = encodingAdapters.first(where: { $0.sourceSchemaID == source && $0.layout == layout }) {
+                switch route {
+                case .adapter(let adapter):
                     result.append(
                         .init(
                             schemaID: source, engineSchemaID: adapter.schemaID, layout: layout,
                             name: adapter.schemaName ?? sourceName + " · " + layout.shortTitle + "配套"))
-                } else if layoutEntries.contains(where: { $0.schemaID == source && $0.layout == layout }) {
+                case .bound:
                     result.append(.init(schemaID: source, engineSchemaID: source, layout: layout, name: sourceName))
-                } else if layout.keyFold == .identity,
-                    selectedSchemaID != nil || layoutEntries.isEmpty,
-                    let alphabet = schemas.first(where: { $0.id == source })?.alphabet,
-                    alphabet.isEmpty || !Set(alphabet).intersection(Set("abcdefghijklmnopqrstuvwxyz")).isEmpty
-                {
+                case .plain:
+                    // Unbound 26-key is only inferred for a letter-typed source of an independent selection.
+                    guard selectedSchemaID != nil || layoutEntries.isEmpty,
+                        let alphabet = schemas.first(where: { $0.id == source })?.alphabet,
+                        alphabet.isEmpty || !Set(alphabet).intersection(Set("abcdefghijklmnopqrstuvwxyz")).isEmpty
+                    else { continue }
                     result.append(.init(schemaID: source, engineSchemaID: source, layout: layout, name: sourceName))
                 }
             }
@@ -75,22 +79,43 @@ public struct KeyboardResourceSet: Equatable, Sendable {
         return result
     }
 
-    /// The *structured* engine schema for a (source, layout): no disk I/O.
-    ///
-    ///  * with a generated adapter -> the adapter's engine schema;
-    ///  * with an author/advanced binding -> the source schema itself (the author declared it serves that layout);
-    ///  * plain 26-key -> the source schema itself; shuangpin hints must be declared by an author binding or a verified adapter;
-    ///  * compact layouts (14 / 9 key) without an adapter or binding -> nil (not runnable);
-    ///    the source schema is never used as a compact engine (that would be the "fall back to 26-key" bug).
-    func structurallyRunnableEngineSchema(source: String, layout: KeyboardLayoutKind) -> String? {
-        if let adapter = encodingAdapters.first(where: { $0.sourceSchemaID == source && $0.layout == layout }) {
-            return adapter.schemaID
-        }
-        if layoutEntries.contains(where: { $0.schemaID == source && $0.layout == layout }) {
+    /// How a (source, layout) pair reaches the engine.
+    enum EngineRoute: Equatable {
+        /// A generated or registered companion runs in place of the source.
+        case adapter(EncodingAdapter)
+        /// An author binding declares the source itself serves the layout.
+        case bound
+        /// 26-key runs the source as-is.
+        case plain
+
+        func schemaID(source: String) -> String {
+            if case .adapter(let adapter) = self { return adapter.schemaID }
             return source
         }
-        if !layout.requiresSpellingDisplay { return source }
-        return nil
+    }
+
+    static func engineRoute(
+        source: String, layout: KeyboardLayoutKind, adapters: [EncodingAdapter], bindings: [LayoutEntry]
+    ) -> EngineRoute? {
+        if let adapter = adapters.first(where: { $0.sourceSchemaID == source && $0.layout == layout }) {
+            return .adapter(adapter)
+        }
+        if bindings.contains(where: { $0.schemaID == source && $0.layout == layout }) { return .bound }
+        // A compact layout never runs the 26-key source: its codes would be folded letters the source cannot read.
+        return layout.requiresSpellingDisplay ? nil : .plain
+    }
+
+    /// The engine schema that runs `source` on `layout`, or nil when the layout cannot run it.
+    /// The one resolver for every caller; no disk I/O.
+    public static func engineSchemaID(
+        source: String, layout: KeyboardLayoutKind, adapters: [EncodingAdapter], bindings: [LayoutEntry]
+    ) -> String? {
+        engineRoute(source: source, layout: layout, adapters: adapters, bindings: bindings)?.schemaID(source: source)
+    }
+
+    /// The engine schema that runs `source` on `layout` in this resource set; see the static form.
+    public func engineSchemaID(source: String, layout: KeyboardLayoutKind) -> String? {
+        Self.engineSchemaID(source: source, layout: layout, adapters: encodingAdapters, bindings: layoutEntries)
     }
 
     /// Whether a published keyboard is actually runnable in this snapshot: the structured
@@ -99,7 +124,7 @@ public struct KeyboardResourceSet: Equatable, Sendable {
     func isPublishedKeyboardRunnable(_ keyboard: PublishedKeyboard, build: URL) -> Bool {
         let enabled = schemas.isEmpty ? Set(layoutEntries.map(\.schemaID)) : Set(schemas.map(\.id))
         guard enabled.contains(keyboard.schemaID),
-            let engine = structurallyRunnableEngineSchema(source: keyboard.schemaID, layout: keyboard.layout)
+            let engine = engineSchemaID(source: keyboard.schemaID, layout: keyboard.layout)
         else {
             return false
         }
@@ -170,9 +195,6 @@ public struct KeyboardResourceSet: Equatable, Sendable {
             data.count < 1_000_000
         else { return [] }
         return (try? JSONDecoder().decode([EncodingAdapter].self, from: data)) ?? []
-    }
-    public func logicalSchemaID(_ sourceID: String, layout: KeyboardLayoutKind) -> String {
-        encodingAdapters.first { $0.sourceSchemaID == sourceID && $0.layout == layout }?.schemaID ?? sourceID
     }
     public func sourceSchemaID(_ engineID: String) -> String {
         encodingAdapters.first { $0.schemaID == engineID }?.sourceSchemaID ?? engineID

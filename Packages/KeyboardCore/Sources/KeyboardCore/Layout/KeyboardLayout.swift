@@ -167,8 +167,8 @@ public enum BuiltinTemplateSchemas {
     /// The engine schema running `sourceID` on `layout`.
     public static func engineSchemaID(source sourceID: String, layout: KeyboardLayoutKind) -> String? {
         guard sourceSchemaIDs.contains(sourceID) else { return nil }
-        guard layout != .qwerty26 else { return sourceID }
-        return adapters.first { $0.sourceSchemaID == sourceID && $0.layout == layout }?.schemaID
+        return KeyboardResourceSet.engineSchemaID(
+            source: sourceID, layout: layout, adapters: adapters, bindings: layoutEntries)
     }
 
     public static func layout(forSchemaID schemaID: String) -> KeyboardLayoutKind? {

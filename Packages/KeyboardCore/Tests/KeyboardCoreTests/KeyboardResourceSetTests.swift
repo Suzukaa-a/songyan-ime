@@ -89,7 +89,10 @@ final class KeyboardResourceSetTests: XCTestCase {
         for source in BuiltinTemplateSchemas.sourceSchemaIDs {
             XCTAssertEqual(set.keyboardChoices(for: source).map(\.layout), KeyboardLayoutKind.allCases)
             for layout in KeyboardLayoutKind.allCases {
-                let engine = set.logicalSchemaID(source, layout: layout)
+                guard let engine = set.engineSchemaID(source: source, layout: layout) else {
+                    XCTFail("\(source) has no engine schema on \(layout)")
+                    continue
+                }
                 XCTAssertEqual(engine, BuiltinTemplateSchemas.engineSchemaID(source: source, layout: layout))
                 XCTAssertEqual(set.sourceSchemaID(engine), source)
                 XCTAssertEqual(BuiltinTemplateSchemas.layout(forSchemaID: engine), layout)
@@ -411,5 +414,87 @@ final class ResourceSetInputSessionTests: XCTestCase {
         XCTAssertEqual(session.layout, .merged14)
         "bugao".forEach { session.tap(.code(String($0))) }
         XCTAssertTrue(session.snapshot.candidates.contains { $0.text == "你好" })
+    }
+
+    /// A compact layout with neither a companion nor a binding is refused instead of running the 26-key source.
+    func testCompactLayoutWithoutCompanionIsRefusedRatherThanRunningTheSource() throws {
+        let engine = try makeEngine()
+        let set = KeyboardResourceSet(
+            id: "test", name: "测试", sharedDirectory: URL(fileURLWithPath: "/tmp/shared"),
+            userDirectory: URL(fileURLWithPath: "/tmp/user"), layoutEntries: [], prebuiltDirectory: nil,
+            schemas: [.init(id: BuiltinTemplateSchemas.quanpin, name: "全拼", alphabet: "")],
+            selectedSchemaID: BuiltinTemplateSchemas.quanpin, preferredLayout: nil, sourceRevision: nil,
+            publicationGeneration: nil, publishedKeyboards: nil, englishCandidateRoutes: [], encodingAdapters: [])
+        var errors: [Error] = []
+        let session = InputSession(engine: engine, layout: .merged14, resourceSet: set)
+        session.onError = { errors.append($0) }
+        let refused = EngineBackendError.unsupportedSchema(UserTerminology.layoutUnavailableReason(.merged14))
+
+        session.revalidateCurrentSchema()
+        XCTAssertEqual(errors as? [EngineBackendError], [refused])
+
+        let wide = InputSession(engine: engine, layout: .qwerty26, resourceSet: set)
+        wide.onError = { errors.append($0) }
+        wide.select(layout: .merged14, boundSchemaID: BuiltinTemplateSchemas.quanpin)
+        XCTAssertEqual(wide.layout, .qwerty26)
+        XCTAssertEqual(errors as? [EngineBackendError], [refused, refused])
+    }
+}
+
+final class EngineSchemaResolverTests: XCTestCase {
+    private let source = "src"
+
+    private func resolve(
+        _ layout: KeyboardLayoutKind, adapters: [KeyboardResourceSet.EncodingAdapter] = [],
+        bindings: [KeyboardResourceSet.LayoutEntry] = []
+    ) -> String? {
+        KeyboardResourceSet.engineSchemaID(source: source, layout: layout, adapters: adapters, bindings: bindings)
+    }
+
+    func testEveryLayoutResolvesCompanionThenBindingThenPlainSource() {
+        for layout in KeyboardLayoutKind.allCases {
+            let adapter = KeyboardResourceSet.EncodingAdapter(
+                sourceSchemaID: source, schemaID: "companion", layout: layout)
+            let binding = KeyboardResourceSet.LayoutEntry(layout: layout, schemaID: source)
+            XCTAssertEqual(resolve(layout, adapters: [adapter]), "companion", "\(layout)")
+            XCTAssertEqual(resolve(layout, adapters: [adapter], bindings: [binding]), "companion", "\(layout)")
+            XCTAssertEqual(resolve(layout, bindings: [binding]), source, "\(layout)")
+            XCTAssertEqual(resolve(layout), layout == .qwerty26 ? source : nil, "\(layout)")
+        }
+    }
+
+    func testOtherSourcesAndLayoutsDoNotLeakIntoTheResolution() {
+        let otherSource = KeyboardResourceSet.EncodingAdapter(
+            sourceSchemaID: "other", schemaID: "x_14", layout: .merged14)
+        let otherLayout = KeyboardResourceSet.EncodingAdapter(
+            sourceSchemaID: source, schemaID: "src_9", layout: .phone9)
+        let otherBinding = KeyboardResourceSet.LayoutEntry(layout: .merged14, schemaID: "other")
+        XCTAssertNil(resolve(.merged14, adapters: [otherSource, otherLayout], bindings: [otherBinding]))
+        XCTAssertEqual(resolve(.phone9, adapters: [otherSource, otherLayout]), "src_9")
+    }
+
+    func testResourceSetAndBuiltinTableUseTheSameResolver() {
+        let adapter = KeyboardResourceSet.EncodingAdapter(sourceSchemaID: source, schemaID: "src_9", layout: .phone9)
+        let binding = KeyboardResourceSet.LayoutEntry(layout: .merged18, schemaID: source)
+        let set = KeyboardResourceSet(
+            id: "pkg", name: "", sharedDirectory: URL(fileURLWithPath: "/tmp/shared"),
+            userDirectory: URL(fileURLWithPath: "/tmp/user"), layoutEntries: [binding], prebuiltDirectory: nil,
+            schemas: [.init(id: source, name: "源", alphabet: "")], selectedSchemaID: source, preferredLayout: nil,
+            sourceRevision: nil, publicationGeneration: nil, publishedKeyboards: nil, englishCandidateRoutes: [],
+            encodingAdapters: [adapter])
+        for layout in KeyboardLayoutKind.allCases {
+            let expected = resolve(layout, adapters: [adapter], bindings: [binding])
+            XCTAssertEqual(set.engineSchemaID(source: source, layout: layout), expected, "\(layout)")
+            XCTAssertEqual(set.combination(layout: layout)?.engineSchemaID, expected, "\(layout)")
+            for builtin in BuiltinTemplateSchemas.sourceSchemaIDs {
+                XCTAssertEqual(
+                    BuiltinTemplateSchemas.engineSchemaID(source: builtin, layout: layout),
+                    KeyboardResourceSet.engineSchemaID(
+                        source: builtin, layout: layout, adapters: BuiltinTemplateSchemas.adapters,
+                        bindings: BuiltinTemplateSchemas.layoutEntries))
+            }
+        }
+        XCTAssertNil(set.engineSchemaID(source: source, layout: .merged14))
+        XCTAssertNil(set.combination(layout: .merged14))
     }
 }

@@ -35,14 +35,11 @@ extension KeyboardRecipeStore {
                 throw StoreError(message: "已添加的键盘包含未启用的输入方案 \(keyboard.schemaID)，请重新添加")
             }
             guard keyboard.needsGeneratedAdapter else { continue }
-            let boundEngine = activation.schemaBindings?.first {
-                $0.schemaID == keyboard.schemaID && $0.layout == keyboard.layout
-            }?.schemaID
-            let engine =
-                adapters.first {
-                    $0.sourceSchemaID == keyboard.schemaID && $0.layout == keyboard.layout
-                }?.schemaID ?? boundEngine
-            guard let engine else {
+            guard
+                let engine = KeyboardResourceSet.engineSchemaID(
+                    source: keyboard.schemaID, layout: keyboard.layout, adapters: adapters,
+                    bindings: activation.schemaBindings ?? [])
+            else {
                 throw StoreError(message: "已添加的 \(keyboard.layout.userTitle) 键盘缺少按键映射，请重新添加后再保存")
             }
             guard FileManager.default.fileExists(atPath: build.appendingPathComponent("\(engine).schema.yaml").path)

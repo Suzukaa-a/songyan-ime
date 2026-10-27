@@ -235,13 +235,9 @@ public final class InputSession {
             return
         }
         do {
-            let target = resourceSet?.logicalSchemaID(schemaID, layout: layout) ?? schemaID
-            try validateSelection(target)
-            if let reason = resourceSet?.incompatibilityReason(layout: layout, schemaID: schemaID) {
-                throw EngineBackendError.unsupportedSchema(reason)
-            }
+            try validateSelection(schemaID)
             guard prepareForConfigurationChange() else { return }
-            try engine.selectSchema(target)
+            try engine.selectSchema(schemaID)
             selectedSchemaID = schemaID
             reloadOptions()
             refresh()
@@ -258,7 +254,7 @@ public final class InputSession {
         var succeeded = false
         defer { if !succeeded { compactSpellingLayout = previous } }
         do {
-            let target = resourceSet?.logicalSchemaID(boundSchemaID, layout: newLayout) ?? boundSchemaID
+            let target = try engineSchemaID(source: boundSchemaID, layout: newLayout)
             try validateSelection(target)
             if let reason = resourceSet?.incompatibilityReason(layout: newLayout, schemaID: boundSchemaID) {
                 throw EngineBackendError.unsupportedSchema(reason)
@@ -279,13 +275,22 @@ public final class InputSession {
         drainPendingCodes()
         guard !retired else { return }
         do {
-            let target = resourceSet?.logicalSchemaID(selectedSchemaID, layout: layout) ?? selectedSchemaID
+            let target = try engineSchemaID(source: selectedSchemaID, layout: layout)
             try validateSelection(target)
             guard prepareForConfigurationChange() else { return }
             try engine.selectSchema(target)
             reloadOptions()
             refresh()
         } catch { refreshAfterSelectionFailure(error) }
+    }
+
+    /// The engine schema running `source` on `layout`; a layout the resource set cannot run is refused.
+    private func engineSchemaID(source: String, layout: KeyboardLayoutKind) throws -> String {
+        guard let resourceSet else { return source }
+        guard let engine = resourceSet.engineSchemaID(source: resourceSet.sourceSchemaID(source), layout: layout) else {
+            throw EngineBackendError.unsupportedSchema(UserTerminology.layoutUnavailableReason(layout))
+        }
+        return engine
     }
 
     private func validateSelection(_ schemaID: String) throws {
