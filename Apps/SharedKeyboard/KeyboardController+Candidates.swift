@@ -15,7 +15,7 @@ extension KeyboardController {
     ///   - Empty composition: inserts the space/newline directly.
     public func confirmOrInsert(commitWhenIdle: String) {
         if snapshot.isComposing {
-            commitComposition()
+            commitComposition(allowingPartial: true)
         } else {
             session.insertLiteral(commitWhenIdle)
         }

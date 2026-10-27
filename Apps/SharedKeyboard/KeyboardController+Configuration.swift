@@ -40,18 +40,18 @@ extension KeyboardController {
         let completed = session.discardComposition()
         // Do not drop the only restore token before cancellation is proven.
         // A failed cancellation leaves the internal canonical/alias input live.
-        if completed { ambiguityPicker.clear() }
+        if completed, !session.snapshot.isComposing { ambiguityPicker.clear() }
         return completed
     }
 
     @discardableResult
-    public func commitComposition() -> Bool {
+    public func commitComposition(allowingPartial: Bool = false) -> Bool {
         inputError = nil
         if session.compactSpellingLayout && readingFilter.isFiltering { return confirmReadingTarget() }
-        let completed = session.commitComposition()
+        let completed = session.commitComposition(allowingPartial: allowingPartial)
         // `refresh()` normally clears the picker when composition ends. Keep
         // the lock on failure so a later code key must still restore first.
-        if completed { ambiguityPicker.clear() }
+        if completed, !session.snapshot.isComposing { ambiguityPicker.clear() }
         return completed
     }
 

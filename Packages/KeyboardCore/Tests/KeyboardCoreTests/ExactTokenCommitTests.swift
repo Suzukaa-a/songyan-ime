@@ -123,4 +123,25 @@ final class ExactTokenCommitTests: XCTestCase {
         let rewritten = confirm(["n", "i", q], selectingFirst: true) { $0 + "!" }
         XCTAssertEqual(rewritten, ["你" + q + "!"])
     }
+
+    /// Space on `nih` confirms 你 and leaves `h` composing: progress, not an error.
+    func testSpaceConfirmingOnlyAPrefixIsNotAnError() {
+        func run(allowingPartial: Bool) -> (ok: Bool, errors: Int, session: InputSession) {
+            let session = InputSession(engine: RawReturnEngine(), layout: .qwerty26)
+            var errors = 0
+            session.onError = { _ in errors += 1 }
+            session.onCommitted = { _ in }
+            "nih".forEach { session.tap(.code(String($0))) }
+            let ok = session.commitComposition(allowingPartial: allowingPartial)
+            return (ok, errors, session)
+        }
+        let partial = run(allowingPartial: true)
+        XCTAssertTrue(partial.ok)
+        XCTAssertEqual(partial.errors, 0)
+        XCTAssertTrue(partial.session.snapshot.isComposing)
+        XCTAssertEqual(partial.session.snapshot.preedit, "你h")
+        let strict = run(allowingPartial: false)
+        XCTAssertFalse(strict.ok)
+        XCTAssertEqual(strict.errors, 1)
+    }
 }

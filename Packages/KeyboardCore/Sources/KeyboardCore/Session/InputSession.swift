@@ -433,14 +433,18 @@ public final class InputSession {
     ///  - candidates present: confirms the highlighted one (index 0 on the page if none highlighted);
     ///  - composing without candidates: sends return to the engine to commit the raw text (never swallows the key);
     ///  - empty composition: no-op.
+    /// With `allowingPartial`, a selection that only confirms the first segment and leaves the rest
+    /// composing counts as success (space/return); transitions keep requiring a finished composition.
     @discardableResult
-    public func commitComposition() -> Bool {
+    public func commitComposition(allowingPartial: Bool = false) -> Bool {
         drainPendingCodes()
         guard inputAvailable() else { return false }
         // Prediction is not a composition: confirming only dismisses it and never picks a prediction word for the user.
         guard snapshot.isComposing else { return dismissPrediction() }
         do {
             let delivered: Bool
+            let before = (snapshot.preedit, snapshot.rawInput, snapshot.preeditSelStart)
+            var partialProgress = false
             if snapshot.candidates.isEmpty {
                 // Return commits the confirmed text and then the raw input after it, where the
                 // engine read every exact token as its letter; any other commit stays as the
@@ -464,7 +468,11 @@ public final class InputSession {
                 } else {
                     delivered = apply(try engine.selectCandidate(0))
                 }
+                partialProgress =
+                    allowingPartial && snapshot.isComposing
+                    && (snapshot.preedit, snapshot.rawInput, snapshot.preeditSelStart) != before
             }
+            if partialProgress { return true }
             guard !snapshot.isComposing else {
                 onError?(EngineBackendError.operationFailed("拼音组合未完成"))
                 return false
