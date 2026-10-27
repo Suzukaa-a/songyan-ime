@@ -321,7 +321,7 @@ public struct KeyboardPanelHost: View {
         HStack {
             NativeInputModeKey(
                 handleEvent: handleEvent,
-                accessibilitySwitch: { session.onSwitchKeyboard?() }
+                accessibilitySwitch: { session.host?.switchKeyboard() }
             )
             .frame(width: 44, height: 44)
             Spacer()
@@ -393,7 +393,7 @@ public struct KeyboardPanelHost: View {
                 systemKeyboardSwitch: systemKeyboardSwitch, keyAlternates: keyAlternates,
                 layoutRegistry: layoutRegistry ?? storedRegistry,
                 selectedLayoutID: selectedLayoutID ?? storedLayoutID,
-                allowsCursorMovement: session.onMoveCursor != nil,
+                allowsCursorMovement: session.host != nil,
                 statusMessage: resolvedStatusMessage(controller),
                 onStatusDetails: {
                     if session.transitionError != nil || controller.inputError != nil {
@@ -423,7 +423,7 @@ public struct KeyboardPanelHost: View {
                 insertTools: AnyView(QuickInsertView(state: session.quickInsert)),
                 asyncInsertionContext: {
                     guard session.controller === controller, session.phase == .ready else { return nil }
-                    return session.asyncInsertionContext?()
+                    return session.host?.asyncInsertionContext()
                 },
                 pasteLiteral: { session.insertExternalLiteral($0) },
                 openHostApp: openHostApp,
@@ -546,7 +546,7 @@ public struct KeyboardPanelHost: View {
                 if let systemKeyboardSwitch {
                     NativeInputModeKey(
                         handleEvent: systemKeyboardSwitch,
-                        accessibilitySwitch: { session.onSwitchKeyboard?() }
+                        accessibilitySwitch: { session.host?.switchKeyboard() }
                     )
                     .frame(width: 44, height: 44)
                 }

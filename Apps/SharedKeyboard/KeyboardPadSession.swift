@@ -3,6 +3,31 @@ import Foundation
 import KeyboardCore
 import OSLog
 
+/// Where the session's engine output goes: the keyboard controller that is presenting.
+/// The session holds one host at a time and calls nothing else, so a controller the
+/// system replaced or kept alive off screen never sees a callback.
+@MainActor
+public protocol KeyboardPadHost: AnyObject {
+    /// False rejects the current operation, including any dependent document edit.
+    func dispatchCommit(_ text: String) -> Bool
+    /// Memory-only identity of the writable document; nil while none can be written.
+    /// Tools refuse delivery if confirmation changes the target.
+    func hostContextIdentifier() -> String?
+    /// Captured only for explicit asynchronous insertions; nil means no live target.
+    func asyncInsertionContext() -> AnyHashable?
+    func updateMarked(_ composition: MarkedComposition?)
+    /// The running engine's schema or layout changed; the host decides whether it is remembered.
+    func keyboardSelectionChanged(_ change: KeyboardSelectionChange)
+    func readDocumentContext() -> String?
+    func replaceLiteralSuffix(expected: String, old: String, new: String) -> Bool
+    /// Backspace on an empty composition: the host deletes an already committed character.
+    func deleteBackward()
+    /// Re-reads host text-input traits (`hasText` etc.) now; see `KeyboardController.onRequestHostTraitsRefresh`.
+    func refreshHostTraits()
+    func moveCursor(by offset: Int)
+    func switchKeyboard()
+}
+
 /// Interactive keyboard session: starts the real Rime engine in the background, then builds a `KeyboardController`.
 ///
 /// The host app's typing area and the keyboard extension both go through this facade, so there is a
@@ -23,9 +48,9 @@ import OSLog
 ///  - `start()` is idempotent; the process-wide `EngineOwnershipCoordinator` owns the full lifecycle.
 ///  - Configuration switches, navigation and background-validation handoffs wait for in-flight boot and
 ///    shutdown; `EngineOpQueue` runs the background operations and `bootGeneration` rejects stale results.
-///  - Switching or shutting down never touches text already committed to the host (callbacks such as
-///    `onCommit` are kept and picked up by the new controller) and never deletes any resource set's
-///    user directory.
+///  - Switching or shutting down never touches text already committed to the host (the bound
+///    `KeyboardPadHost` stays bound and the new `KeyboardController` reaches it) and never deletes any
+///    resource set's user directory.
 ///  - The first start may deploy (compile dictionaries); the UI shows loading and a retryable failure.
 ///  - Failures are reported through `phase` (never swallowed, never a demo-engine fallback); `retry()`
 ///    retries the current configuration.
@@ -52,7 +77,16 @@ public final class KeyboardPadSession: ObservableObject {
     @Published public private(set) var availableSchemas: [KeyboardSchemaDescriptor] = []
     @Published public private(set) var selectedSchemaID: String = ""
     @Published public private(set) var successfulChange: KeyboardSelectionChange?
-    public var onMarkedComposition: ((MarkedComposition?) -> Void)?
+    /// Weak: a controller the system discards unbinds by going away.
+    public private(set) weak var host: (any KeyboardPadHost)?
+    /// Hands the engine output to `host`; the previous host gets no further callbacks.
+    public func bind(_ host: any KeyboardPadHost) {
+        self.host = host
+    }
+    /// No-op unless `host` is the bound one: a newer host may already own the session.
+    public func unbind(_ host: any KeyboardPadHost) {
+        if self.host === host { self.host = nil }
+    }
     /// Not `@Published`: it flips awaitingHost ↔ inline on every key and nothing in the
     /// UI renders it; the visible part is `keyboardCompositionFallback` below.
     public private(set) var compositionPresentation: CompositionPresentation = .idle
@@ -70,32 +104,23 @@ public final class KeyboardPadSession: ObservableObject {
     public func refreshCompositionPresentation() {
         guard let controller, controller.snapshot.isComposing else {
             reportCompositionPresentation(.idle)
-            onMarkedComposition?(nil)
+            host?.updateMarked(nil)
             return
         }
-        reportCompositionPresentation(onMarkedComposition == nil ? .keyboard(reason: "输入框暂不可用") : .awaitingHost)
-        onMarkedComposition?(controller.markedComposition)
+        reportCompositionPresentation(host == nil ? .keyboard(reason: "输入框暂不可用") : .awaitingHost)
+        host?.updateMarked(controller.markedComposition)
     }
-    public var onSelectionChanged: ((KeyboardSelectionChange) -> Void)?
-    /// Asked when a ready engine switches layout. False keeps the remembered layout on the
-    /// keyboard the next start shows: a switch that cannot be saved lasts one presentation,
-    /// and that presentation's height is budgeted from the remembered layout.
-    public var remembersLayoutSwitch: (() -> Bool)?
-    /// Host identity is memory-only. Tools refuse delivery if confirmation changes the target.
-    public var hostContextIdentifier: (() -> String?)?
-    /// Captured only for explicit asynchronous insertions; nil means no live target.
-    public var asyncInsertionContext: (() -> AnyHashable?)?
     public lazy var quickInsert: QuickInsertState = {
         let defaults = KeyboardRecipeStore.sharedDefaults() ?? .standard
         let state = QuickInsertState(
             formatStore: QuickInsertFormatStore(
                 defaults: defaults, persists: { KeyboardRecipeStore.canWriteSharedContainer }))
         state.core.confirmComposition = { [weak self] in
-            guard let self, self.onDispatchCommit != nil || self.onCommit != nil,
+            guard let self, let host = self.host,
                 let controller = self.controller,
-                let context = self.hostContextIdentifier?(), controller.commitComposition()
+                let context = host.hostContextIdentifier(), controller.commitComposition()
             else { return false }
-            return self.hostContextIdentifier?() == context
+            return self.host?.hostContextIdentifier() == context
         }
         state.core.dispatchInsert = { [weak self] text in self?.dispatchCommitToHost(text) ?? false }
         return state
@@ -179,11 +204,6 @@ public final class KeyboardPadSession: ObservableObject {
     /// Current resource set (nil = not specified; Release without one is unconfigured, with no bundled fallback).
     public private(set) var resourceSet: KeyboardResourceSet?
 
-    /// Commit-text callback (host text field insert / text document proxy).
-    public var onCommit: ((String) -> Void)?
-    /// False rejects the current operation, including any dependent document edit.
-    public var onDispatchCommit: ((String) -> Bool)?
-
     @discardableResult
     public func insertExternalLiteral(_ text: String) -> Bool {
         guard phase == .ready, let controller else { return false }
@@ -192,24 +212,9 @@ public final class KeyboardPadSession: ObservableObject {
 
     @discardableResult
     private func dispatchCommitToHost(_ text: String) -> Bool {
-        guard hostContextIdentifier?() != nil else { return false }
-        if let onDispatchCommit { return onDispatchCommit(text) }
-        guard let onCommit else { return false }
-        onCommit(text)
-        return true
+        guard let host, host.hostContextIdentifier() != nil else { return false }
+        return host.dispatchCommit(text)
     }
-    /// Backspace-on-empty-composition callback (the host deletes an already committed character).
-    public var onDeleteBackward: (() -> Void)?
-    public var onReadDocumentContext: (() -> String?)?
-    public var onReplaceLiteralSuffix: ((String, String, String) -> Bool)?
-    /// Re-reads host text-input traits (`hasText` etc.) immediately; see `KeyboardController.onRequestHostTraitsRefresh`.
-    public var onRefreshHostTraits: (() -> Void)?
-    /// Switch-keyboard callback (extension: advanceToNextInputMode; host app: shows a hint).
-    public var onSwitchKeyboard: (() -> Void)?
-    /// Relative cursor-move callback (argument = character offset), from `controller.moveCursor(by:)`.
-    /// The extension host should wire `textDocumentProxy.adjustTextPosition(byCharacterOffset:)`;
-    /// the host typing area implements it only if it can move the selection exactly, otherwise leaves it nil (never fakes a move).
-    public var onMoveCursor: ((Int) -> Void)?
 
     /// Extension-only: with nothing published, the switcher lists the bundled fallback's keyboards.
     public var enablesOfflineBundledInput = false
@@ -382,7 +387,7 @@ public final class KeyboardPadSession: ObservableObject {
         if phase == .ready, let controller {
             transitionError = nil
             controller.selectLayout(newLayout)
-            // The successful onLayoutChanged callback is the only writer while ready.
+            // While ready the host's selection callback decides whether the switch is remembered.
             return
         }
         recordUnreadySelection(schemaID: selectionTarget?.schemaID, layout: newLayout)
@@ -405,7 +410,7 @@ public final class KeyboardPadSession: ObservableObject {
         suspendedComposition = nil
         selectionTarget = SelectionTarget(resources: resourceSet, schemaID: schemaID, layout: newLayout)
         self.layout = newLayout
-        persistLayout(newLayout)
+        Self.persistLayout(newLayout)
         guard startTapped else { return }
         // Invalidate the in-flight boot (including the background engine start await) and restart with the new
         // target; the old engine shuts itself down per the bootGeneration rules.
@@ -489,7 +494,7 @@ public final class KeyboardPadSession: ObservableObject {
     public func shutdown() {
         reportCompositionPresentation(.idle)
         resetHostContext()
-        onMarkedComposition?(nil)
+        host?.updateMarked(nil)
         suspendedComposition = nil
         selectionTarget = nil
         // Do NOT clear runningEngine here: the coordinator stop closure is the single owner
@@ -532,7 +537,7 @@ public final class KeyboardPadSession: ObservableObject {
         layout = target
         availableLayouts = newSet?.availableLayouts ?? KeyboardLayoutKind.allCases
         phase = .starting
-        persistLayout(target)
+        Self.persistLayout(target)
         noteRequestedBootRoute()
         requestOwnership()
     }
@@ -577,7 +582,7 @@ public final class KeyboardPadSession: ObservableObject {
                         controller.snapshot.rawInput
                     )
                 }
-                onMarkedComposition?(nil)
+                host?.updateMarked(nil)
                 controller?.retire()
                 controller = nil
                 if startTapped { phase = .starting }
@@ -734,7 +739,7 @@ public final class KeyboardPadSession: ObservableObject {
         // Publish normalization only after real enabled/publication validation and activation.
         if layout != bootLayout {
             layout = bootLayout
-            persistLayout(bootLayout)
+            Self.persistLayout(bootLayout)
         }
         // 5. Generation publish point (before any observable side effect): first confirm this boot is still
         //    the latest intent, then build the controller / install callbacks / write any ready state. A
@@ -764,18 +769,18 @@ public final class KeyboardPadSession: ObservableObject {
         ctrl.onDispatchCommit = { [weak self] text in
             self?.dispatchCommitToHost(text) ?? false
         }
-        ctrl.onRequestDeleteBackward = { [weak self] in self?.onDeleteBackward?() }
+        ctrl.onRequestDeleteBackward = { [weak self] in self?.host?.deleteBackward() }
         ctrl.onReadDocumentContext = { [weak self] in
-            guard let self, self.hostContextIdentifier?() != nil else { return nil }
-            return self.onReadDocumentContext?()
+            guard let host = self?.host, host.hostContextIdentifier() != nil else { return nil }
+            return host.readDocumentContext()
         }
         ctrl.onReplaceLiteralSuffix = { [weak self] expected, old, new in
-            guard let self, self.hostContextIdentifier?() != nil else { return false }
-            return self.onReplaceLiteralSuffix?(expected, old, new) ?? false
+            guard let host = self?.host, host.hostContextIdentifier() != nil else { return false }
+            return host.replaceLiteralSuffix(expected: expected, old: old, new: new)
         }
-        ctrl.onRequestHostTraitsRefresh = { [weak self] in self?.onRefreshHostTraits?() }
-        ctrl.onRequestSwitchKeyboard = { [weak self] in self?.onSwitchKeyboard?() }
-        ctrl.onMoveCursor = { [weak self] offset in self?.onMoveCursor?(offset) }
+        ctrl.onRequestHostTraitsRefresh = { [weak self] in self?.host?.refreshHostTraits() }
+        ctrl.onRequestSwitchKeyboard = { [weak self] in self?.host?.switchKeyboard() }
+        ctrl.onMoveCursor = { [weak self] offset in self?.host?.moveCursor(by: offset) }
         ctrl.onInputError = { [weak self, weak ctrl] message in
             guard let self else { return }
             self.transitionError = message
@@ -790,8 +795,8 @@ public final class KeyboardPadSession: ObservableObject {
             self.reportCompositionPresentation(
                 composition == nil
                     ? .idle
-                    : (self.onMarkedComposition == nil ? .keyboard(reason: "输入框暂不可用") : .awaitingHost))
-            self.onMarkedComposition?(composition)
+                    : (self.host == nil ? .keyboard(reason: "输入框暂不可用") : .awaitingHost))
+            self.host?.updateMarked(composition)
         }
         ctrl.onSelectionChanged = { [weak self] change in
             guard let self else { return }
@@ -805,13 +810,14 @@ public final class KeyboardPadSession: ObservableObject {
             // The ready engine's real identity changed (within one run): sync the running key so the next appear
             // reuses it instead of restarting because the selection was written back to the shared record.
             self.noteRunningIdentity()
-            self.onSelectionChanged?(change)
+            self.host?.keyboardSelectionChanged(change)
         }
-        // After the panel's layout key cycles, sync back to this session and persist, so the host Picker and the next start agree.
+        // After the panel's layout key cycles, sync back to this session. Whether the switch is
+        // remembered for the next start is the host's call (`keyboardSelectionChanged`): only it
+        // knows whether the choice can be saved.
         ctrl.onLayoutChanged = { [weak self] newLayout in
             guard let self else { return }
             self.layout = newLayout
-            if self.remembersLayoutSwitch?() ?? true { self.persistLayout(newLayout) }
             self.noteRunningIdentity()
         }
         // The generation was validated and published before the controller was built (see 5); only state writes happen here.
@@ -852,16 +858,11 @@ public final class KeyboardPadSession: ObservableObject {
         await refreshPublishedKeyboards()
     }
 
-    /// Points the remembered layout at the keyboard the next start shows, for a running
-    /// switch that turned out not to be saved. The running layout is unchanged.
-    public func rememberLayout(_ layout: KeyboardLayoutKind) {
-        persistLayout(layout)
-    }
-
     /// Remembers the selected Chinese layout in this process's `UserDefaults.standard` only (not the App Group
     /// container: HostApp and the extension each persist in their own sandbox). Layout kinds are shared by
-    /// every resource set, so the stored value stays meaningful after a switch.
-    private func persistLayout(_ newLayout: KeyboardLayoutKind) {
+    /// every resource set, so the stored value stays meaningful after a switch. Also the next presentation's
+    /// height source. Nonisolated so a save can remember its layout in the same queue step that wrote it.
+    public nonisolated static func persistLayout(_ newLayout: KeyboardLayoutKind) {
         UserDefaults.standard.set(newLayout.rawValue, forKey: AppSettings.selectedLayoutKey)
     }
 }

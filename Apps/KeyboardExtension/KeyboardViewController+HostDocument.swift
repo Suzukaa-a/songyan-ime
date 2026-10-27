@@ -68,7 +68,7 @@ extension KeyboardViewController {
     func writableDocument() -> UUID? {
         // Before the host document attach the proxy may still be mid-handoff;
         // the attach (cancelOrphanedMarked) reconciles anything skipped here.
-        guard Self.activeController === self, !hostDocumentAttachPending,
+        guard isBoundHost, !hostDocumentAttachPending,
             session.backend?.hostInputIsReady != false,
             let current = documentIdentity()
         else { return nil }
@@ -145,7 +145,6 @@ extension KeyboardViewController {
     }
 
     func updateMarked(_ composition: MarkedComposition?) {
-        guard Self.activeController === self else { return }
         guard let composition, !composition.text.isEmpty else {
             cancelOwnedMarked()
             keyboardOnlyComposition = false
@@ -266,7 +265,7 @@ extension KeyboardViewController {
     }
 
     func checkDocumentOwnership() {
-        guard !proxyWriteInProgress, !hostDocumentAttachPending, Self.activeController === self,
+        guard !proxyWriteInProgress, !hostDocumentAttachPending, isBoundHost,
             let current = documentIdentity()
         else { return }
         if activeDocumentID != current {
@@ -306,7 +305,7 @@ extension KeyboardViewController {
     /// handoff finishes with a sync hop to the main queue, so the next main turn,
     /// or `viewDidAppear` if it comes first, reads the settled state.
     func attachToHostDocument() {
-        guard hostDocumentAttachPending, Self.activeController === self else { return }
+        guard hostDocumentAttachPending, isBoundHost else { return }
         hostDocumentAttachPending = false
         checkDocumentOwnership()
         expectedContext = proxyContext
@@ -316,27 +315,15 @@ extension KeyboardViewController {
         refreshHostTraits()
     }
 
-    /// Unbinds the shared proxy/session. Only the still-active controller may call this.
+    /// Unbinds the shared proxy/session. Only the still-bound controller may call this.
     func unbindSharedProxy() {
-        guard Self.activeController === self else { return }
+        guard isBoundHost else { return }
         session?.controller?.cancelRailSelection()
         if markedDocument != nil, pendingMarked != nil { Self.orphanedMarked = true }
         // `viewWillDisappear` can run after the host invalidated its document proxy
         // (notably while locking). Never read/write that proxy from teardown.
         detachFromHostWithoutUsingProxy()
-        session.onCommit = nil
-        session.onDispatchCommit = nil
-        session.onDeleteBackward = nil
-        session.onReadDocumentContext = nil
-        session.onReplaceLiteralSuffix = nil
-        session.onRefreshHostTraits = nil
-        session.onMoveCursor = nil
-        session.onSwitchKeyboard = nil
-        session.onMarkedComposition = nil
-        session.onSelectionChanged = nil
-        session.remembersLayoutSwitch = nil
-        session.hostContextIdentifier = nil
-        session.asyncInsertionContext = nil
+        session.unbind(self)
         session.resetHostContext()
         // The engine session suspends below; a batch decoding on the engine queue
         // must not race it or land a composition into a hidden keyboard. Only after
@@ -357,7 +344,6 @@ extension KeyboardViewController {
         session.controller?.session.refresh()
         KeyboardFeedbackService.shared.release()
         activeDocumentID = nil
-        Self.activeController = nil
     }
 
     func clearComposition() {
@@ -369,12 +355,12 @@ extension KeyboardViewController {
     }
 
     func refreshHostTraits() {
-        guard Self.activeController === self, let controller = session?.controller else { return }
+        guard isBoundHost, let controller = session?.controller else { return }
         updateHostTraits(on: controller)
     }
 
     func updateHostTraits(on controller: KeyboardController) {
-        guard Self.activeController === self, !hostDocumentAttachPending else { return }
+        guard isBoundHost, !hostDocumentAttachPending else { return }
         let ownsDocument = writableDocument() != nil
         let proxy = textDocumentProxy
         controller.updateHostTraits(
@@ -385,5 +371,76 @@ extension KeyboardViewController {
             enablesReturnKeyAutomatically: proxy.enablesReturnKeyAutomatically,
             beforeCursor: ownsDocument ? proxy.documentContextBeforeInput : nil,
             documentIsEmpty: ownsDocument ? !proxy.hasText : nil)
+    }
+}
+
+/// Engine output from the process session; called only while this controller is bound.
+extension KeyboardViewController: KeyboardPadHost {
+    func dispatchCommit(_ text: String) -> Bool {
+        guard session.backend?.hostInputIsReady != false else { return false }
+        guard let document = writableDocument() else { return false }
+        _ = observeMarkedEcho()
+        _ = observeCancelledMarkedEcho()
+        guard expectedContext == proxyContext else {
+            // The engine already committed: this text is dropped. Logged so a host whose
+            // context lags our own writes can be told apart from a real outside edit.
+            KeyboardLifecycleDiagnostics.emit(
+                "commitRefused", ["marked": pendingMarked == nil ? "0" : "1"])
+            checkDocumentOwnership()
+            return false
+        }
+        if commitOverEchoedMarked(text, document: document) {
+            session.quickInsert.recordCommitted(text)
+            return true
+        }
+        cancelOwnedMarked()
+        // The payload belongs to `document`; cancelling can find another one.
+        guard stillOwns(document) else { return false }
+        cancelledMarkedEcho = nil
+        keyboardOnlyComposition = false
+        writeProxy { textDocumentProxy.insertText(text) }
+        session.quickInsert.recordCommitted(text)
+        return true
+    }
+
+    func hostContextIdentifier() -> String? {
+        writableDocument()?.uuidString
+    }
+
+    func asyncInsertionContext() -> AnyHashable? {
+        writableDocument().map { AnyHashable($0) }
+    }
+
+    func readDocumentContext() -> String? {
+        guard writableDocument() != nil, textDocumentProxy.selectedText?.isEmpty != false else { return nil }
+        return textDocumentProxy.documentContextBeforeInput
+    }
+
+    func replaceLiteralSuffix(expected: String, old: String, new: String) -> Bool {
+        guard writableDocument() != nil,
+            textDocumentProxy.selectedText?.isEmpty != false,
+            let before = textDocumentProxy.documentContextBeforeInput,
+            String(before.suffix(T9PunctuationCycle.contextLimit)) == expected,
+            before.hasSuffix(old)
+        else { return false }
+        writeProxy {
+            for _ in old { textDocumentProxy.deleteBackward() }
+            textDocumentProxy.insertText(new)
+        }
+        return true
+    }
+
+    func deleteBackward() {
+        guard writableDocument() != nil else { return }
+        writeProxy { textDocumentProxy.deleteBackward() }
+    }
+
+    func moveCursor(by offset: Int) {
+        guard writableDocument() != nil else { return }
+        writeProxy { textDocumentProxy.adjustTextPosition(byCharacterOffset: offset) }
+    }
+
+    func switchKeyboard() {
+        advanceToNextInputMode()
     }
 }

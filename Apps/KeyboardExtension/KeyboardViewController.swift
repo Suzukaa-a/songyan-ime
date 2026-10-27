@@ -50,9 +50,13 @@ class KeyboardViewController: UIInputViewController {
         session.optionPreferencesDirectory = RimePaths.optionPreferencesDirectory()
         return session
     }()
-    static weak var activeController: KeyboardViewController?
-    /// Every controller that loaded its view, weakly: a replaced one may never become
-    /// `activeController`'s previous value (it already unbound on disappear).
+    /// The controller presenting the keyboard: the one the process session is bound to.
+    /// Ownership of the session, the proxy and the shared route state moves only through
+    /// `session.bind` in `viewWillAppear` and `session.unbind` in `unbindSharedProxy`.
+    static var boundHost: KeyboardViewController? { processSession.host as? KeyboardViewController }
+    var isBoundHost: Bool { Self.processSession.host === self }
+    /// Every controller that loaded its view, weakly: a replaced one may never be
+    /// `boundHost`'s previous value (it already unbound on disappear).
     private static let liveControllers = NSHashTable<KeyboardViewController>.weakObjects()
     /// Set when a newer controller appears while this one is still on screen.
     private var retiresPanelWhenHidden = false
@@ -63,8 +67,7 @@ class KeyboardViewController: UIInputViewController {
     /// budget the next presentation, once off screen.
     private var preparesNextPresentation = false
     private lazy var panelHostLifetime = KeyboardPanelHostLifetime { [weak self] in
-        guard let self else { return false }
-        return Self.activeController === self
+        self?.isBoundHost ?? false
     }
     /// Process-wide: whether this process has ever reached ready. Separates a true cold start (first engine in
     /// the process) from an in-process re-boot; neither is a warm resume, and diagnostics must not call them
@@ -151,11 +154,8 @@ class KeyboardViewController: UIInputViewController {
     /// The document this controller currently serves; nil until the first proxy contact.
     var activeDocumentID: UUID?
     /// Orders asynchronous shared-selection saves. Only the newest request from
-    /// the still-active controller may publish a completion notice.
-    private var selectionSaveGeneration: UInt64 = 0
-    /// Orders saves across controllers and presentations: a failure may only roll the
-    /// remembered layout back while no newer selection has been made.
-    static var layoutSaveGeneration: UInt64 = 0
+    /// the still-bound controller may publish a completion notice.
+    var selectionSaveGeneration: UInt64 = 0
     var proxyWriteInProgress = false
     var expectedContext: ProxyDocumentContext?
     /// Set in `viewWillAppear`; the proxy is first read once the host handoff settles.
@@ -184,7 +184,7 @@ class KeyboardViewController: UIInputViewController {
     // MARK: Lifecycle
 
     /// Release contract: a destroyed controller must leave no observer or in-flight route task behind.
-    /// `activeController` is a weak reference, so process-wide shared state is not altered by this instance going away.
+    /// The session holds its host weakly, so process-wide shared state is not altered by this instance going away.
     deinit {
         if loadedViewCounted { KeyboardLiveObjects.controllers.decrement() }
         // viewWillDisappear is not guaranteed to pair, so retire the route task here too.
@@ -320,14 +320,14 @@ class KeyboardViewController: UIInputViewController {
                 self?.selectBuiltin(builtin)
             },
             systemKeyboardSwitch: { [weak self] sender, event in
-                guard let self, Self.activeController === self else { return }
+                guard let self, self.isBoundHost else { return }
                 self.handleInputModeList(from: sender, with: event)
             }, retryRoute: { [weak self] operation in self?.retryRoute(operation) },
             restoreBuiltin: { [weak self] in
                 self?.restoreBuiltinTemporarily()
             }, reloadLayouts: { [weak self] in self?.refreshLayoutRegistry() },
             selectDefinition: { [weak self] definition in
-                guard let self, Self.activeController === self else { return }
+                guard let self, self.isBoundHost else { return }
                 self.route.selectedLayoutID = definition.id
                 UserDefaults.standard.set(definition.id, forKey: Self.selectedDefinitionKey)
             }, initialPresentation: initialPresentation, presentation: presentation,
@@ -340,7 +340,7 @@ class KeyboardViewController: UIInputViewController {
                 HostAppLink.open(url, from: self, completion: completion)
             },
             dismissKeyboard: { [weak self] in
-                guard let self, Self.activeController === self else { return }
+                guard let self, self.isBoundHost else { return }
                 self.dismissKeyboard()
             })
         let hosting = UIHostingController(rootView: host)
@@ -468,18 +468,15 @@ class KeyboardViewController: UIInputViewController {
         KeyboardFeedbackService.shared.refreshPreferences()
         // Appearance (skin + candidate-area layout) is re-read via the `hostBindingTick` increment below
         // (the panel's `onChange(of: hostBindingTick)`); no separate notification, or each appearance would read twice.
-        // Ownership transfer must precede any shared-composition clear. A previous
-        // controller's callbacks may still be installed on the process-shared session;
-        // clearing while it is still the active controller could synchronously re-enter
-        // its writers and touch a `textDocumentProxy` that may already be invalid
-        // (lock screen, host suspension). Assigning `self` first makes any such
-        // re-entry fail its `activeController === self` guard.
-        let previousController = Self.activeController
+        // A previous controller still bound must lose the session before any shared-composition
+        // clear: the clear re-enters the host's writers, and that controller's `textDocumentProxy`
+        // may already be invalid (lock screen, host suspension). Until `bind(self)` below the
+        // session has no host, exactly as when the previous controller unbound on disappear.
+        let previousController = Self.boundHost
         let isSameLiveHost = previousController === self
-        Self.activeController = self
+        if let previousController, !isSameLiveHost { session.unbind(previousController) }
         retireReplacedPanels()
         session.setHostVisibility(true)
-        syncPresentationSizeClass()
         if let previousController, !isSameLiveHost {
             previousController.endPresentationGeometry()
             previousController.detachFromHostWithoutUsingProxy()
@@ -492,13 +489,12 @@ class KeyboardViewController: UIInputViewController {
         hostAppearanceToken = appearanceToken
         // Rebinding a **valid** host must never reuse the previous host's librime
         // composition — disappear→appear, cross-app return, and keyboard dismissed then
-        // raised all leave `activeController == nil` (the previous controller already
-        // unbound during `viewWillDisappear`). The old implementation only cleared when
-        // a *different* controller was still active, so those regular paths kept stale
+        // raised all leave the session unbound (the previous controller already unbound
+        // during `viewWillDisappear`). The old implementation only cleared when a
+        // *different* controller was still bound, so those regular paths kept stale
         // composition that then followed the new host. Clearing is correct only here,
-        // on the appear path with a live document, and after `Self.activeController = self`;
-        // the teardown / host-loss paths never clear composition and never touch an
-        // invalid proxy.
+        // on the appear path, while no host is bound; the teardown / host-loss paths
+        // never clear composition and never touch an invalid proxy.
         let wasComposingOnRebind = session.controller?.snapshot.isComposing ?? false
         if wasComposingOnRebind && !isSameLiveHost {
             if session.backend?.hostInputIsReady != false {
@@ -527,6 +523,9 @@ class KeyboardViewController: UIInputViewController {
                     "sameLiveHost": isSameLiveHost ? "1" : "0",
                 ])
         }
+        // One ownership point: from here the session calls only this controller.
+        session.bind(self)
+        syncPresentationSizeClass()
         // A resumed session is refreshed only when the queued work has completed.
         // The old snapshot is not evidence that the suspended engine is usable.
         // Explicit host-binding event, replacing the app-active notification that never fires in an extension;
@@ -539,171 +538,18 @@ class KeyboardViewController: UIInputViewController {
         // A ready engine is never restarted just because the view reappeared: the refresh re-resolves only when
         // the shared record names another generation or selection. The record is readable without Full Access.
         refreshRouteOncePerAppearance()
-        session.onDispatchCommit = { [weak self] text in
-            guard let self, Self.activeController === self,
-                self.session.backend?.hostInputIsReady != false
-            else { return false }
-            guard let document = self.writableDocument() else { return false }
-            _ = self.observeMarkedEcho()
-            _ = self.observeCancelledMarkedEcho()
-            guard self.expectedContext == self.proxyContext else {
-                // The engine already committed: this text is dropped. Logged so a host whose
-                // context lags our own writes can be told apart from a real outside edit.
-                KeyboardLifecycleDiagnostics.emit(
-                    "commitRefused", ["marked": self.pendingMarked == nil ? "0" : "1"])
-                self.checkDocumentOwnership()
-                return false
-            }
-            if self.commitOverEchoedMarked(text, document: document) {
-                self.session.quickInsert.recordCommitted(text)
-                return true
-            }
-            self.cancelOwnedMarked()
-            // The payload belongs to `document`; cancelling can find another one.
-            guard self.stillOwns(document) else { return false }
-            self.cancelledMarkedEcho = nil
-            self.keyboardOnlyComposition = false
-            self.writeProxy { self.textDocumentProxy.insertText(text) }
-            self.session.quickInsert.recordCommitted(text)
-            return true
-        }
-        session.hostContextIdentifier = { [weak self] in
-            guard let self, Self.activeController === self else { return nil }
-            return self.writableDocument()?.uuidString
-        }
-        session.asyncInsertionContext = { [weak self] in
-            guard let self, Self.activeController === self else { return nil }
-            return self.writableDocument().map { AnyHashable($0) }
-        }
-        session.onMarkedComposition = { [weak self] in self?.updateMarked($0) }
-        session.remembersLayoutSwitch = { [weak self] in self?.switchOutlivesPresentation ?? true }
-        session.onSelectionChanged = { [weak self] change in
-            guard let self, Self.activeController === self else { return }
-            self.selectionSaveGeneration &+= 1
-            let requestGeneration = self.selectionSaveGeneration
-            Self.layoutSaveGeneration &+= 1
-            let layoutGeneration = Self.layoutSaveGeneration
-            guard let backend = self.session.backend else { return }
-            // Classify the running identity before touching the shared store. A session
-            // on the bundled fallback (`prebuiltDirectory == nil`) is not a publication: its
-            // layout is remembered by the session itself, and only a temporary switch away
-            // from a publication is worth a notice. `saveSelection` keeps its own identity
-            // check for direct callers.
-            guard backend.prebuiltDirectory != nil else {
-                if Self.rescuedRoute != nil { self.route.notice = self.temporaryBuiltinSelectionNotice }
-                Self.diagnosticLogger.info(
-                    """
-                    selection save skipped: temporary runtime \
-                    schema=\(change.schemaID, privacy: .public) layout=\(change.layout.rawValue, privacy: .public)
-                    """)
-                return
-            }
-            guard self.session.resourceSet?.publicationGeneration != nil else {
-                self.route.notice = "已临时切换，但未能保存。下次呼出键盘时需重新选择。"
-                Self.diagnosticLogger.error(
-                    """
-                    selection save skipped: missing publication identity \
-                    schema=\(change.schemaID, privacy: .public) layout=\(change.layout.rawValue, privacy: .public)
-                    """)
-                return
-            }
-            // Read-only App Group: the running session already holds the choice.
-            guard KeyboardRecipeStore.canWriteSharedContainer else {
-                Self.diagnosticLogger.info("selection kept for this session: shared container is read-only")
-                return
-            }
-            let runtimeIdentity = KeyboardRecipeStore.SelectionRuntimeIdentity.published
-            let schemaID = change.schemaID
-            let layout = change.layout
-            let session: KeyboardPadSession = self.session
-            Task { @MainActor [weak self, weak backend] in
-                do {
-                    let outcome = try await EngineOpQueue.async {
-                        try KeyboardRecipeStore.saveSelection(
-                            schemaID: schemaID, layout: layout,
-                            runtimeIdentity: runtimeIdentity)
-                    }
-                    if outcome != .saved {
-                        await Self.rememberSavedLayout(in: session, ifCurrent: layoutGeneration)
-                    }
-                    guard let self, let backend,
-                        Self.activeController === self,
-                        self.selectionSaveGeneration == requestGeneration,
-                        self.session.backend === backend
-                    else { return }
-                    switch outcome {
-                    case .saved:
-                        Self.diagnosticLogger.info(
-                            """
-                            selection saved schema=\(schemaID, privacy: .public) layout=\(layout.rawValue, privacy: .public)
-                            """)
-                    case .notPublishedRuntime:
-                        self.route.notice = self.inactivePublicationSelectionNotice
-                        Self.diagnosticLogger.info(
-                            """
-                            selection save skipped: inactive publication \
-                            schema=\(schemaID, privacy: .public) layout=\(layout.rawValue, privacy: .public)
-                            """)
-                    }
-                } catch {
-                    await Self.rememberSavedLayout(in: session, ifCurrent: layoutGeneration)
-                    guard let self, let backend,
-                        Self.activeController === self,
-                        self.selectionSaveGeneration == requestGeneration,
-                        self.session.backend === backend
-                    else { return }
-                    Self.diagnosticLogger.error(
-                        "selection save failed: \(error.localizedDescription, privacy: .public)")
-                    self.route.notice = "选择已在本次会话生效，但未能保存。下次呼出键盘时请重新选择。"
-                }
-            }
-        }
-        session.onReadDocumentContext = { [weak self] in
-            guard let self, self.writableDocument() != nil,
-                self.textDocumentProxy.selectedText?.isEmpty != false
-            else { return nil }
-            return self.textDocumentProxy.documentContextBeforeInput
-        }
-        session.onReplaceLiteralSuffix = { [weak self] expected, old, new in
-            guard let self, self.writableDocument() != nil,
-                self.textDocumentProxy.selectedText?.isEmpty != false,
-                let before = self.textDocumentProxy.documentContextBeforeInput,
-                String(before.suffix(T9PunctuationCycle.contextLimit)) == expected,
-                before.hasSuffix(old)
-            else { return false }
-            self.writeProxy {
-                for _ in old { self.textDocumentProxy.deleteBackward() }
-                self.textDocumentProxy.insertText(new)
-            }
-            return true
-        }
-        session.onDeleteBackward = { [weak self] in
-            guard let self, Self.activeController === self else { return }
-            guard self.writableDocument() != nil else { return }
-            self.writeProxy { self.textDocumentProxy.deleteBackward() }
-        }
-        session.onRefreshHostTraits = { [weak self] in self?.refreshHostTraits() }
-        session.onMoveCursor = { [weak self] offset in
-            guard let self, Self.activeController === self else { return }
-            guard self.writableDocument() != nil else { return }
-            self.writeProxy { self.textDocumentProxy.adjustTextPosition(byCharacterOffset: offset) }
-        }
-        session.onSwitchKeyboard = { [weak self] in
-            guard let self, Self.activeController === self else { return }
-            self.advanceToNextInputMode()
-        }
         if let appearanceBackend, let appearanceToken,
             !appearanceBackend.hostInputIsReady
         {
             let resumeStarted = ProcessInfo.processInfo.systemUptime
             hostResumeTask = Task { @MainActor [weak self, weak appearanceBackend] in
                 guard let self, let appearanceBackend,
-                    Self.activeController === self,
+                    self.isBoundHost,
                     self.hostAppearanceToken == appearanceToken,
                     self.session.backend === appearanceBackend
                 else { return }
                 let ready = await appearanceBackend.resumeSessionForHostAppearance(token: appearanceToken)
-                guard Self.activeController === self,
+                guard self.isBoundHost,
                     self.hostAppearanceToken == appearanceToken,
                     self.session.backend === appearanceBackend
                 else { return }
@@ -736,7 +582,7 @@ class KeyboardViewController: UIInputViewController {
     /// was established" on every read (its forwarding interface is never set), though
     /// the controller state it returns is already current here.
     func syncInputModeSwitchKey() {
-        guard !hostDocumentAttachPending, Self.activeController === self else { return }
+        guard !hostDocumentAttachPending, isBoundHost else { return }
         let needed = needsInputModeSwitchKey
         // The app validates new/imported layouts against this real requirement. Read once per
         // appearance; only a changed value is written, on a background queue.
@@ -747,7 +593,7 @@ class KeyboardViewController: UIInputViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         hostDocumentAttachPending = false
-        preparesNextPresentation = Self.activeController === self
+        preparesNextPresentation = isBoundHost
         endPresentationGeometry()
         selectionSaveGeneration &+= 1
         hostAppearanceToken = nil
@@ -766,7 +612,7 @@ class KeyboardViewController: UIInputViewController {
         panelHostLifetime.notifyDisappearance(name: .keyboardPanelHostWillDisappear)
         // Retire this controller's own tasks whether or not it is still active; only unbinding the shared
         // proxy/session is guarded (a new controller may already own the process-wide state).
-        let isActive = Self.activeController === self
+        let isActive = isBoundHost
         KeyboardLifecycleDiagnostics.emit(
             "viewWillDisappear",
             [
@@ -782,7 +628,7 @@ class KeyboardViewController: UIInputViewController {
         Self.diagnosticLogger.debug(
             """
             session deactivated pid=\(KeyboardLifecycleDiagnostics.processIdentifier, privacy: .public) \
-            active=\(Self.activeController === self, privacy: .public)
+            active=\(self.isBoundHost, privacy: .public)
             """)
     }
 
@@ -790,9 +636,9 @@ class KeyboardViewController: UIInputViewController {
         super.viewDidDisappear(animated)
         isOnScreen = false
         // A controller that claimed the keyboard in the meantime owns the next presentation.
-        if preparesNextPresentation, Self.activeController == nil { prepareNextPresentationGeometry() }
+        if preparesNextPresentation, Self.boundHost == nil { prepareNextPresentationGeometry() }
         preparesNextPresentation = false
-        if retiresPanelWhenHidden, Self.activeController !== self { retirePanelHost() }
+        if retiresPanelWhenHidden, !isBoundHost { retirePanelHost() }
     }
 
     override func viewDidAppear(_ animated: Bool) {

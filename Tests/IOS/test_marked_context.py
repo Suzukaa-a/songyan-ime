@@ -27,9 +27,8 @@ class MarkedContextProductionTests(unittest.TestCase):
             "observeMarkedEcho", "observeCancelledMarkedEcho", "writeProxy", "updateMarked",
             "commitOverEchoedMarked", "cancelOwnedMarked", "checkDocumentOwnership",
             "writableDocument", "adoptDocument", "stillOwns", "abandonDocumentOwnership",
-            "forgetLocalDocumentState",
+            "forgetLocalDocumentState", "dispatchCommit",
             "textDidChange", "selectionDidChange"))
-        dispatch = section(source, "        session.onDispatchCommit =", "        session.hostContextIdentifier =")
         mark = section(core, "    /// A display-only replacement", "    /// Conservative visibility")
         program = r'''
 import Foundation
@@ -49,7 +48,6 @@ final class QuickInsert {
 final class Session {
     let backend: Backend? = Backend()
     let quickInsert = QuickInsert()
-    var onDispatchCommit: ((String) -> Bool)?
     var presentation = Presentation.idle
     func resetHostContext() {}
     func reportCompositionPresentation(_ value: Presentation) { presentation = value }
@@ -113,7 +111,8 @@ class InputController {
     func selectionDidChange(_ input: UITextInput?) {}
 }
 final class Subject: InputController {
-    static weak var activeController: Subject?
+    static weak var boundHost: Subject?
+    var isBoundHost: Bool { Self.boundHost === self }
     let session = Session()
     let textDocumentProxy = ScriptedProxy()
     var identity: UUID? = UUID()
@@ -126,10 +125,9 @@ final class Subject: InputController {
 ''' + fields + r'''
     override init() {
         super.init()
-        Self.activeController = self
+        Self.boundHost = self
         activeDocumentID = identity
         expectedContext = proxyContext
-        bind()
     }
     func documentIdentity() -> UUID? {
         if identity == nil { abandonDocumentOwnership() }
@@ -139,9 +137,6 @@ final class Subject: InputController {
     func refreshHostTraits() {}
     func attachToHostDocument() {}
     func scheduleHostTraitsRefresh() {}
-    func bind() {
-''' + dispatch + r'''
-    }
 ''' + methods + r'''
 }
 // An ordinary short mark in a long document: context lengths differ on each read.
@@ -158,7 +153,7 @@ windowed.textDocumentProxy.flush()
 windowed.selectionDidChange(nil)
 precondition(windowed.clears == 0)
 windowed.textDocumentProxy.delayed = false
-precondition(windowed.session.onDispatchCommit!("你好"))
+precondition(windowed.dispatchCommit("你好"))
 precondition(windowed.textDocumentProxy.document == original.replacingOccurrences(of: windowed.textDocumentProxy.originalAfter,
     with: "你好" + windowed.textDocumentProxy.originalAfter))
 precondition(windowed.session.quickInsert.commits == ["你好"])
@@ -184,7 +179,7 @@ growing.updateMarked(MarkedComposition(text: long + "继续输入"))
 growing.updateMarked(MarkedComposition(text: "n"))
 precondition(growing.textDocumentProxy.setMarkedCalls == calls, "remain keyboard-only for this composition")
 growing.textDocumentProxy.delayed = false
-precondition(growing.session.onDispatchCommit!(long))
+precondition(growing.dispatchCommit(long))
 precondition(growing.textDocumentProxy.document == before + long + after)
 precondition(growing.textDocumentProxy.insertCalls == 1 && growing.session.quickInsert.commits == [long])
 growing.updateMarked(nil)
@@ -206,10 +201,10 @@ for reset in [false, true] {
             proxy.flush()
             replacement.expectedContext = replacement.proxyContext
             replacement.updateMarked(MarkedComposition(text: "ni hao"))
-            precondition(replacement.session.onDispatchCommit!(commit))
+            precondition(replacement.dispatchCommit(commit))
             precondition(proxy.document == head + commit + tail && proxy.mark == nil)
             replacement.updateMarked(MarkedComposition(text: "ma"))
-            precondition(replacement.session.onDispatchCommit!("吗"))
+            precondition(replacement.dispatchCommit("吗"))
             precondition(proxy.document == head + commit + "吗" + tail, "replacement must leave the caret after committed text")
             precondition(proxy.documentContextBeforeInput == head + commit + "吗" && proxy.documentContextAfterInput == tail)
         }
@@ -224,7 +219,7 @@ interiorProxy.originalAfter = "👉右"
 interiorProxy.flush()
 interior.expectedContext = interior.proxyContext
 interior.updateMarked(MarkedComposition(text: "👩🏽‍💻ni", selection: NSRange(location: 7, length: 0)))
-precondition(interior.session.onDispatchCommit!("你"))
+precondition(interior.dispatchCommit("你"))
 precondition(interiorProxy.document == "左👈你👉右" && interiorProxy.mark == nil)
 precondition(interiorProxy.documentContextBeforeInput == "左👈你" && interiorProxy.documentContextAfterInput == "👉右")
 print("PASS selected prefill replacement, subsequent append, equal commit, Unicode and interior composition caret")
@@ -246,7 +241,7 @@ for change in 0..<4 {
 let changed = Subject()
 changed.updateMarked(MarkedComposition(text: "ni"))
 changed.identity = UUID()
-precondition(!changed.session.onDispatchCommit!("旧提交"))
+precondition(!changed.dispatchCommit("旧提交"))
 precondition(changed.textDocumentProxy.insertCalls == 0 && changed.session.quickInsert.commits.isEmpty)
 print("PASS external moves, selections and document changes still reject stale writes")
 '''

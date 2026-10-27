@@ -8,7 +8,7 @@ import UIKit
 
 extension KeyboardViewController {
     func selectBuiltin(_ builtin: Bool) {
-        guard Self.activeController === self, !selectionSaveInFlight else { return }
+        guard isBoundHost, !selectionSaveInFlight else { return }
         if builtin && !hasFullAccess && session.resourceSet == nil { return }
         let runningGeneration = session.resourceSet?.publicationGeneration
         selectionSaveInFlight = true
@@ -25,14 +25,14 @@ extension KeyboardViewController {
                 try await EngineOpQueue.async {
                     try KeyboardRecipeStore.setEnabled(!builtin, expectedGeneration: runningGeneration)
                 }
-                guard Self.activeController === self else { return }
+                guard isBoundHost else { return }
                 route.selectionError = nil
                 route.recovery = nil
                 Self.rescuedRoute = nil
                 route.explainRecipeAvailability = !builtin
                 refreshResourceRoute()
             } catch {
-                guard Self.activeController === self else { return }
+                guard isBoundHost else { return }
                 Self.diagnosticLogger.error(
                     "recipe selection save failed: \(error.localizedDescription, privacy: .private)")
                 let message = "无法确认方案保存结果，请重新读取后重试。"
@@ -45,7 +45,7 @@ extension KeyboardViewController {
     }
 
     func retryRoute(_ operation: ExtensionRouteStatus.Recovery) {
-        guard Self.activeController === self else { return }
+        guard isBoundHost else { return }
         switch operation {
         case .saveBuiltin: selectBuiltin(true)
         case .applyRecipe: selectBuiltin(false)
@@ -56,7 +56,7 @@ extension KeyboardViewController {
     }
 
     func restoreBuiltinTemporarily() {
-        guard Self.activeController === self else { return }
+        guard isBoundHost else { return }
         if Self.rescuedRoute == nil { Self.rescuedRoute = Self.applied?.key ?? "" }
         Self.applied?.key = "builtin"
         route.schemeName = ProductionInputAvailability.runtimeUnconfiguredSchemeName
@@ -70,21 +70,86 @@ extension KeyboardViewController {
         }
     }
 
-    /// Whether an in-keyboard switch is still showing at the next presentation: the bundled
-    /// fallback remembers its own layout, a published keyboard needs its choice saved to the
-    /// App Group. Otherwise the next presentation returns to the saved keyboard.
-    var switchOutlivesPresentation: Bool {
-        guard session.backend?.prebuiltDirectory != nil else { return true }
-        return session.resourceSet?.publicationGeneration != nil && KeyboardRecipeStore.canWriteSharedContainer
-    }
-
-    /// A save that did not land leaves the shared record on the earlier choice, which the
-    /// next presentation shows: the remembered layout (and so that presentation's height)
-    /// follows the record again. Runs even after this presentation ended.
-    static func rememberSavedLayout(in session: KeyboardPadSession, ifCurrent generation: UInt64) async {
-        let saved = try? await KeyboardResourceReadQueue.async { KeyboardRecipeStore.savedLayout() }
-        guard let layout = saved, layoutSaveGeneration == generation else { return }
-        session.rememberLayout(layout)
+    /// Classifies an in-keyboard switch once and remembers its layout (the next presentation's
+    /// keyboard and height) only where the switch lasts: the bundled fallback keeps its own
+    /// choice, a published keyboard once the App Group record holds it. Any other switch lasts
+    /// this presentation, and the next one returns to the saved keyboard.
+    func keyboardSelectionChanged(_ change: KeyboardSelectionChange) {
+        selectionSaveGeneration &+= 1
+        let requestGeneration = selectionSaveGeneration
+        guard let backend = session.backend else {
+            KeyboardPadSession.persistLayout(change.layout)
+            return
+        }
+        // A session on the bundled fallback (`prebuiltDirectory == nil`) is not a publication:
+        // only a temporary switch away from a publication is worth a notice. `saveSelection`
+        // keeps its own identity check for direct callers.
+        guard backend.prebuiltDirectory != nil else {
+            KeyboardPadSession.persistLayout(change.layout)
+            if Self.rescuedRoute != nil { route.notice = temporaryBuiltinSelectionNotice }
+            Self.diagnosticLogger.info(
+                """
+                selection save skipped: temporary runtime \
+                schema=\(change.schemaID, privacy: .public) layout=\(change.layout.rawValue, privacy: .public)
+                """)
+            return
+        }
+        guard session.resourceSet?.publicationGeneration != nil else {
+            route.notice = "已临时切换，但未能保存。下次呼出键盘时需重新选择。"
+            Self.diagnosticLogger.error(
+                """
+                selection save skipped: missing publication identity \
+                schema=\(change.schemaID, privacy: .public) layout=\(change.layout.rawValue, privacy: .public)
+                """)
+            return
+        }
+        // Read-only App Group: the running session alone holds the choice.
+        guard KeyboardRecipeStore.canWriteSharedContainer else {
+            Self.diagnosticLogger.info("selection kept for this session: shared container is read-only")
+            return
+        }
+        let runtimeIdentity = KeyboardRecipeStore.SelectionRuntimeIdentity.published
+        let schemaID = change.schemaID
+        let layout = change.layout
+        Task { @MainActor [weak self, weak backend] in
+            do {
+                // Remembered in the same serial queue step as the save, so the remembered
+                // layout follows the record in save order, even after this presentation ended.
+                let outcome = try await EngineOpQueue.async {
+                    let outcome = try KeyboardRecipeStore.saveSelection(
+                        schemaID: schemaID, layout: layout,
+                        runtimeIdentity: runtimeIdentity)
+                    if outcome == .saved { KeyboardPadSession.persistLayout(layout) }
+                    return outcome
+                }
+                guard let self, let backend, self.isBoundHost,
+                    self.selectionSaveGeneration == requestGeneration,
+                    self.session.backend === backend
+                else { return }
+                switch outcome {
+                case .saved:
+                    Self.diagnosticLogger.info(
+                        """
+                        selection saved schema=\(schemaID, privacy: .public) layout=\(layout.rawValue, privacy: .public)
+                        """)
+                case .notPublishedRuntime:
+                    self.route.notice = self.inactivePublicationSelectionNotice
+                    Self.diagnosticLogger.info(
+                        """
+                        selection save skipped: inactive publication \
+                        schema=\(schemaID, privacy: .public) layout=\(layout.rawValue, privacy: .public)
+                        """)
+                }
+            } catch {
+                guard let self, let backend, self.isBoundHost,
+                    self.selectionSaveGeneration == requestGeneration,
+                    self.session.backend === backend
+                else { return }
+                Self.diagnosticLogger.error(
+                    "selection save failed: \(error.localizedDescription, privacy: .public)")
+                self.route.notice = "选择已在本次会话生效，但未能保存。下次呼出键盘时请重新选择。"
+            }
+        }
     }
 
     /// Shown when a choice is made while the keyboard was temporarily switched to the bundled fallback.
@@ -208,7 +273,7 @@ extension KeyboardViewController {
     func refreshResourceRoute() {
         routeTask?.cancel()
         routeTask = nil
-        guard Self.activeController === self else { return }
+        guard isBoundHost else { return }
         let explainRecipeAvailability = route.explainRecipeAvailability
         let rescued = Self.rescuedRoute
         // Reuse needs a ready engine, a previous result to restore and no pending rescue.
@@ -312,14 +377,14 @@ extension KeyboardViewController {
     /// Refreshes the published keyboard list (official extension lifecycle): triggered once by `viewWillAppear`;
     /// the read itself runs in `KeyboardPadSession` on the read queue with a latest-wins gate. Uses no app-only notifications.
     func refreshPublishedKeyboards() {
-        guard Self.activeController === self, session != nil else { return }
+        guard isBoundHost, session != nil else { return }
         Task { @MainActor [weak self] in
             await self?.session.refreshPublishedKeyboards()
         }
     }
 
     func refreshLayoutRegistry() {
-        guard Self.activeController === self else { return }
+        guard isBoundHost else { return }
         route.assignIfChanged(
             \.selectedLayoutID,
             UserDefaults.standard.string(forKey: Self.selectedDefinitionKey))
@@ -356,7 +421,7 @@ extension KeyboardViewController {
                     return .failed("无法读取布局，当前使用内置布局。")
                 }
             }
-            guard let self, Self.activeController === self, self.layoutReadGate.accepts(token) else { return }
+            guard let self, isBoundHost, self.layoutReadGate.accepts(token) else { return }
             // Settled in the same main-thread turn as the registry assignment (success, unavailable and failure all count as settled).
             defer { self.route.layoutReadSettled = true }
             switch result {

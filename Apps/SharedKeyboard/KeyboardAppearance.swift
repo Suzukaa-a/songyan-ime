@@ -119,23 +119,25 @@ public struct KeyboardInitialPresentation {
     }
 
     /// Selection context shared by cold start and host recording (same defaults source, no duplicated key-name logic).
-    private static var readingRowSelection: String {
-        let defaults = UserDefaults.standard
-        return CandidateReadingRowHint.selectionKey(
-            layoutKind: defaults.string(forKey: AppSettings.selectedLayoutKey),
-            definitionID: defaults.string(forKey: "keyboard.selectedLayoutDefinitionID"))
+    private static func readingRowSelection(layoutKind: String?) -> String {
+        CandidateReadingRowHint.selectionKey(
+            layoutKind: layoutKind,
+            definitionID: UserDefaults.standard.string(forKey: "keyboard.selectedLayoutDefinitionID"))
     }
 
-    /// Called after the host adopts eligibility: records it as the next cold-start first-frame hint (not rewritten if unchanged).
-    /// Only the remembered layout's report is recorded: a switch that was not remembered lasts one
-    /// presentation and must not overwrite the hint of the keyboard the next one shows.
+    private static var readingRowSelection: String {
+        readingRowSelection(layoutKind: UserDefaults.standard.string(forKey: AppSettings.selectedLayoutKey))
+    }
+
+    /// Called after the host adopts eligibility: records it as `layout`'s cold-start first-frame hint (not
+    /// rewritten if unchanged). Hints are kept per keyboard, so a switch that is not remembered (or not yet
+    /// saved) leaves the hint of the keyboard the next presentation shows in place.
     public static func recordReadingRow(
         eligible: Bool, candidateAreaRequired: Bool = true, layout: KeyboardLayoutKind
     ) {
         let defaults = UserDefaults.standard
-        guard defaults.string(forKey: AppSettings.selectedLayoutKey) == layout.rawValue else { return }
         let hint = CandidateReadingRowHint(
-            selection: readingRowSelection, eligible: eligible,
+            selection: readingRowSelection(layoutKind: layout.rawValue), eligible: eligible,
             candidateAreaRequired: candidateAreaRequired)
         guard
             let hints = CandidateReadingRowHint.recording(

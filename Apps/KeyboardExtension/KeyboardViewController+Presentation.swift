@@ -8,7 +8,7 @@ import UIKit
 
 extension KeyboardViewController {
     func syncSystemColorScheme(animated: Bool) {
-        if let active = Self.activeController, active !== self { return }
+        if let bound = Self.boundHost, bound !== self { return }
         // The actual UIInputView owns the keyboard surface. Use its trait
         // before its window: the two can briefly disagree during a host field
         // switch. The controller and window are fallbacks while attaching.
@@ -157,7 +157,7 @@ extension KeyboardViewController {
     }
 
     func syncPresentationSizeClass() {
-        guard Self.activeController === self,
+        guard isBoundHost,
             let input = viewIfLoaded as? KeyboardPanelInputView,
             input.acceptsPresentation(input.presentationRevision)
         else { return }
@@ -168,13 +168,13 @@ extension KeyboardViewController {
 
     /// Deferred receipts may only change the controller and presentation that observed them.
     func syncPresentedHeight() {
-        guard Self.activeController === self, let input = view as? KeyboardPanelInputView else { return }
+        guard isBoundHost, let input = view as? KeyboardPanelInputView else { return }
         let revision = input.presentationRevision
         guard input.acceptsPresentation(revision) else { return }
         let presented = input.retainedPresentedHeight
         guard presentation.presentedHeight != presented else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self, Self.activeController === self,
+            guard let self, isBoundHost,
                 let input = self.view as? KeyboardPanelInputView,
                 input.acceptsPresentation(revision),
                 input.retainedPresentedHeight == presented,

@@ -146,7 +146,7 @@ struct ExtensionKeyboardPanel: View {
                 if route.needsInputModeSwitchKey {
                     NativeInputModeKey(
                         handleEvent: systemKeyboardSwitch,
-                        accessibilitySwitch: { session.onSwitchKeyboard?() }
+                        accessibilitySwitch: { session.host?.switchKeyboard() }
                     )
                     .frame(width: 44, height: 44)
                 }

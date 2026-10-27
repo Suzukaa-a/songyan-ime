@@ -14,7 +14,7 @@ extension KeyboardViewController {
     /// Rules:
     ///   * Runs only while this controller is visible and active; started in `viewDidAppear`, cancelled in
     ///     `viewWillDisappear` / `deinit`.
-    ///   * After each sleep it reads only in-memory permission/ownership (`activeController`, visibility, Full
+    ///   * After each sleep it reads only in-memory permission/ownership (`isBoundHost`, visibility, Full
     ///     Access); all disk I/O is done by `KeyboardLearningTransfer` on a dedicated background queue, so the
     ///     main thread never reads disk.
     ///   * Cancelling this task does not cancel a backup/merge already running (owned by the service's
@@ -29,7 +29,7 @@ extension KeyboardViewController {
                 do { try await Task.sleep(for: .seconds(2)) } catch { return }
                 guard let self, !Task.isCancelled else { return }
                 // Re-evaluate after every sleep; never reuse the previous round's conclusion.
-                guard Self.activeController === self, !self.hostInBackground,
+                guard isBoundHost, !self.hostInBackground,
                     self.viewIfLoaded?.window != nil,
                     self.pollFullAccess
                 else { continue }
@@ -41,7 +41,7 @@ extension KeyboardViewController {
                     session: self.session,
                     isVisibleController: { [weak self] in
                         guard let self else { return false }
-                        return Self.activeController === self
+                        return isBoundHost
                             && self.viewIfLoaded?.window != nil
                     },
                     isFullAccessGranted: { [weak self] in self?.hasFullAccess ?? false })
@@ -54,7 +54,7 @@ extension KeyboardViewController {
         if background {
             stopLearningTransferPolling()
             KeyboardFeedbackService.shared.stopKeyHaptics()
-        } else if Self.activeController === self, viewIfLoaded?.window != nil {
+        } else if isBoundHost, viewIfLoaded?.window != nil {
             startLearningTransferPolling()
         }
     }
