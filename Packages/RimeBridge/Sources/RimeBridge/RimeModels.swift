@@ -1,15 +1,5 @@
 import Foundation
 
-/// Installation inventory is distinct from Rime's enabled schema_list and from an input test.
-/// Dependency/helper schemas may have sources and compiled artifacts without being enabled.
-public struct RimeSchemaInventoryEntry: Equatable, Sendable, Identifiable {
-    public let id: String
-    public let name: String
-    public let sourcePaths: [String]
-    public let isCompiled: Bool
-    public let isEnabled: Bool
-}
-
 public struct RimeGrammarDiagnostics: Codable, Sendable {
     public struct Load: Codable, Sendable {
         public let path: String
@@ -755,5 +745,25 @@ public struct RimeActionResult: Hashable, Sendable {
     /// Text committed by this key press, or nil.
     public var commitText: String? {
         state.commitText.isEmpty ? nil : state.commitText
+    }
+}
+
+/// One key of a batch: only what decides how the next key is handled. The
+/// state itself is read once after the batch (`RimeEngine.actionState()`).
+public struct RimeKeyFeed: Hashable, Sendable {
+    /// Same meaning as `RimeActionResult.consumed`.
+    public let consumed: Bool
+    /// `RimeState.isComposing` after the key.
+    public let isComposing: Bool
+    /// `RimeState.input` is non-empty after the key.
+    public let hasInput: Bool
+    /// Text this key committed; "" when none.
+    public let commitText: String
+
+    public init(consumed: Bool, isComposing: Bool, hasInput: Bool, commitText: String) {
+        self.consumed = consumed
+        self.isComposing = isComposing
+        self.hasInput = hasInput
+        self.commitText = commitText
     }
 }

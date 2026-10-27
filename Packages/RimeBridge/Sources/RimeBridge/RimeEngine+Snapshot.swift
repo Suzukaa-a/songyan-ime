@@ -4,20 +4,22 @@ import RimeKit
 extension RimeEngine {
     // MARK: - Session snapshots (must run on `queue`)
 
+    /// Whether librime still has the session is left to the action's own read
+    /// (`actionSnapshotOnQueue`): every action is a no-op on a missing session.
     func requireReadableSessionOnQueue() throws {
         guard engine != nil else { throw RimeEngineError.notStarted }
-        guard session != 0, let api = rime_get_api(), hasLiveStatusOnQueue(api: api) else {
-            throw RimeEngineError.noSession
-        }
+        guard session != 0 else { throw RimeEngineError.noSession }
         guard !snapshotRecoveryRequired else { throw RimeEngineError.snapshotUnavailable }
     }
 
     func actionSnapshotOnQueue() throws -> RimeState {
-        guard let state = snapshotOnQueue() else { throw RimeEngineError.snapshotUnavailable }
+        guard let state = snapshotOnQueue(missingSessionIsError: true) else {
+            throw snapshotRecoveryRequired ? RimeEngineError.snapshotUnavailable : RimeEngineError.noSession
+        }
         return state
     }
 
-    func snapshotOnQueue(recovering: Bool = false) -> RimeState? {
+    func snapshotOnQueue(recovering: Bool = false, missingSessionIsError: Bool = false) -> RimeState? {
         // A failed action owns any pending commit until explicit cancellation.
         // Neither state() nor another action may accidentally consume/deliver it.
         guard recovering || !snapshotRecoveryRequired else { return nil }
@@ -30,6 +32,8 @@ extension RimeEngine {
         #endif
         guard let engine = engine, session != 0 else { return nil }
         guard let snap = rb_snapshot_get(engine, session) else {
+            // A session librime no longer has holds no pending commit to protect.
+            if missingSessionIsError, let api = rime_get_api(), !hasLiveStatusOnQueue(api: api) { return nil }
             snapshotRecoveryRequired = true
             return nil
         }
@@ -62,15 +66,6 @@ extension RimeEngine {
                     ))
             }
         }
-        var preview = ""
-        if let api = rime_get_api() {
-            var context = RimeContext()
-            context.data_size = Int32(MemoryLayout<RimeContext>.size - MemoryLayout<Int32>.size)
-            if api.pointee.get_context(session, &context) != 0 {
-                preview = string(fromC: context.commit_text_preview) ?? ""
-                _ = api.pointee.free_context(&context)
-            }
-        }
         // Computed in the same serialized step as the candidate list above, so a
         // consumer never sees a candidate page and a spelling from different
         // states. The authorization decision is made HERE, before any decode:
@@ -86,6 +81,7 @@ extension RimeEngine {
         var declaredDisplayMode: RimeDisplayMode = .native
         var displayCapability: RimeDisplayCapability?
         let composing = snap.pointee.is_composing != 0
+        let schemaID = string(fromC: snap.pointee.schema_id) ?? ""
         // Failure-closed demand gate, evaluated in the same serialized step as
         // the candidate list. When the front end has not requested spelling for
         // its actual layout (`false` or unset `nil`), the declared capability is
@@ -95,7 +91,7 @@ extension RimeEngine {
         // (version/mode/source/producer agreement) still applies.
         let demand = spellingDemand?() ?? false
         if composing {
-            let context = displayContextOnQueue()
+            let context = displayContextOnQueue(schemaID: schemaID)
             // Raw block presence (independent of parse success): a malformed block
             // still suppresses the legacy spelling protocol, while never
             // authorizing a decode.
@@ -118,7 +114,7 @@ extension RimeEngine {
             }
         }
         let state = RimeState(
-            schemaID: string(fromC: snap.pointee.schema_id) ?? "",
+            schemaID: schemaID,
             schemaName: string(fromC: snap.pointee.schema_name) ?? "",
             isComposing: composing,
             isAsciiMode: snap.pointee.is_ascii_mode != 0,
@@ -141,7 +137,7 @@ extension RimeEngine {
             highlightedIndex: Int(snap.pointee.highlighted_index),
             candidates: candidates,
             commitText: string(fromC: snap.pointee.commit_text) ?? "",
-            commitTextPreview: preview
+            commitTextPreview: string(fromC: snap.pointee.commit_text_preview) ?? ""
         )
         // Cached observation carries no one-shot commit; state() may return it on
         // failure, but only the triggering successful action can deliver the text.

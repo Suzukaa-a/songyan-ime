@@ -112,6 +112,7 @@ typedef struct {
   int num_select_labels;
   char* commit_text;    /* text committed by the last action; "" if none.
                            Reading it consumes librime's pending commit. */
+  char* commit_text_preview; /* RimeContext.commit_text_preview; NULL if none */
 } rb_snapshot;
 
 /* ---- trusted candidate spelling (implemented in rime_spelling.cc) -------- */
@@ -401,6 +402,25 @@ void rb_session_destroy(rb_engine* engine, uintptr_t session_id);
  * unbound printable key -> insert into the text field). */
 int rb_process_key(rb_engine* engine, uintptr_t session_id, int keycode,
                    int mask);
+
+/* What one key of a batch leaves behind, without copying the menu. */
+typedef struct {
+  int consumed;      /* same as rb_process_key's result */
+  int is_composing;  /* RimeStatus.is_composing after the key */
+  int has_input;     /* RB_TRUE when the raw input is non-empty after the key */
+  char* commit_text; /* text this key committed, or NULL. librime-owned:
+                        release with rb_key_result_free() only. */
+} rb_key_result;
+
+/* Feeds one key like rb_process_key and consumes the commit it produced, so
+ * keys can be fed in a row and the state read once with rb_snapshot_get().
+ * librime accumulates commits until read; consuming them per key keeps their
+ * order against text the caller inserts for unconsumed keys. Returns RB_FALSE
+ * (with `out` cleared, nothing fed) when the session does not exist. */
+int rb_process_key_brief(rb_engine* engine, uintptr_t session_id, int keycode,
+                         int mask, rb_key_result* out);
+
+void rb_key_result_free(rb_engine* engine, rb_key_result* result);
 
 /* Commits the current composition (Return key path). Returns RB_TRUE on
  * success; the committed text appears in the next snapshot's commit_text. */

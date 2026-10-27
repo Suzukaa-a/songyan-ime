@@ -76,16 +76,6 @@ extension RimeEngine {
 
     // MARK: - Maintenance / native sync
 
-    /// Runs librime's native user-data sync (`sync_user_data`): exports this
-    /// device's snapshots and merges other devices' snapshots from the sync
-    /// directory, then restores a working session with the previous schema.
-    /// The caller is expected to hold exclusive database access.
-    public func sync() throws -> RimeState {
-        try queue.sync {
-            try maintainOnQueue(sync: true, fullCheck: true)
-        }
-    }
-
     /// Runs a maintenance pass (full check re-compiles changed dictionaries).
     /// Useful after importing new schemas/packages. Restores the session.
     public func redeploy(fullCheck: Bool = true) throws -> RimeState {

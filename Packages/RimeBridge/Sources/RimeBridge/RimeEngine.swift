@@ -104,10 +104,17 @@ public final class RimeEngine: @unchecked Sendable {
     // like all engine state, touch it only on `queue`.
     var engine: OpaquePointer?
     var session: UInt = 0
-    var snapshotRecoveryRequired = false
+    // Written only on `queue`; the lock lets the main thread read it per key without
+    // waiting behind a slow engine op. Main's own ops are synchronous, so it never
+    // observes a value older than its last completed op.
+    private let storedSnapshotRecoveryRequired = OSAllocatedUnfairLock(initialState: false)
+    var snapshotRecoveryRequired: Bool {
+        get { storedSnapshotRecoveryRequired.withLock { $0 } }
+        set { storedSnapshotRecoveryRequired.withLock { $0 = newValue } }
+    }
     var lastTrustedState: RimeState = .empty
 
-    public var requiresSnapshotRecovery: Bool { queue.sync { snapshotRecoveryRequired } }
+    public var requiresSnapshotRecovery: Bool { snapshotRecoveryRequired }
     /// Read-only word-completion session (the ABC page queries the active scheme). Same
     /// engine instance, never commits, destroyed with the input session.
     var wordSession: UInt = 0
@@ -502,7 +509,9 @@ public final class RimeEngine: @unchecked Sendable {
                 var reading: ReadingWire?
                 if let readingDecoder, let json = rb_copy_candidate_syllables_json(session, Int32(absoluteIndex)) {
                     defer { free(json) }
-                    reading = try? readingDecoder.decode(ReadingWire.self, from: Data(String(cString: json).utf8))
+                    // Decoding copies every string out before the deferred free.
+                    let bytes = Data(bytesNoCopy: json, count: strlen(json), deallocator: .none)
+                    reading = try? readingDecoder.decode(ReadingWire.self, from: bytes)
                 }
                 var selectKey: String?
                 var selectLabel: String?
@@ -595,6 +604,32 @@ public final class RimeEngine: @unchecked Sendable {
                 ) != 0
             let state = try actionSnapshotOnQueue()
             return RimeActionResult(consumed: consumed, state: state)
+        }
+    }
+
+    /// Feeds one key of a batch with the same effect on the session as
+    /// `processKey`, but reads no state; call `actionState()` after the last key.
+    public func feedKey(_ key: RimeKey) throws -> RimeKeyFeed {
+        try queue.sync {
+            try requireReadableSessionOnQueue()
+            guard let engine else { throw RimeEngineError.notStarted }
+            var result = rb_key_result()
+            guard rb_process_key_brief(engine, session, key.keycode, key.modifiers.rawValue, &result) != 0 else {
+                throw RimeEngineError.noSession
+            }
+            defer { rb_key_result_free(engine, &result) }
+            return RimeKeyFeed(
+                consumed: result.consumed != 0, isComposing: result.is_composing != 0,
+                hasInput: result.has_input != 0, commitText: string(fromC: result.commit_text) ?? "")
+        }
+    }
+
+    /// The state after keys fed with `feedKey`, with the same failure contract
+    /// as an action's own read.
+    public func actionState() throws -> RimeState {
+        try queue.sync {
+            try requireReadableSessionOnQueue()
+            return try actionSnapshotOnQueue()
         }
     }
 

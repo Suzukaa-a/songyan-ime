@@ -264,40 +264,6 @@ extension RimeEngine {
         return values
     }
 
-    /// Reports installed source files, compiled artifacts and the enabled list independently.
-    /// It does not deploy or enable source-only entries and does not certify companion configuration.
-    /// Standard Rime source filenames are the inventory IDs; enabled/deployed metadata supplies names.
-    public func schemaInventory() throws -> [RimeSchemaInventoryEntry] {
-        let enabled = schemas()
-        let enabledNames = Dictionary(enabled.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        let fm = FileManager.default
-        var sources: [String: [String]] = [:]
-        func schemaFiles(_ directory: URL) throws -> [URL] {
-            guard fm.fileExists(atPath: directory.path) else { return [] }
-            return try fm.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
-            ).filter {
-                let info = try $0.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                return $0.lastPathComponent.hasSuffix(".schema.yaml") && info.isRegularFile == true
-                    && info.isSymbolicLink != true
-            }
-        }
-        for directory in [configuration.sharedDirectory, configuration.userDirectory] {
-            for file in try schemaFiles(directory) {
-                let id = String(file.lastPathComponent.dropLast(".schema.yaml".count))
-                sources[id, default: []].append(file.path)
-            }
-        }
-        let build = configuration.prebuiltDirectory ?? configuration.userDirectory.appendingPathComponent("build")
-        let compiled = Set(try schemaFiles(build).map { String($0.lastPathComponent.dropLast(".schema.yaml".count)) })
-        return Set(sources.keys).union(compiled).union(enabledNames.keys).sorted().map { id in
-            RimeSchemaInventoryEntry(
-                id: id,
-                name: enabledNames[id] ?? schemaValue(id, key: "schema/name") ?? id,
-                sourcePaths: sources[id] ?? [], isCompiled: compiled.contains(id), isEnabled: enabledNames[id] != nil)
-        }
-    }
-
     public func schemas() -> [(id: String, name: String)] {
         queue.sync {
             guard engine != nil, let api = rime_get_api() else { return [] }

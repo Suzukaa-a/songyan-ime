@@ -12,10 +12,46 @@ final class DeferredCodeKeyTests: XCTestCase {
         private let lock = NSLock()
         private var input = ""
         private(set) var processed: [String] = []
+        /// Called on the decoding thread as each key reaches the engine.
+        var onKey: (() -> Void)?
+        /// Called on the decoding thread between a batch's keys and its closing read.
+        var beforeClosingRead: (() -> Void)?
+        private var storedClosingReads = 0
+        var closingReads: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedClosingReads
+        }
 
         func setup(sharedDirectory: URL, userDirectory: URL) throws {}
         func selectSchema(_ schemaID: String) throws {}
+        /// Like the real backend: keys go in one by one, the state is read once at the end.
+        func processKeys(_ keys: [String], gate: any EngineKeyGate) -> EngineKeyBatch {
+            var batch = EngineKeyBatch()
+            var committed = ""
+            for key in keys {
+                do {
+                    guard try gate.admit({ committed += try processKey(key).committed }) else { break }
+                    batch.processed += 1
+                } catch {
+                    batch.error = error
+                    break
+                }
+            }
+            guard batch.processed > 0 else { return batch }
+            beforeClosingRead?()
+            gate.settle {
+                var snapshot = currentSnapshot()
+                lock.lock()
+                storedClosingReads += 1
+                lock.unlock()
+                snapshot.committed = committed
+                batch.snapshot = snapshot
+            }
+            return batch
+        }
         func processKey(_ keyValue: String) throws -> EngineSnapshot {
+            onKey?()
             lock.lock()
             defer { lock.unlock() }
             processed.append(keyValue)
@@ -80,6 +116,7 @@ final class DeferredCodeKeyTests: XCTestCase {
         func runAll() {
             while !queued.isEmpty { queued.removeFirst()() }
         }
+        func takeFirst() -> @Sendable () -> Void { queued.removeFirst() }
     }
 
     private func makeSession(delay: TimeInterval) -> (InputSession, SlowEngine, ManualQueue) {
@@ -227,5 +264,68 @@ final class DeferredCodeKeyTests: XCTestCase {
         queue.runAll()
         deliverMainQueue()
         XCTAssertEqual(engine.processed, ["6", "4"], "the taken-back batch never runs")
+    }
+
+    /// Starts the queued batch on another thread and returns once its first key is in the engine.
+    private func startBatchInBackground(_ engine: SlowEngine, _ queue: ManualQueue) -> DispatchSemaphore {
+        let inKey = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        engine.onKey = { inKey.signal() }
+        let work = queue.takeFirst()
+        DispatchQueue.global().async {
+            work()
+            finished.signal()
+        }
+        inKey.wait()
+        engine.onKey = nil
+        return finished
+    }
+
+    func testCancelledBatchSkipsItsClosingRead() {
+        let (session, engine, queue) = makeSession(delay: 0)
+        session.tap(.code("6"))
+        session.tap(.code("4"))
+        engine.beforeClosingRead = { MainActor.assumeIsolated { session.cancelPendingCodes() } }
+        queue.runAll()
+        XCTAssertEqual(engine.processed, ["6", "4"])
+        XCTAssertEqual(engine.closingReads, 0, "a discarded batch reads nothing after the cancel")
+        deliverMainQueue()
+        XCTAssertEqual(session.snapshot.rawInput, "6", "nothing from the cancelled batch is applied")
+    }
+
+    func testDrainLandsAStoppedBatchWithItsClosingRead() {
+        let (session, engine, queue) = makeSession(delay: 0.05)
+        var committed: [String] = []
+        session.onCommitted = { committed.append($0) }
+        session.tap(.code("6"))
+        session.tap(.code("4"))
+        session.tap(.code("2"))
+        let finished = startBatchInBackground(engine, queue)
+        session.tap(.space)
+        finished.wait()
+        XCTAssertEqual(engine.processed, ["6", "4", "2", " "])
+        XCTAssertEqual(engine.closingReads, 2, "the stopped batch and the drained rest each read once")
+        XCTAssertEqual(committed, ["642"])
+        deliverMainQueue()
+        XCTAssertEqual(committed, ["642"])
+        XCTAssertFalse(session.snapshot.isComposing)
+    }
+
+    func testDefaultBatchMatchesKeyByKey() throws {
+        let keys = ["n", "i", "\u{08}", "i", "h", "a", "o", " ", "x", "i", "Esc", "n", "\n"]
+        let stepped = EngineProvider.makeDemoEngine()
+        var last: EngineSnapshot?
+        var committed = ""
+        for key in keys {
+            let next = try stepped.processKey(key)
+            committed += next.committed
+            last = next
+        }
+        last?.committed = committed
+        let batched = EngineProvider.makeDemoEngine()
+        let batch = batched.processKeys(keys, gate: OpenKeyGate())
+        XCTAssertEqual(batch.processed, keys.count)
+        XCTAssertNil(batch.error)
+        XCTAssertEqual(batch.snapshot, last)
     }
 }

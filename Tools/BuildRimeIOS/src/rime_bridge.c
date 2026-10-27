@@ -302,6 +302,36 @@ int rb_process_key(rb_engine* engine, uintptr_t session_id, int keycode,
                                                              : RB_FALSE;
 }
 
+int rb_process_key_brief(rb_engine* engine, uintptr_t session_id, int keycode,
+                         int mask, rb_key_result* out) {
+  if (!out) return RB_FALSE;
+  memset(out, 0, sizeof(*out));
+  if (!engine || !engine->api) return RB_FALSE;
+  /* A missing session makes process_key a no-op, so checking it afterwards
+   * costs no extra status read on the normal path. */
+  int consumed = engine->api->process_key(session_id, keycode, mask);
+  RIME_STRUCT(RimeStatus, status);
+  if (!engine->api->get_status(session_id, &status)) return RB_FALSE;
+  out->consumed = consumed ? RB_TRUE : RB_FALSE;
+  out->is_composing = status.is_composing ? RB_TRUE : RB_FALSE;
+  engine->api->free_status(&status);
+  const char* input = engine->api->get_input(session_id);
+  out->has_input = (input && input[0]) ? RB_TRUE : RB_FALSE;
+  RIME_STRUCT(RimeCommit, commit);
+  if (engine->api->get_commit(session_id, &commit)) out->commit_text = commit.text;
+  return RB_TRUE;
+}
+
+void rb_key_result_free(rb_engine* engine, rb_key_result* result) {
+  if (!result || !result->commit_text) return;
+  if (engine && engine->api) {
+    RIME_STRUCT(RimeCommit, commit);
+    commit.text = result->commit_text;
+    engine->api->free_commit(&commit);
+  }
+  result->commit_text = NULL;
+}
+
 int rb_commit_composition(rb_engine* engine, uintptr_t session_id) {
   if (!engine || !engine->api) return RB_FALSE;
   return engine->api->commit_composition(session_id) ? RB_TRUE : RB_FALSE;
@@ -448,6 +478,11 @@ rb_snapshot* rb_snapshot_get(rb_engine* engine, uintptr_t session_id) {
         if (!snap->select_labels[i]) SNAP_FAIL();
       }
     }
+    if (RIME_STRUCT_HAS_MEMBER(context, context.commit_text_preview) &&
+        context.commit_text_preview) {
+      snap->commit_text_preview = rb_strdup(context.commit_text_preview);
+      if (!snap->commit_text_preview) SNAP_FAIL();
+    }
     engine->api->free_context(&context);
   } else {
     SNAP_FAIL();
@@ -490,6 +525,7 @@ void rb_snapshot_free(rb_snapshot* snapshot) {
     free(snapshot->candidates);
   }
   free(snapshot->select_keys);
+  free(snapshot->commit_text_preview);
   if (snapshot->select_labels) {
     for (int i = 0; i < snapshot->num_select_labels; ++i) {
       free(snapshot->select_labels[i]);

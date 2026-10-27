@@ -350,7 +350,6 @@ public struct MarkedComposition: Equatable, Sendable {
 
 /// Presentation evidence, not a promise inferred from an enabled preference.
 public enum InlineCompositionEvidence: String, Equatable, Sendable {
-    case nativeMarkedRange
     /// Public UITextDocumentProxy exposes context, but no markedTextRange or acceptance result.
     /// This confirms visible text echo only; native marking semantics still require host QA.
     case documentContextEcho
@@ -363,11 +362,6 @@ public enum CompositionPresentation: Equatable, Sendable {
     case awaitingHost
     case keyboard(reason: String)
     case inline(evidence: InlineCompositionEvidence)
-
-    public var isInline: Bool {
-        if case .inline = self { return true }
-        return false
-    }
 
     public var isKeyboardFallback: Bool {
         if case .keyboard = self { return true }
@@ -540,6 +534,4 @@ public enum AmbiguityApplyOutcome: Equatable, Sendable {
     case invalid
     case failed
     case failedRollbackUnverified
-
-    public var isSuccess: Bool { self == .applied }
 }

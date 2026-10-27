@@ -144,10 +144,6 @@ public final class RimeBackend: EngineBackend, @unchecked Sendable {
         self.sharedWritesAllowed = sharedWritesAllowed
     }
 
-    /// Whether the engine has started (idempotent). A real first run deploys (compiles dictionaries) and can take
-    /// a while; prebuilt mode skips deployment and uses the read-only compiled resources directly.
-    public var isStarted: Bool { rime != nil }
-
     public func startIfNeeded() throws {
         guard rime == nil else { return }
         let fm = FileManager.default
@@ -203,10 +199,19 @@ public final class RimeBackend: EngineBackend, @unchecked Sendable {
         let descriptorIDs = Set(schemas.map(\.id)).union(adapters.map(\.schemaID)).union([state.schemaID])
         var descriptors: [String: [EngineOptionDescriptor]] = [:]
         if !resourceID.isEmpty {
+            // Adapters share their source schema's file; parse each file once.
+            var bySource: [String: [EngineOptionDescriptor]] = [:]
             for id in descriptorIDs where !id.isEmpty {
-                descriptors[id] = SchemaOptionCapabilities.read(
-                    resourceID: resourceID, schemaID: mapping[id] ?? id,
+                let source = mapping[id] ?? id
+                if let read = bySource[source] {
+                    descriptors[id] = read
+                    continue
+                }
+                let read = SchemaOptionCapabilities.read(
+                    resourceID: resourceID, schemaID: source,
                     compiledDirectory: directory, sharedDirectory: sharedDirectory)
+                bySource[source] = read
+                descriptors[id] = read
             }
         }
         optionPreferences?.preload(descriptors.values.flatMap { $0 })
@@ -482,6 +487,72 @@ public final class RimeBackend: EngineBackend, @unchecked Sendable {
         return snap
     }
 
+    /// `processKey` per key, but librime is asked only for what the next key depends
+    /// on (consumed, composing, empty input, commit text) and the full state is read
+    /// once at the end. Commits are consumed key by key so unconsumed-key literals
+    /// keep their place among them.
+    public func processKeys(_ keys: [String], gate: any EngineKeyGate) -> EngineKeyBatch {
+        var batch = EngineKeyBatch()
+        var committed = ""
+        var committedBeforeLastKey = ""
+        var predicting: Bool?
+        var fed = false
+        for keyValue in keys {
+            do {
+                let admitted = try gate.admit {
+                    committedBeforeLastKey = committed
+                    try requireAvailableInput()
+                    guard let engine = rime else { throw EngineBackendError.engineNotStarted }
+                    guard let key = Self.rimeKey(for: keyValue) else { return }
+                    if predicting ?? Self.isPrediction(lastState), keyValue != "Esc" {
+                        try closePrediction(on: engine)
+                    }
+                    let result: RimeKeyFeed
+                    do { result = try engine.feedKey(key) } catch {
+                        lastErrorText = error.localizedDescription
+                        throw error
+                    }
+                    fed = true
+                    try requireAvailableInput()
+                    predicting = result.isComposing && !result.hasInput
+                    if !result.commitText.isEmpty {
+                        committed += result.commitText
+                    } else if !result.consumed && !result.isComposing, let literal = Self.literalForUnconsumed(keyValue)
+                    {
+                        committed += literal
+                    }
+                }
+                guard admitted else { break }
+                batch.processed += 1
+            } catch {
+                batch.error = error
+                break
+            }
+        }
+        guard batch.processed > 0 else { return batch }
+        gate.settle {
+            // After a failure no state was read past the last one published.
+            var snap = currentSnapshot()
+            if batch.error == nil, fed, let engine = rime {
+                do {
+                    let state = try engine.actionState()
+                    publishState(state)
+                    snap = Self.snapshot(from: state)
+                    applyDisplay(&snap, from: state)
+                } catch {
+                    // As when the last key's own read fails: that key and its commit are not delivered.
+                    lastErrorText = error.localizedDescription
+                    batch.error = error
+                    batch.processed -= 1
+                    committed = committedBeforeLastKey
+                }
+            }
+            snap.committed = committed + snap.committed
+            batch.snapshot = batch.processed > 0 ? snap : nil
+        }
+        return batch
+    }
+
     public func selectCandidate(_ index: Int) throws -> EngineSnapshot {
         try requireAvailableInput()
         guard let engine = rime else { throw EngineBackendError.engineNotStarted }
@@ -634,6 +705,10 @@ public final class RimeBackend: EngineBackend, @unchecked Sendable {
 
     private func dismissPredictionOnEngine(_ engine: RimeEngine) throws {
         guard Self.isPrediction(lastState) else { return }
+        try closePrediction(on: engine)
+    }
+
+    private func closePrediction(on engine: RimeEngine) throws {
         var state = try engine.processKey(RimeKey(keycode: RimeKeyCode.keyEscape)).state
         if Self.isPrediction(state) { state = try engine.cancelComposition() }
         lastState = state
@@ -692,13 +767,6 @@ public final class RimeBackend: EngineBackend, @unchecked Sendable {
             rime?.armSnapshotFailureForTesting()
         }
     #endif
-
-    /// Native sync (exports and merges a userdb snapshot); rebuilds the session and restores the schema.
-    public func performSync() throws {
-        guard let engine = rime else { throw EngineBackendError.engineNotStarted }
-        let state = try engine.sync()
-        lastState = state
-    }
 
     public func shutdown() {
         hostLocked {

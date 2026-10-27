@@ -13,11 +13,11 @@
   "slices": {
     "ios-arm64": {
       "archive": "ios-arm64/RimeKit.framework/RimeKit",
-      "sha256": "a1124283fee0512184017bf4293a34525137282256f19f0afd38244f604fba96"
+      "sha256": "ca431f1aff426db3a4828ccb25ba245600e0400033d61a9540e4963d2793240c"
     },
     "ios-arm64-simulator": {
       "archive": "ios-arm64-simulator/RimeKit.framework/RimeKit",
-      "sha256": "9018edd4d8ef74d4ed63db7c80aa52f5a2de789fcb5ff99dc09ee5c2d311ea24"
+      "sha256": "3159c9d69dddd4d67fecdb7a3fa7294486b68f510c57a157ad73cb3723ae9425"
     }
   }
 }

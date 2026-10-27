@@ -256,9 +256,11 @@ extension RimeEngine {
         queue.sync { displayContextOnQueue() }
     }
 
-    func displayContextOnQueue() -> RimeDisplayContext? {
+    /// `schemaID`: the session's current schema when the caller already read it (a
+    /// snapshot carries it), saving another engine call per key.
+    func displayContextOnQueue(schemaID: String? = nil) -> RimeDisplayContext? {
         guard engine != nil, session != 0 else { return nil }
-        let schema = readCurrentSchemaIDOnQueue()
+        let schema = schemaID ?? readCurrentSchemaIDOnQueue()
         if displayContextComputed, displayContextSchema == schema {
             return cachedDisplayContext
         }

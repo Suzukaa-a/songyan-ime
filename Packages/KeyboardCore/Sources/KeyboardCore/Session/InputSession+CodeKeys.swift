@@ -1,18 +1,20 @@
 import Foundation
 
 extension InputSession {
-    /// One batch of code keys on the engine queue. The worker holds `lock` around each
-    /// key, so once `stop()` returns no further key reaches the engine; a batch the
-    /// queue has not started yet never touches it at all.
-    // @unchecked: every mutable field is guarded by `lock`, and `engine` (not Sendable) is
-    // only called under that lock while the session, which stops and waits first, is not.
-    final class CodeBatch: @unchecked Sendable {
+    /// One batch of code keys on the engine queue. The engine runs each key and the
+    /// closing state read inside `lock` (`admit` / `settle`), so once `stop()` returns
+    /// no further key reaches the engine; a batch the queue has not started yet never
+    /// touches it at all.
+    // @unchecked: every mutable field is guarded by `lock`, and `engine` (not Sendable) only
+    // touches the engine under that lock while the session, which stops and waits first, is not.
+    final class CodeBatch: EngineKeyGate, @unchecked Sendable {
         let keys: [String]
         private let engine: EngineBackend
         private let lock = NSLock()
         private let finished = DispatchSemaphore(value: 0)
         private var started = false
         private var stopped = false
+        private var discarded = false
         private var done = false
         private(set) var processed = 0
         private(set) var snapshot: EngineSnapshot?
@@ -34,30 +36,11 @@ extension InputSession {
             }
             started = true
             lock.unlock()
-            var committed = ""
-            for key in keys {
-                lock.lock()
-                if stopped {
-                    lock.unlock()
-                    break
-                }
-                do {
-                    let next = try engine.processKey(key)
-                    committed += next.committed
-                    snapshot = next
-                    processed += 1
-                } catch {
-                    self.error = error
-                    lock.unlock()
-                    break
-                }
-                lock.unlock()
-            }
+            let result = engine.processKeys(keys, gate: self)
             lock.lock()
-            if var final = snapshot {
-                final.committed = committed
-                snapshot = final
-            }
+            processed = result.processed
+            snapshot = result.snapshot
+            error = result.error
             // A failed read leaves `lookahead` nil and the front end reads the pages itself.
             if !stopped, error == nil, lookaheadPages > 0, let s = snapshot, s.isComposing,
                 s.pageSize > 0, s.pageIndex == 0, !s.isLastPage, s.candidates.count == s.pageSize
@@ -69,12 +52,31 @@ extension InputSession {
             finished.signal()
         }
 
-        /// No key reaches the engine after this returns. True when the worker started
-        /// (its result then covers `processed` keys once `waitUntilDone` returns).
-        func stop() -> Bool {
+        func admit(_ key: () throws -> Void) rethrows -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !stopped else { return false }
+            try key()
+            return true
+        }
+
+        /// Even once stopped, a drain lands the keys already processed; a discarded
+        /// batch leaves the engine alone.
+        func settle(_ read: () -> Void) {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !discarded else { return }
+            read()
+        }
+
+        /// No key reaches the engine after this returns, nor anything else when
+        /// `discarding`. True when the worker started (its result then covers
+        /// `processed` keys once `waitUntilDone` returns).
+        func stop(discarding: Bool = false) -> Bool {
             lock.lock()
             defer { lock.unlock() }
             stopped = true
+            discarded = discarded || discarding
             return started
         }
 
@@ -158,24 +160,9 @@ extension InputSession {
     /// The remaining keys in one pass: commits keep their order, the front end
     /// refreshes once.
     private func processSynchronously(_ keys: [String]) {
-        var last: EngineSnapshot?
-        var committed = ""
-        var failure: Error?
-        for key in keys {
-            do {
-                let next = try engine.processKey(key)
-                committed += next.committed
-                last = next
-            } catch {
-                failure = error
-                break
-            }
-        }
-        if var final = last {
-            final.committed = committed
-            apply(final)
-        }
-        if let failure { onError?(failure) }
+        let result = engine.processKeys(keys, gate: OpenKeyGate())
+        if let final = result.snapshot { apply(final) }
+        if let failure = result.error { onError?(failure) }
     }
 
     /// Drops the deferred keys without delivering them (a clear, a discard, the host
@@ -184,7 +171,7 @@ extension InputSession {
         guard batch != nil || !pendingCodes.isEmpty else { return }
         if let current = batch {
             batch = nil
-            _ = current.stop()
+            _ = current.stop(discarding: true)
         }
         pendingCodes = []
         pendingCodesRevision &+= 1

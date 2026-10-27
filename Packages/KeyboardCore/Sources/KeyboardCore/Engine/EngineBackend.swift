@@ -36,6 +36,12 @@ public protocol EngineBackend: AnyObject {
     /// Returns the resulting state snapshot.
     func processKey(_ keyValue: String) throws -> EngineSnapshot
 
+    /// Processes `keys` in order with the same effect as one `processKey` each, but
+    /// may read the full state only once, after the last key. Every key's engine
+    /// work runs inside `gate.admit`, the closing read inside `gate.settle`.
+    /// The result's snapshot carries every key's commit text in order.
+    func processKeys(_ keys: [String], gate: any EngineKeyGate) -> EngineKeyBatch
+
     /// Cancels the current composition (no commit, no commit text) and returns the *validated* post-cancel snapshot.
     ///
     /// Must be distinct from `processKey("Esc")`: a synthesized Esc goes through the
@@ -166,7 +172,55 @@ public extension EngineBackend {
     ) throws -> String? { nil }
 }
 
+/// Serializes a key batch's engine work with whoever may end the batch early.
+public protocol EngineKeyGate {
+    /// Runs one key's engine work, or returns false without running it to end the batch.
+    func admit(_ key: () throws -> Void) rethrows -> Bool
+    /// Runs the closing state read of keys already admitted; never declined.
+    func settle(_ read: () -> Void)
+}
+
+/// Admits every key.
+public struct OpenKeyGate: EngineKeyGate {
+    public init() {}
+    public func admit(_ key: () throws -> Void) rethrows -> Bool {
+        try key()
+        return true
+    }
+    public func settle(_ read: () -> Void) { read() }
+}
+
+public struct EngineKeyBatch {
+    /// Keys that reached the engine.
+    public var processed = 0
+    /// State after the last processed key, `committed` holding all their commits; nil when none ran.
+    public var snapshot: EngineSnapshot?
+    /// What stopped the batch early.
+    public var error: Error?
+
+    public init() {}
+}
+
 public extension EngineBackend {
+    func processKeys(_ keys: [String], gate: any EngineKeyGate) -> EngineKeyBatch {
+        var batch = EngineKeyBatch()
+        var committed = ""
+        for key in keys {
+            do {
+                var next: EngineSnapshot?
+                guard try gate.admit({ next = try processKey(key) }), let next else { break }
+                committed += next.committed
+                batch.snapshot = next
+                batch.processed += 1
+            } catch {
+                batch.error = error
+                break
+            }
+        }
+        batch.snapshot?.committed = committed
+        return batch
+    }
+
     var inputUnavailableReason: String? { nil }
     func validateSchema(_ schemaID: String) throws {}
 
