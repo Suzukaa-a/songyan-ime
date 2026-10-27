@@ -406,31 +406,6 @@ extension KeyboardPanelView {
             .foregroundStyle(appearance.accentForeground)
     }
 
-    /// English-state top-row text is only for status display in English mode with no candidates (outside the resident budget, at natural English height).
-    private var preeditText: String {
-        if controller.isEnglishMode {
-            switch controller.shiftState {
-            case .off: return "英文 · 小写"
-            case .once: return "英文 · 下一字母大写"
-            case .locked: return "英文 · 大写锁定"
-            }
-        }
-        if controller.snapshot.preedit.isEmpty {
-            return controller.showsDemoBanner ? "演示模式" : "中文"
-        }
-        return controller.snapshot.preedit
-    }
-
-    /// Spoken Chinese composition: prefers the whole marked preview, falling back to the engine preedit.
-    private var preeditAccessibilityLabel: String {
-        if !controller.snapshot.isComposing, let statusMessage { return statusMessage }
-        if controller.isEnglishMode { return preeditText }
-        if let fallback = controller.keyboardCompositionFallback, !fallback.text.isEmpty {
-            return "正在组合：\(fallback.text)"
-        }
-        return controller.snapshot.preedit.isEmpty ? "尚未输入" : "正在组合：\(controller.snapshot.preedit)"
-    }
-
     /// Shown only when the shared content policy confirms real candidates; the effective paging and expand controls share the current page state.
     /// Rendering goes through the CandidateKit default renderer (parameters from the user's candidate-area config), and actions go via
     /// CandidateAreaActionSink -> the real session; expand/collapse are local UI state.

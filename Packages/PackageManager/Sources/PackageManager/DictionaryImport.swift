@@ -174,7 +174,8 @@ extension RecipePackageManager {
     @discardableResult
     public func reinstallActiveDictionary(deploy: @escaping Deploy) async throws -> InstalledRecipe? {
         guard let active = try activeInstallation() else { return nil }
-        let source = active.resourceURL.deletingLastPathComponent().appendingPathComponent("source.json")
+        let source = active.resourceURL.deletingLastPathComponent().appendingPathComponent(
+            InstalledPackageLayout.sourceFile)
         let manifest = try JSONDecoder().decode(RecipeManifest.self, from: Data(contentsOf: source))
         guard manifest.origin == .userDictionary else { throw DictionaryImportError.invalid("已安装的内容不是词库") }
         let resources = active.resourceURL

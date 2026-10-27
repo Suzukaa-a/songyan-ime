@@ -59,7 +59,7 @@ extension SchemeImportCenter {
                     providedOrdinaryResources[requirementPath] = nil
                     providedDownloadFiles[requirementPath] = asset
                     message =
-                        "已添加文件（\(ByteCountFormatter.string(fromByteCount: Int64(asset.size), countStyle: .file))）。"
+                        "已添加文件（\(HostStorePaths.fileSizeText(asset.size))）。"
                 } else {
                     // Ordinary resources are read as bounded immutable bytes on a background task; the SHA/size identity
                     // is pinned from those same bytes, and cancel is forwarded to the reader.
@@ -92,7 +92,7 @@ extension SchemeImportCenter {
                     providedDownloadFiles[requirementPath] = nil
                     providedOrdinaryResources[requirementPath] = resource
                     message =
-                        "已添加文件（\(ByteCountFormatter.string(fromByteCount: Int64(resource.size), countStyle: .file))）。"
+                        "已添加文件（\(HostStorePaths.fileSizeText(resource.size))）。"
                 }
             } catch is CancellationError {
                 message = "已取消。"
@@ -133,7 +133,7 @@ extension SchemeImportCenter {
                     try Task.checkCancellation()
                     providedOrdinaryResources[requirement.path] = nil
                     providedDownloadFiles[requirement.path] = asset
-                    message = "已下载（\(ByteCountFormatter.string(fromByteCount: Int64(asset.size), countStyle: .file))）。"
+                    message = "已下载（\(HostStorePaths.fileSizeText(asset.size))）。"
                 } else {
                     let resource = try await RecipePackageManager.fetchOrdinaryResource(
                         requirement.url,
@@ -145,7 +145,7 @@ extension SchemeImportCenter {
                     providedDownloadFiles[requirement.path] = nil
                     providedOrdinaryResources[requirement.path] = resource
                     message =
-                        "已下载（\(ByteCountFormatter.string(fromByteCount: Int64(resource.size), countStyle: .file))）。"
+                        "已下载（\(HostStorePaths.fileSizeText(resource.size))）。"
                 }
             } catch is CancellationError {
                 message = "已取消。"

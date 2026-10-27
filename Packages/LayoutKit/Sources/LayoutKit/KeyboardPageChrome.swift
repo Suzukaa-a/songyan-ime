@@ -65,13 +65,6 @@ public struct KeyboardPageChrome: Codable, Equatable, Sendable {
 
     public var allKeys: [LayoutKey] { bottom + leading + trailing }
 
-    /// Rail span weights, or nil when the rail is empty.
-    public func railWeights(in region: Region) -> [Double]? {
-        let keys = keys(in: region)
-        guard !keys.isEmpty, region != .bottom else { return nil }
-        return keys.map(\.widthWeight)
-    }
-
     /// Key counts are part of the page budget (`LayoutResourceBudget.usage(_:)`).
     func validate() throws {
         for key in allKeys { try KeyboardPageDefinition.validateKey(key) }

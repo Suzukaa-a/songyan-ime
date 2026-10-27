@@ -171,14 +171,16 @@ extension KeyboardViewController {
         }
         // Every controller refresh re-sends the composition. Re-marking identical
         // text makes some hosts redraw (and re-scroll) the field on each key.
+        // One read: each is three proxy IPCs, and nothing below writes before setMarkedText.
+        let context = proxyContext
         if composition == pendingMarked, markedDocument == document,
-            expectedContext == proxyContext
+            expectedContext == context
         {
             return
         }
-        if markedDocument == nil { markedInsertionContext = proxyContext }
+        if markedDocument == nil { markedInsertionContext = context }
         cancelledMarkedEcho = nil
-        markedBaselineContext = proxyContext
+        markedBaselineContext = context
         pendingMarked = composition
         markedDocument = document
         writeProxy {

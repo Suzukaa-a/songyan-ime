@@ -182,8 +182,7 @@ public struct ShuangpinHintPreset: Codable, Equatable, Sendable, Identifiable {
     public func encoded() throws -> Data {
         let value = normalized()
         try value.validate()
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let encoder = JSONEncoder.layoutKitPretty()
         let data = try encoder.encode(value)
         try ShuangpinHintDocument.checkSize(data, "提示文件")
         return data

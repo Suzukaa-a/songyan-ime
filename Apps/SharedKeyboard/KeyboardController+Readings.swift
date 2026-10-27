@@ -174,5 +174,4 @@ extension KeyboardController {
         guard snapshot.isComposing, !holdsMarkedCompositionForReading else { return }
         publishMarked(markedComposition)
     }
-    public func clearReadingSelection() { readingFilter.clearSelection() }
 }

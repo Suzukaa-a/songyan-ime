@@ -124,10 +124,6 @@ public actor RecipePackageManager {
         RecipeStatus(active: try load(InstalledPackageLayout.activeMarker))
     }
 
-    public func activeResourceURL() throws -> URL? {
-        try activeDirectory()?.appendingPathComponent("resources", isDirectory: true)
-    }
-
     public func activeUserDataURL() throws -> URL? {
         try activeDirectory()?.appendingPathComponent("user", isDirectory: true)
     }
@@ -236,7 +232,7 @@ public actor RecipePackageManager {
                 try copyUserDirectory(source, to: user, topLevel: true, excludedModels: models)
             }
             try JSONEncoder().encode(manifest).write(
-                to: directory.appendingPathComponent("source.json"), options: .atomic)
+                to: directory.appendingPathComponent(InstalledPackageLayout.sourceFile), options: .atomic)
             let receipt = try await deploy(
                 RecipeDeployment(manifest: manifest, resourceURL: resources, userDataURL: user))
             let missing = Set(manifest.requiredComponents).subtracting(receipt.availableComponents).sorted()

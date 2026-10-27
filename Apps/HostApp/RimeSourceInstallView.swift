@@ -16,10 +16,8 @@ struct RimeSourceInstallView: View {
     @State private var entrySchemaID = ""
     private var schemaIDs: [String] {
         Set(
-            center.acquiredSources.flatMap { $0.files.keys }.filter {
-                $0.hasSuffix(".schema.yaml") && !$0.contains("/")
-            }
-            .map { String($0.dropLast(12)) }
+            InstalledPackageLayout.topLevelSchemaFiles(in: center.acquiredSources.flatMap { $0.files.keys })
+                .map { String($0.dropLast(InstalledPackageLayout.schemaFileSuffix.count)) }
         ).sorted()
     }
 
@@ -96,7 +94,7 @@ struct RimeSourceInstallView: View {
                     Text(requirement.url.absoluteString).font(.caption).textSelection(.enabled)
                     if let model = center.providedDownloadFiles[requirement.path] {
                         Text(
-                            "已提供 \(ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file)) · SHA256 \(model.sha256)"
+                            "已提供 \(HostStorePaths.fileSizeText(model.size)) · SHA256 \(model.sha256)"
                         ).font(.caption)
                     } else if let file = center.providedOrdinaryResources[requirement.path] {
                         Text("已提供 \(file.size) 字节").font(.caption)

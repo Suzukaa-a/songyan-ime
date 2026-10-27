@@ -277,8 +277,7 @@ public struct LayoutDefinition: Codable, Equatable, Sendable, Identifiable {
 
     public func encoded() throws -> Data {
         try validate()
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let encoder = JSONEncoder.layoutKitPretty()
         let data = try encoder.encode(self)
         try LayoutResourceBudget.check(data.count <= LayoutResourceBudget.definitionBytes, "布局文件过大，请删掉一些按键或文字后再试。")
         return data
@@ -421,5 +420,14 @@ public enum LayoutError: Error, LocalizedError, Equatable {
         case .duplicateID: return "已经有一个相同的键盘布局，请选择替换，或者另存为副本。"
         case .unknownID: return "找不到这个键盘布局，它可能已经被删除。"
         }
+    }
+}
+
+extension JSONEncoder {
+    /// Stable, human-readable on-disk JSON shared by layout and hint documents.
+    static func layoutKitPretty() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return encoder
     }
 }

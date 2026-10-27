@@ -100,7 +100,7 @@ public struct PreparedSchemeImport: Sendable {
     /// Keep the installation's learning identity when the user explicitly updates it.
     /// A package with its own different identity must instead be imported separately.
     public func updatingInstallation(id: String, name: String) throws -> PreparedSchemeImport {
-        if let data = sourceFiles["keyboard-package.json"] {
+        if let data = sourceFiles[InstalledPackageLayout.keyboardPackageFile] {
             let declared = try JSONDecoder().decode(SchemePackageDeclaration.self, from: data)
             guard declared.id == id else {
                 throw RecipeInstallError.invalidManifest("所选文件属于另一个输入方案，请从「导入方案」添加。")
@@ -110,7 +110,7 @@ public struct PreparedSchemeImport: Sendable {
         var updated = bytes
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        updated["keyboard-package.json"] = try encoder.encode(declaration)
+        updated[InstalledPackageLayout.keyboardPackageFile] = try encoder.encode(declaration)
         let records = Set(updated.keys).union(fileResources.keys).sorted().map { path in
             if let file = fileResources[path] {
                 return RecipeManifest.File(path: path, sha256: file.sha256, size: file.size)
@@ -331,10 +331,10 @@ public extension RecipePackageManager {
         let declaration: SchemePackageDeclaration
         if let supplied {
             declaration = supplied
-        } else if let data = bytes["keyboard-package.json"] {
+        } else if let data = bytes[InstalledPackageLayout.keyboardPackageFile] {
             declaration = try JSONDecoder().decode(SchemePackageDeclaration.self, from: data)
         } else {
-            let ids = bytes.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }.map {
+            let ids = InstalledPackageLayout.topLevelSchemaFiles(in: bytes.keys).map {
                 String($0.dropLast(12))
             }.sorted()
             guard let first = ids.first else {
@@ -351,7 +351,7 @@ public extension RecipePackageManager {
                 "^\\s*-\\s*schema:\\s*[\"']?([A-Za-z0-9_.-]+)",
                 String(data: bytes["default.yaml"] ?? Data(), encoding: .utf8) ?? "")
             let primary = listed.first(where: ids.contains) ?? first
-            let schemaText = String(data: bytes[primary + ".schema.yaml"]!, encoding: .utf8) ?? ""
+            let schemaText = String(data: bytes[InstalledPackageLayout.schemaFile(primary)]!, encoding: .utf8) ?? ""
             let name =
                 SchemeSourceCheck.matches("^\\s+name:\\s*[\"']?([^\"'\\r\\n#]+)", schemaText).first?
                 .trimmingCharacters(in: .whitespaces) ?? primary
@@ -382,7 +382,7 @@ public extension RecipePackageManager {
                 throw RecipeInstallError.invalidManifest("\(layout.userTitle)的验证码只能用这个布局按键实际发送的字母：\(binding.code)")
             }
         }
-        let schemas = bytes.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }.map {
+        let schemas = InstalledPackageLayout.topLevelSchemaFiles(in: bytes.keys).map {
             String($0.dropLast(12))
         }.sorted()
         guard !schemas.isEmpty else { throw RecipeInstallError.invalidManifest("没有可安装的输入方案") }
@@ -390,8 +390,8 @@ public extension RecipePackageManager {
         try SchemeSourceCheck.dependencies(bytes)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        if bytes["keyboard-package.json"] == nil || supplied != nil {
-            bytes["keyboard-package.json"] = try encoder.encode(declaration)
+        if bytes[InstalledPackageLayout.keyboardPackageFile] == nil || supplied != nil {
+            bytes[InstalledPackageLayout.keyboardPackageFile] = try encoder.encode(declaration)
         }
         try RecipeResourceBudget.validate(
             bytes.mapValues(\.count).merging(fileResources.mapValues(\.size)) { _, new in new })
@@ -410,7 +410,7 @@ public extension RecipePackageManager {
             SchemeSourceCheck.hash(Data(records.map { $0.path + $0.sha256 }.joined().utf8)).prefix(40))
         let manifest = RecipeManifest(
             id: declaration.id, repository: "user/import", revision: revision,
-            recipePath: "keyboard-package.json", license: "用户提供的方案文件",
+            recipePath: InstalledPackageLayout.keyboardPackageFile, license: "用户提供的方案文件",
             schemaID: entrySchema, requiredComponents: [], files: records, origin: .userScheme)
         return PreparedSchemeImport(
             declaration: declaration, manifest: manifest, schemaIDs: schemas, bytes: bytes, sourceFiles: sourceFiles,
@@ -520,8 +520,8 @@ enum SchemeSourceCheck {
             }
             if let list, list.allSatisfy({ $0["schema"] is String }) {
                 let ids = Set(list.compactMap { $0["schema"] as? String })
-                let present = ids.filter { files[$0 + ".schema.yaml"] != nil }
-                missing.formUnion(ids.subtracting(present).map { $0 + ".schema.yaml" })
+                let present = ids.filter { files[$0 + InstalledPackageLayout.schemaFileSuffix] != nil }
+                missing.formUnion(ids.subtracting(present).map { $0 + InstalledPackageLayout.schemaFileSuffix })
                 if !present.isEmpty { selected = present }
             }
         }
@@ -616,7 +616,9 @@ enum SchemeSourceCheck {
                                     for item in list {
                                         if let name = scalar(item), !name.isEmpty {
                                             try require(
-                                                name + (key.string == "dependencies" ? ".schema.yaml" : ".dict.yaml"))
+                                                name
+                                                    + (key.string == "dependencies"
+                                                        ? InstalledPackageLayout.schemaFileSuffix : ".dict.yaml"))
                                         }
                                     }
                                 }

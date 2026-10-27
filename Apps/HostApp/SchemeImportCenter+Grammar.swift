@@ -212,23 +212,8 @@ extension SchemeImportCenter {
         guard await waitForSourceStep(install) else { return false }
         // The install invalidated the workspace on purpose. A caller that binds the model it just
         // added must see the new one, so wait for the re-read instead of racing it.
-        await waitForWorkspace(packageID: packageID)
+        if let item = beginWorkspaceRead(packageID: packageID) { await readInstalledWorkspace(item) }
         return error == nil
-    }
-
-    /// Waits (bounded) for the workspace of a source to be readable again. Starts the read itself
-    /// when nothing else did, so a screen that is not watching `busy` still gets a usable state.
-    private func waitForWorkspace(packageID: String) async {
-        var started = false
-        for _ in 0..<100 {
-            if !busy, installedWorkspace != nil { return }
-            if !busy, !started {
-                started = true
-                openInstalledWorkspace(packageID: packageID)
-                continue
-            }
-            try? await Task.sleep(nanoseconds: 50_000_000)
-        }
     }
 
     /// Adds one `.gram` file to the current workspace without binding it; the picker URL keeps its

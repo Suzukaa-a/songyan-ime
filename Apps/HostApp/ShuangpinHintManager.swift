@@ -73,15 +73,13 @@ final class ShuangpinHintManager: ObservableObject {
 
     /// App Group container first, app-local directory otherwise.
     nonisolated static func resolveStoreDirectory() -> ShuangpinHintStoreLocation {
-        let fileManager = FileManager.default
         if let container = KeyboardRecipeStore.sharedContainerURL() {
             let url = container.appendingPathComponent(ShuangpinHintStore.directoryName, isDirectory: true)
             return .shared(url)
         }
-        let base =
-            fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return .local(base.appendingPathComponent("Rime\(ShuangpinHintStore.directoryName)", isDirectory: true))
+        return .local(
+            HostStorePaths.applicationSupport
+                .appendingPathComponent("Rime\(ShuangpinHintStore.directoryName)", isDirectory: true))
     }
 
     // MARK: - Reading
@@ -249,19 +247,6 @@ final class ShuangpinHintManager: ObservableObject {
             }, success: "已删除提示预设「\(preset.name)」。")
     }
 
-    func renamePreset(id: String, to name: String) async {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            lastError = "名称不能为空，请输入一个名称。"
-            return
-        }
-        await persist(
-            { snapshot in
-                guard let index = snapshot.presets.firstIndex(where: { $0.id == id }) else { return }
-                snapshot.presets[index].name = trimmed
-            }, success: "已重命名提示预设。")
-    }
-
     /// Recovery is offered only after a read finished with a refused file; a valid snapshot, or one
     /// still loading, is never replaced by the default.
     var canRecover: Bool { !isLoading && loadFailed && snapshot == nil }
@@ -393,11 +378,6 @@ final class ShuangpinHintManager: ObservableObject {
     private func uniqueCopy(of preset: ShuangpinHintPreset) -> ShuangpinHintPreset {
         guard let snapshot, snapshot.preset(id: preset.id) != nil else { return preset }
         return preset.copy(name: preset.name + "（导入）")
-    }
-
-    func clearMessages() {
-        message = nil
-        lastError = nil
     }
 
     // MARK: - Errors

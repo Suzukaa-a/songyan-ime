@@ -391,14 +391,13 @@ struct SchemePackageImportView: View {
             LabeledRow(label: "来自", value: sourceSummary)
             LabeledRow(
                 label: "大小",
-                value: ByteCountFormatter.string(
-                    fromByteCount: Int64(prepared.resourceBytes), countStyle: .file))
+                value: HostStorePaths.fileSizeText(prepared.resourceBytes))
             ForEach(Array(prepared.requiredModelPaths.enumerated()), id: \.element) { index, path in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(developerOptions ? "语法模型：\(path)" : "语法模型 \(index + 1)")
                         .font(.subheadline)
                     if let model = center.providedDownloadFiles[path] ?? prepared.fileResources[path] {
-                        Text("已准备 \(ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file))")
+                        Text("已准备 \(HostStorePaths.fileSizeText(model.size))")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text("需要这个语法模型才能使用，请先下载或导入。")

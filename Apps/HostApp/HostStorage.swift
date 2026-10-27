@@ -10,6 +10,13 @@ enum HostStorePaths {
     }
 }
 
+extension HostStorePaths {
+    /// File-size text for UI ("1.2 MB").
+    static func fileSizeText(_ bytes: some BinaryInteger) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+}
+
 /// On-disk diagnostic log of the host app (Documents/host.log), shown under Settings > Advanced.
 ///
 /// Callers only enqueue; `DiskLogWriter` writes on its own serial queue, so logging from the

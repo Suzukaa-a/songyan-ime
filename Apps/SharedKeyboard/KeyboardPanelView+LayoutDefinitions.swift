@@ -325,6 +325,9 @@ final class DefinitionResolutionMemo {
         let controlRow: LayoutRow?
         let mainRows: [LayoutRow]
         let hasGlobe: Bool
+        /// A main-row or side key draws from the composition (Return, clear input, the
+        /// `'` separator); see `keyRowsReadComposition`.
+        let mainKeysReadComposition: Bool
 
         init(usable: [LayoutDefinition], active: LayoutDefinition?) {
             self.usable = usable
@@ -375,7 +378,13 @@ final class DefinitionResolutionMemo {
                 isBundled: isBundled || isBuiltinPhonePad || isBundledControlRowPolicy)
             self.controlRow = controlRow
             let rows = active?.rows ?? []
-            mainRows = controlRow == nil ? rows : Array(rows.dropLast())
+            let mainRows = controlRow == nil ? rows : Array(rows.dropLast())
+            self.mainRows = mainRows
+            mainKeysReadComposition = (mainRows.flatMap(\.keys) + (active?.auxiliaryAreas ?? []).flatMap(\.keys))
+                .contains {
+                    $0.action.type == .enter || $0.action.type == .clearInput
+                        || $0.action == LayoutAction(.code, value: "'")
+                }
             hasGlobe =
                 active.map { definition in
                     (definition.rows.flatMap(\.keys)

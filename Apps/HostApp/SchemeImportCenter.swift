@@ -116,7 +116,6 @@ final class SchemeImportCenter: ObservableObject {
     @Published var plannedDiagnostics: [String] = []
     /// Installed-package recipe workspace (existing custom/model references + generation baseline).
     @Published var installedWorkspace: InstalledRecipeWorkspace?
-    @Published private(set) var installedWorkspacePackages: [String] = []
     /// Explicitly provided external resources keyed by the recipe-declared requirement path
     /// (never the picked filename). Models stay file references end-to-end (each reference
     /// owns a private temporary-file lease released when the last holder drops it); no 420MB Data.
@@ -241,7 +240,7 @@ final class SchemeImportCenter: ObservableObject {
         }
         if let first = listed.first(where: inPlan) { return first }
         if inPlan(manifestEntry) { return manifestEntry }
-        if let any = plan.files.keys.filter({ $0.hasSuffix(".schema.yaml") && !$0.contains("/") }).sorted().first {
+        if let any = InstalledPackageLayout.topLevelSchemaFiles(in: plan.files.keys).sorted().first {
             return String(any.dropLast(12))
         }
         return manifestEntry
@@ -288,7 +287,7 @@ final class SchemeImportCenter: ObservableObject {
         let snapshot: RecipeWorkspaceSnapshot
         var sources: InstalledRecipeSources? = nil
         var schemaIDs: [String] {
-            snapshot.files.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+            InstalledPackageLayout.topLevelSchemaFiles(in: snapshot.files.keys)
                 .map { String($0.dropLast(12)) }.sorted()
         }
     }
@@ -481,7 +480,8 @@ final class SchemeImportCenter: ObservableObject {
     ) throws -> InstalledPackage {
         let declaration = try JSONDecoder().decode(
             SchemePackageDeclaration.self,
-            from: Data(contentsOf: active.resourceURL.appendingPathComponent("keyboard-package.json")))
+            from: Data(
+                contentsOf: active.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardPackageFile)))
         guard declaration.id == id else { throw RecipeInstallError.invalidResource("安装身份不匹配") }
         let schemas = try JSONDecoder().decode(
             [KeyboardSchemaDescriptor].self,
@@ -566,7 +566,8 @@ final class SchemeImportCenter: ObservableObject {
                         name =
                             (try? await KeyboardResourceReadQueue.async {
                                 let data = try Data(
-                                    contentsOf: active.resourceURL.appendingPathComponent("keyboard-package.json"))
+                                    contentsOf: active.resourceURL.appendingPathComponent(
+                                        InstalledPackageLayout.keyboardPackageFile))
                                 let declaration = try JSONDecoder().decode(SchemePackageDeclaration.self, from: data)
                                 return declaration.id == id ? declaration.name : "输入方案已损坏"
                             }) ?? "输入方案已损坏"

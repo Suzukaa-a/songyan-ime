@@ -39,26 +39,10 @@ public enum SymbolLibraryStorage {
     }
 
     private static func resolveStoreDirectory() -> URL {
-        let fm = FileManager.default
-        if let url = sharedDirectory() {
-            do {
-                try fm.createDirectory(at: url, withIntermediateDirectories: true)
-                let probe = url.appendingPathComponent(".probe-\(UUID().uuidString)")
-                try Data("ok".utf8).write(to: probe, options: .atomic)
-                _ = try Data(contentsOf: probe)
-                try fm.removeItem(at: probe)
-                return url
-            } catch {
-                Logger.keyboardStorage.error(
-                    "App Group symbol directory unavailable: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        let base =
-            fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fm.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let url = base.appendingPathComponent("KeyboardSymbols", isDirectory: true)
-        try? fm.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        RimePaths.probedStoreDirectory(
+            sharedName: SymbolCatalogStore.sharedDirectoryName,
+            localName: SymbolCatalogStore.sharedDirectoryName, label: "symbol"
+        ).url
     }
 }
 
@@ -67,12 +51,10 @@ public enum SymbolLibraryStorage {
 /// Directory probes create files and recent mutations perform read-modify-write;
 /// keep them off the read-only resource queue and serialize across panel models.
 enum SymbolLibraryWriteQueue {
-    private static let queue = DispatchQueue(label: "app.songyan.symbolLibrary.write", qos: .utility)
+    private static let queue = SerialIOQueue(label: "app.songyan.symbolLibrary.write", qos: .utility)
 
     static func async<T>(_ body: @escaping @Sendable () -> T) async -> sending T {
-        await withCheckedContinuation { continuation in
-            queue.async { continuation.resume(returning: body()) }
-        }
+        await queue.async(body)
     }
 }
 

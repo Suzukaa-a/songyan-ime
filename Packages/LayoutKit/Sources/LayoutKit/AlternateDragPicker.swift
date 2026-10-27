@@ -247,15 +247,6 @@ public enum AlternateDragPicker {
             return min(max(Int(tiesLeading), 0), columns - 1)
         }
 
-        /// Column whose centre is closest to `x`, clamped into the grid so a
-        /// finger outside the band still names a stable column.
-        public func nearestColumn(to x: Double) -> Int {
-            guard pitchX > 0, x.isFinite else { return 0 }
-            let raw = ((x - cellWidth / 2) / pitchX).rounded()
-            guard raw.isFinite else { return 0 }
-            return min(max(Int(raw), 0), columns - 1)
-        }
-
         /// Row whose centre is closest to `y`, clamped into the grid: vertical
         /// travel past the popup keeps selecting the nearest row.
         public func nearestRow(to y: Double) -> Int {

@@ -56,9 +56,6 @@ enum LearningBackupUserError: Error, Equatable {
 /// directory, or the keyboard extension would never see the request).
 private enum LearningBackupIO {
 
-    /// Name of the transfer directory: the same directory under the App Group container shared with the keyboard extension.
-    static let directoryName = "KeyboardLearning"
-
     /// Resolves the container directory on the background queue and builds the store.
     static func withStore<T>(_ body: @escaping @Sendable (LearningTransferStore) throws -> T) async throws -> sending T
     {
@@ -69,7 +66,8 @@ private enum LearningBackupIO {
             else {
                 throw LearningBackupUserError.containerUnavailable
             }
-            let directory = container.appendingPathComponent(directoryName, isDirectory: true)
+            let directory = container.appendingPathComponent(
+                KeyboardLearningTransfer.directoryName, isDirectory: true)
             return try body(LearningTransferStore(directory: directory))
         }
     }

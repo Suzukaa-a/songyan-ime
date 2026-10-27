@@ -16,7 +16,4 @@ public enum ShiftState: Equatable, Sendable {
 
     /// Whether once/locked is active (the UI shows English keycaps uppercase).
     public var isActive: Bool { self != .off }
-
-    /// Whether to show the one-shot uppercase state (once only; locked uses a separate lit/filled style).
-    public var isTemporary: Bool { self == .once }
 }

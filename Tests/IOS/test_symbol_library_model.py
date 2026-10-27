@@ -6,7 +6,7 @@ performed by a test case, never as a side effect of unittest discovery/import.
 import sys
 import unittest
 
-from swift_probe import ROOT, compile_swift, run, scratch_directory
+from swift_probe import CORE, ROOT, compile_swift, run, scratch_directory, section
 
 
 @unittest.skipUnless(sys.platform == "darwin", "requires the macOS Swift toolchain")
@@ -25,7 +25,8 @@ class SymbolLibraryModelTests(unittest.TestCase):
             generated = directory / "SymbolModelProbe.swift"
             # Private worker queues stay in the same file as the behavioral checks.
             generated.write_text("import Foundation\nimport Combine\n" + queue + "\n" + model + "\n" + management + "\n" + checks)
-            binary = compile_swift(directory, [generated, *sorted(stores.rglob("*.swift"))], library=True)
+            binary = compile_swift(directory, [generated, CORE / "Support/SerialIOQueue.swift",
+                                           *sorted(stores.rglob("*.swift"))], library=True)
             runtime = directory / "runtime"
             runtime.mkdir()
             print(run([str(binary), str(runtime), str(stores / "Resources")]), end="")
@@ -35,6 +36,11 @@ class SymbolLibraryModelTests(unittest.TestCase):
         storage = "public enum SymbolLibraryStorage {" + source.split("public enum SymbolLibraryStorage {", 1)[1]
         storage = storage.split("// MARK: - Serial symbol store", 1)[0]
         stores = ROOT / "Packages/QuickContentKit/Sources/QuickContentKit"
+        # The real store-directory helpers the storage resolution calls.
+        paths = (ROOT / "Apps/SharedKeyboard/RimePaths.swift").read_text()
+        rime_paths = "enum RimePaths {\n" + section(
+            paths, "    static func writableBase(subdir: String)", "    /// Private user directory used by") + section(
+            paths, "    /// The shared container's `sharedName` directory", "    /// Layout directory for the keyboard read path") + "}\n"
         probe = r'''
 import Foundation
 import OSLog
@@ -67,7 +73,7 @@ extension Bundle { static var module: Bundle { .main } }
 '''
         with scratch_directory("symbol-storage") as directory:
             generated = directory / "StorageProbe.swift"
-            generated.write_text("import Foundation\nimport OSLog\nimport os\n" + storage + "\n" + probe)
+            generated.write_text("import Foundation\nimport OSLog\nimport os\n" + storage + "\n" + rime_paths + "\n" + probe)
             binary = compile_swift(directory, [generated, *sorted(stores.rglob("*.swift"))], library=True)
             runtime = directory / "runtime"
             runtime.mkdir()

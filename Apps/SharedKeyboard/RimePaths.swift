@@ -27,11 +27,12 @@ public enum RimePaths {
         AppearanceStore(directory: localAppearanceDirectory())
     }
     public static func optionPreferencesDirectory() -> URL {
+        let name = "KeyboardOptions"
         if let container = KeyboardRecipeStore.sharedContainerURL() {
-            return container.appendingPathComponent("KeyboardOptions", isDirectory: true)
+            return container.appendingPathComponent(name, isDirectory: true)
         }
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("KeyboardOptions", isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
     }
     /// Built-in package scheme package (BuiltinPackages/Basic in Bundle.main).
     /// - Note: HostApp and KeyboardExtension each embed BuiltinPackages in their own bundle, so both
@@ -41,7 +42,7 @@ public enum RimePaths {
     }
 
     /// Base of the process-writable directory (a keyboard extension without full access can still write its own container).
-    private static func writableBase(subdir: String) -> URL? {
+    static func writableBase(subdir: String) -> URL? {
         let fm = FileManager.default
         let dirs = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)
         let base = dirs.first ?? fm.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -230,28 +231,34 @@ extension RimePaths {
     /// Resolves the DIY layout directory: prefers the App Group shared container (with a read/write probe), falling back to the app-local one on failure.
     /// Performs no writes outside the directory and does not touch existing recipe/dictionary paths.
     public static func layoutStoreDirectory() -> LayoutStoreLocation {
+        let resolved = probedStoreDirectory(sharedName: layoutDirectoryName, localName: "RimeLayouts", label: "layout")
+        return resolved.isShared ? .shared(resolved.url) : .local(resolved.url)
+    }
+
+    /// The shared container's `sharedName` directory once it passes a create/write/read/delete probe;
+    /// otherwise the process-local `localName` directory under Application Support (or Documents).
+    static func probedStoreDirectory(
+        sharedName: String, localName: String, label: String
+    ) -> (url: URL, isShared: Bool) {
         let fm = FileManager.default
         if let container = KeyboardRecipeStore.sharedContainerURL() {
-            let url = container.appendingPathComponent(layoutDirectoryName, isDirectory: true)
+            let url = container.appendingPathComponent(sharedName, isDirectory: true)
             do {
                 try fm.createDirectory(at: url, withIntermediateDirectories: true)
                 let probe = url.appendingPathComponent(".probe-\(UUID().uuidString)")
-                let bytes = Data("ok".utf8)
-                try bytes.write(to: probe, options: .atomic)
+                try Data("ok".utf8).write(to: probe, options: .atomic)
                 _ = try Data(contentsOf: probe)
                 try fm.removeItem(at: probe)
-                return .shared(url)
+                return (url, true)
             } catch {
                 Logger.keyboardStorage.error(
-                    "App Group layout directory unavailable: \(error.localizedDescription, privacy: .public)")
+                    "App Group \(label, privacy: .public) directory unavailable: \(error.localizedDescription, privacy: .public)"
+                )
             }
         }
-        let localBase =
-            fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fm.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let url = localBase.appendingPathComponent("RimeLayouts", isDirectory: true)
+        let url = writableBase(subdir: localName)!
         try? fm.createDirectory(at: url, withIntermediateDirectories: true)
-        return .local(url)
+        return (url, false)
     }
 
     /// Layout directory for the keyboard read path: resolves the URL only, with no read/write probe.
@@ -265,11 +272,7 @@ extension RimePaths {
         if let container = KeyboardRecipeStore.sharedContainerURL() {
             return .shared(container.appendingPathComponent(layoutDirectoryName, isDirectory: true))
         }
-        let fm = FileManager.default
-        let localBase =
-            fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fm.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return .local(localBase.appendingPathComponent("RimeLayouts", isDirectory: true))
+        return .local(writableBase(subdir: "RimeLayouts")!)
     }
 
     /// A read-only instance of the shared appearance store (creates no directory, writes no probe).
@@ -277,8 +280,7 @@ extension RimePaths {
     /// The read path only needs the shared container URL; `AppearanceStore.read()` itself never throws
     /// and never writes to disk. Returns nil when the container is unavailable (no full access).
     public static func sharedAppearanceReadStore() -> AppearanceStore? {
-        guard let container = KeyboardRecipeStore.sharedContainerURL() else { return nil }
-        let directory = container.appendingPathComponent("KeyboardAppearance", isDirectory: true)
+        guard let directory = sharedAppearanceDirectory() else { return nil }
         return AppearanceStore(directory: directory)
     }
 }

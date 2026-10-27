@@ -103,7 +103,8 @@ enum CompactAdapterDeployment {
         with scratch_directory("keyboard-preparation-reuse") as directory:
             generated = directory / "PreparationProbe.swift"
             generated.write_text(source)
-            binary = compile_swift(directory, [generated], library=True, dependencies=("KeyboardCore",))
+            binary = compile_swift(directory, [generated, ROOT / "Packages/PackageManager/Sources/PackageManager/InstalledPackageLayout.swift"],
+                                  library=True, dependencies=("KeyboardCore",))
             print(run([str(binary), str(directory)]), end="")
 
 

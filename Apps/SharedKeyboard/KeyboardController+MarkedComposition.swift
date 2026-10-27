@@ -7,8 +7,6 @@ import OSLog
 import UIKit
 
 extension KeyboardController {
-    /// Display gate for merged 14/9 layouts (UI hint only; engine-side display is driven by schema capability).
-    public var usesReducedLayout: Bool { layout.requiresSpellingDisplay }
     /// Replaces the unconfirmed raw-code segment only when the current schema declares a non-native
     /// display capability and the policy resolves a highlighted-segment display value. The criterion is
     /// `snapshot.displayMode`/`highlightedDisplay` (from the actual schema's `keyboard_adapter`
@@ -81,19 +79,23 @@ extension KeyboardController {
         return MarkedComposition(text: head + echo + tail, selection: NSRange(location: caretAfter, length: 0))
     }
     /// The one composition string for the host field and the in-keyboard fallback.
-    public var markedComposition: MarkedComposition {
+    public var markedComposition: MarkedComposition { markedComposition(sentenceSpelling: sentenceSpelling) }
+
+    /// `refresh` passes a `sentenceSpelling` it already computed; it is costly per key.
+    func markedComposition(sentenceSpelling spelling: @autoclosure () -> String?) -> MarkedComposition {
         // A keypad spells the sentence while the highlighted reading is still being
         // read, instead of holding the field (that read waits behind deferred keys).
         let reading =
             highlightedReading.isEmpty && (highlightedReadCompleted || snapshot.hidesNumericTransportCode)
-            ? sentenceSpelling ?? "" : highlightedReading
+            ? spelling() ?? "" : highlightedReading
         let keypad = snapshot.hidesNumericTransportCode
+        let exactLetters = exactTokenLetters
         let marked = MarkedComposition(
             snapshot: snapshot, chinesePreview: usesChineseMarkedPreview,
             spellingPreedit: usesSpellingPreedit,
             readingFallback: keypad ? Self.keypadJoined(reading) : reading,
             keypadTail: keypad ? keypadTailSpelling ?? "" : "",
-            exactLetters: isEnglishMode || snapshot.isAsciiMode ? [:] : exactTokenLetters)
+            exactLetters: isEnglishMode || snapshot.isAsciiMode ? [:] : exactLetters)
         // An unverifiable (e.g. polyphonic) highlight falls back to the engine preedit,
         // which already spells the completed candidate (`na` for one key). Trim a
         // pure-pinyin preedit with the caret at its end the same way.
@@ -109,7 +111,7 @@ extension KeyboardController {
             snapshot.preedit.allSatisfy(\.isASCII),
             let path = readingFilter.matches.first?.readingPaths?.first(where: readingFilter.startsWithPrefix),
             let typed = ReadingInputCoverage(
-                input: snapshot.rawInput, keyForLetter: readingKeyMap, exactKeys: exactTokenLetters)?
+                input: snapshot.rawInput, keyForLetter: readingKeyMap, exactKeys: exactLetters)?
                 .typedSpelling(path)
         {
             return MarkedComposition(text: typed.joined(separator: keypad ? SentenceSpelling.separator : " "))
@@ -118,7 +120,9 @@ extension KeyboardController {
             marked.selection.location == marked.text.utf16.count,
             marked.text.allSatisfy({ $0.isASCII && ($0.isLetter || $0 == " " || $0 == "'") })
         else { return marked }
-        let typed = typedReading(marked.text, rawInput: snapshot.rawInput, keypad: snapshot.hidesNumericTransportCode)
+        let typed = typedReading(
+            marked.text, rawInput: snapshot.rawInput, keypad: snapshot.hidesNumericTransportCode,
+            exactLetters: exactLetters)
         return typed == marked.text ? marked : MarkedComposition(text: typed)
     }
 
@@ -185,7 +189,9 @@ extension KeyboardController {
             highlightedReadCompleted = true
             let reading = resolved ?? ""
             let safeReading = s.hidesNumericTransportCode && reading.contains(where: { $0.isNumber }) ? "" : reading
-            let shownReading = typedReading(safeReading, rawInput: s.rawInput, keypad: s.hidesNumericTransportCode)
+            let shownReading = typedReading(
+                safeReading, rawInput: s.rawInput, keypad: s.hidesNumericTransportCode,
+                exactLetters: exactTokenLetters)
             guard highlightedReading != shownReading else {
                 // The held text (see `refresh`) is released even when unchanged.
                 publishMarked(markedComposition)
@@ -242,10 +248,12 @@ extension KeyboardController {
     /// whether they came from a verified reading or the engine's `'`-joined preedit.
     /// Unprovable key maps keep the reading. A numeric keypad joins syllables with
     /// `'` like mainstream 9-key pinyin (`ni'h`).
-    private func typedReading(_ reading: String, rawInput: String, keypad: Bool) -> String {
+    private func typedReading(
+        _ reading: String, rawInput: String, keypad: Bool, exactLetters: [Character: Character]
+    ) -> String {
         guard !reading.isEmpty,
             let coverage = ReadingInputCoverage(
-                input: rawInput, keyForLetter: readingKeyMap, exactKeys: exactTokenLetters)
+                input: rawInput, keyForLetter: readingKeyMap, exactKeys: exactLetters)
         else {
             return keypad ? Self.keypadJoined(reading) : reading
         }
@@ -280,9 +288,11 @@ extension KeyboardController {
     /// A verified reading for the live snapshot is still being read. The field keeps
     /// its previous text meanwhile instead of flashing the raw engine preedit
     /// (merged-key letters or `'`-joined codes) for one frame on every key.
-    var holdsMarkedCompositionForReading: Bool {
+    var holdsMarkedCompositionForReading: Bool { holdsMarkedComposition(sentenceSpelling: sentenceSpelling) }
+
+    func holdsMarkedComposition(sentenceSpelling spelling: @autoclosure () -> String?) -> Bool {
         highlightedReadInFlight != nil && highlightedReading.isEmpty
-            && !(snapshot.hidesNumericTransportCode && sentenceSpelling != nil)
+            && !(snapshot.hidesNumericTransportCode && spelling() != nil)
     }
 
     /// An abandoned read (layout/mode changed under it) must not leave the field on

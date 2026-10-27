@@ -63,9 +63,6 @@ public enum CandidateCollapsedFlow {
 
     // MARK: Vertical budget (inside the fixed header surface)
 
-    /// Base layout box height of a collapsed cell. For larger primary candidate sizes the effective header height makes up the difference.
-    public static let minimumBlockHeight: CGFloat = 36
-
     /// Automatic layout box height: always <= budget (never exceeding the original block height).
     ///
     /// The collapsed state never scales as a whole: the primary candidate is always rasterized natively at its

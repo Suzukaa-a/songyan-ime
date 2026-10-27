@@ -680,14 +680,6 @@ enum RecipePlanSupport {
 }
 
 public extension RecipePackageManager {
-    /// Read a quiescent workspace for planning. User custom files override shared copies;
-    /// live databases and compiled build output never enter a recipe resource plan.
-    static func readRecipeWorkspace(resources: URL, userConfiguration: URL? = nil) throws -> [String: Data] {
-        let snapshot = try readRecipeWorkspaceSnapshot(resources: resources, userConfiguration: userConfiguration)
-        guard snapshot.fileResources.isEmpty else { throw RecipeInstallError.invalidResource("包含模型文件的工作区需保留文件引用，请重试。") }
-        return snapshot.files
-    }
-
     static func readRecipeWorkspaceSnapshot(resources: URL, userConfiguration: URL? = nil) throws
         -> RecipeWorkspaceSnapshot
     {

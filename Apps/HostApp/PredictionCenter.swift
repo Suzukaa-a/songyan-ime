@@ -109,7 +109,9 @@ final class PredictionCenter: ObservableObject {
                 packageID: packageID, revision: activation.revision, keyboard: keyboard,
                 schemaID: schemaID, state: state, eligible: eligible, databaseBytes: bytes)
         }
-        guard let compiled = try? Data(contentsOf: snapshot.build.appendingPathComponent(schemaID + ".schema.yaml"))
+        guard
+            let compiled = try? Data(
+                contentsOf: InstalledPackageLayout.compiledSchemaURL(build: snapshot.build, id: schemaID))
         else {
             return make(.unavailable("无法读取当前输入方式的设置。"))
         }
@@ -249,75 +251,31 @@ extension SchemeImportCenter {
     func applyPrediction(enabled: Bool, packageID: String, database: RecipeFileResource?) async throws
         -> PredictionOutcome
     {
-        guard !busy, !KeyboardSelectionCenter.shared.isBusy else { throw UserKeyboardPublicationError.busy }
-        busy = true
-        message = database != nil ? "正在导入联想词库…" : (enabled ? "正在开启上屏联想…" : "正在关闭上屏联想…")
-        defer {
-            busy = false
-            message = nil
-        }
-        let openCC = Bundle.main.url(forResource: "opencc", withExtension: nil, subdirectory: "EngineResources")
-        let store = manager(packageID)
-        let packageName = installedPackages.first { $0.id == packageID }?.name
-        return try await EngineOwnershipCoordinator.shared.withExclusive {
-            guard let active = try await store.activeInstallation() else {
-                throw RecipeInstallError.invalidResource("请先安装输入方案")
-            }
-            let reference = packageID
-            let snapshot = try await Self.readWorkspaceSnapshot(
-                resources: active.resourceURL,
-                userConfiguration: active.userDataURL)
-            let sources = try await Self.readInstalledSources(resources: active.resourceURL)
-            let hasDatabase = database != nil || snapshot.fileResources[Prediction.databasePath] != nil
-            guard hasDatabase || !enabled else { throw RecipeInstallError.invalidResource("请先导入联想词库。") }
-            let build = active.userDataURL.appendingPathComponent("build")
-            let task = Task.detached(priority: .userInitiated) {
-                () throws -> (DeclarativeRecipePlan, [Prediction.Target])? in
+        let result = try await applyManagedPatch(
+            packageID: packageID,
+            message: database != nil ? "正在导入联想词库…" : (enabled ? "正在开启上屏联想…" : "正在关闭上屏联想…"),
+            plan: { context in
+                let hasDatabase = database != nil || context.snapshot.fileResources[Prediction.databasePath] != nil
+                guard hasDatabase || !enabled else { throw RecipeInstallError.invalidResource("请先导入联想词库。") }
                 let changes = PredictionPlanning.changes(
-                    desired: enabled, build: build,
-                    customFiles: snapshot.files, packageReference: reference)
+                    desired: enabled, build: context.build,
+                    customFiles: context.snapshot.files, packageReference: packageID)
                 guard !changes.isEmpty || database != nil else { return nil }
                 let recipe = try Prediction.make(
                     enabling: enabled ? changes : [], disabling: enabled ? [] : changes,
                     installDatabase: database != nil)
-                var files = sources.files
-                files[recipe.path] = recipe.source
-                var resources = sources.fileResources
+                var resources: [String: RecipeFileResource] = [:]
                 if let database { resources[Prediction.databasePath] = database }
-                let plan = try DeclarativeRecipePlan(
-                    recipe: recipe, packageReference: reference,
-                    selectedRecipe: recipe.declaredName ?? "", arguments: [], packageFiles: files,
-                    existingFiles: snapshot.files, sourceRevision: active.installation.revision,
-                    expectedGeneration: active.installation.generation,
-                    packageFileResources: resources,
-                    existingFileResources: snapshot.fileResources,
-                    userCustomBaseline: snapshot.userCustomFiles, sharedOpenCCDirectory: openCC)
-                return (plan, changes)
-            }
-            let planned = try await withTaskCancellationHandler(
-                operation: { try await task.value },
-                onCancel: { task.cancel() })
-            guard let planned else {
-                return PredictionOutcome(changed: false, previousRevision: active.installation.revision)
-            }
-            let (plan, changes) = planned
-            _ = try await store.installRecipePlan(
-                plan, packageID: reference, schemaID: active.installation.schemaID,
-                deploy: { deployment in
-                    let compiled = deployment.userDataURL.appendingPathComponent("build")
-                    let resources = deployment.resourceURL
-                    let verification = try await Self.verifyRecipeDeployment(
-                        deployment,
-                        packageID: reference, packageName: packageName,
-                        postValidation: { engine, enabledIDs in
-                            try PredictionPlanning.verify(
-                                engine: engine, enabledSchemaIDs: enabledIDs,
-                                changes: changes, desired: enabled, build: compiled, resources: resources)
-                        })
-                    return verification.receipt
-                })
-            return PredictionOutcome(changed: true, previousRevision: active.installation.revision)
-        }
+                return ManagedPatchPlan(recipe: recipe, resources: resources, change: changes)
+            },
+            verify: { engine, enabledIDs, deployment, changes in
+                try PredictionPlanning.verify(
+                    engine: engine, enabledSchemaIDs: enabledIDs,
+                    changes: changes, desired: enabled,
+                    build: deployment.userDataURL.appendingPathComponent("build"),
+                    resources: deployment.resourceURL)
+            })
+        return PredictionOutcome(changed: result.installed != nil, previousRevision: result.previousRevision)
     }
 }
 
@@ -327,14 +285,11 @@ enum PredictionPlanning {
         desired: Bool, build: URL, customFiles: [String: Data],
         packageReference: String
     ) -> [Prediction.Target] {
-        guard let defaults = try? Data(contentsOf: build.appendingPathComponent("default.yaml")) else { return [] }
         var targets: [Prediction.Target] = []
         var current: [String: Bool] = [:]
         var managed = Set<String>()
-        for id in TypoCorrection.enabledSchemaIDs(compiledDefault: defaults) {
-            guard let compiled = try? Data(contentsOf: build.appendingPathComponent(id + ".schema.yaml")),
-                let target = Prediction.eligibility(compiled: compiled, schemaID: id).target
-            else { continue }
+        for (id, compiled) in TypoCorrection.enabledCompiledSchemas(build: build) {
+            guard let target = Prediction.eligibility(compiled: compiled, schemaID: id).target else { continue }
             targets.append(target)
             current[id] = Prediction.compiledEnabled(compiled: compiled)
             if Prediction.userOwnsSetting(

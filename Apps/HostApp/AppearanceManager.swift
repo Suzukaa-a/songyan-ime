@@ -12,15 +12,11 @@ import SwiftUI
 ///
 /// Shared by `AppearanceManager` and `LayoutManager`.
 enum HostConfigIOQueue {
-    private static let serial = DispatchQueue(label: "app.songyan.host.config.io", qos: .utility)
+    private static let serial = SerialIOQueue(label: "app.songyan.host.config.io", qos: .utility)
 
     /// Runs configuration I/O on the serial background queue without blocking the caller.
     static func async<T>(_ body: @escaping @Sendable () throws -> T) async throws -> sending T {
-        try await withCheckedThrowingContinuation { continuation in
-            serial.async {
-                do { continuation.resume(returning: try body()) } catch { continuation.resume(throwing: error) }
-            }
-        }
+        try await serial.async(body)
     }
 }
 
@@ -72,8 +68,6 @@ enum HostConfigIOQueue {
     init() {
         reload()
     }
-
-    var isSharedAvailable: Bool { RimePaths.sharedAppearanceStore() != nil }
 
     /// Re-reads the snapshot and drafts on `HostConfigIOQueue`; returns immediately.
     ///

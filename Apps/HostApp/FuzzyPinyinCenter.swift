@@ -199,7 +199,9 @@ final class FuzzyPinyinCenter: ObservableObject {
         guard let schemaID = activation.selectedSchemaID ?? activation.requiredSchemaIDs.first else { return nil }
         let keyboard = activation.selectedLayout.map { PublishedKeyboard(schemaID: schemaID, layout: $0) }
         let unavailable = State.unavailable("当前输入方式不支持模糊音。")
-        guard let compiled = try? Data(contentsOf: snapshot.build.appendingPathComponent(schemaID + ".schema.yaml")),
+        guard
+            let compiled = try? Data(
+                contentsOf: InstalledPackageLayout.compiledSchemaURL(build: snapshot.build, id: schemaID)),
             let target = FuzzyPinyin.eligibility(compiled: compiled, schemaID: schemaID).target
         else {
             return make(keyboard, schemaID, unavailable, nil, packageID: packageID)
@@ -218,7 +220,7 @@ final class FuzzyPinyinCenter: ObservableObject {
             guard
                 let source = try Self.optionalCustomData(
                     at: userDirectory.deletingLastPathComponent()
-                        .appendingPathComponent("source.json"))
+                        .appendingPathComponent(InstalledPackageLayout.sourceFile))
             else {
                 return make(keyboard, schemaID, unavailable, nil, packageID: packageID)
             }
@@ -413,43 +415,25 @@ extension SchemeImportCenter {
         schemaID: String, enabledPairIDs: Set<String>, packageID: String,
         viewedGeneration: String?, savedGeneration: String? = nil
     ) async throws -> FuzzyPinyinOutcome {
-        guard !busy, !KeyboardSelectionCenter.shared.isBusy else { throw UserKeyboardPublicationError.busy }
-        busy = true
-        message = enabledPairIDs.isEmpty ? "正在关闭模糊音…" : "正在保存模糊音…"
-        defer {
-            busy = false
-            message = nil
-        }
-        let openCC = Bundle.main.url(forResource: "opencc", withExtension: nil, subdirectory: "EngineResources")
-        let store = manager(packageID)
-        let packageName = installedPackages.first { $0.id == packageID }?.name
-        return try await EngineOwnershipCoordinator.shared.withExclusive {
-            guard let active = try await store.activeInstallation() else {
-                throw RecipeInstallError.invalidResource("请先安装输入方案")
-            }
-            // `savedGeneration` is the version an earlier save of this page installed but the
-            // keyboard never picked up; retrying from it only has to finish the republish.
-            let installedGeneration = active.installation.generation
-            guard
-                installedGeneration == viewedGeneration
-                    || (savedGeneration != nil && installedGeneration == savedGeneration)
-            else {
-                throw UserKeyboardPublicationError.unavailable(
-                    "输入方案已有新版本，请先在「我的键盘」中选择要使用的版本。")
-            }
-            let unpublished = installedGeneration != viewedGeneration
-            let reference = packageID
-            let snapshot = try await Self.readWorkspaceSnapshot(
-                resources: active.resourceURL,
-                userConfiguration: active.userDataURL)
-            let sources = try await Self.readInstalledSources(resources: active.resourceURL)
-            let build = active.userDataURL.appendingPathComponent("build")
-            let task = Task.detached(priority: .userInitiated) {
-                () throws -> (DeclarativeRecipePlan, FuzzyPinyin.Target)? in
+        let result = try await applyManagedPatch(
+            packageID: packageID, message: enabledPairIDs.isEmpty ? "正在关闭模糊音…" : "正在保存模糊音…",
+            preflight: { active in
+                // `savedGeneration` is the version an earlier save of this page installed but the
+                // keyboard never picked up; retrying from it only has to finish the republish.
+                let installedGeneration = active.installation.generation
+                guard
+                    installedGeneration == viewedGeneration
+                        || (savedGeneration != nil && installedGeneration == savedGeneration)
+                else {
+                    throw UserKeyboardPublicationError.unavailable(
+                        "输入方案已有新版本，请先在「我的键盘」中选择要使用的版本。")
+                }
+            },
+            plan: { context in
                 let planned: FuzzyPinyin.Planned
                 switch FuzzyPinyin.plan(
                     schemaID: schemaID, enabledPairIDs: enabledPairIDs,
-                    build: build, customFiles: snapshot.files, packageReference: reference)
+                    build: context.build, customFiles: context.snapshot.files, packageReference: packageID)
                 {
                 case .noChange: return nil
                 case .refused(let reason): throw UserKeyboardPublicationError.unavailable(reason)
@@ -460,44 +444,18 @@ extension SchemeImportCenter {
                 let recipe = try FuzzyPinyin.make(
                     enabledPairIDsBySchema: planned.pairIDsBySchema,
                     targets: planned.targets)
-                // A previous run archived a different body at the same path; the new recipe
-                // replaces it (same as typo correction bindings).
-                var files = sources.files
-                files[recipe.path] = recipe.source
-                let plan = try DeclarativeRecipePlan(
-                    recipe: recipe, packageReference: reference,
-                    selectedRecipe: recipe.declaredName ?? "", arguments: [], packageFiles: files,
-                    existingFiles: snapshot.files, sourceRevision: active.installation.revision,
-                    expectedGeneration: active.installation.generation,
-                    packageFileResources: sources.fileResources,
-                    existingFileResources: snapshot.fileResources,
-                    userCustomBaseline: snapshot.userCustomFiles, sharedOpenCCDirectory: openCC)
-                return (plan, planned.changed)
-            }
-            let planned = try await withTaskCancellationHandler(
-                operation: { try await task.value },
-                onCancel: { task.cancel() })
-            guard let planned else {
-                return FuzzyPinyinOutcome(
-                    changed: unpublished, previousRevision: active.installation.revision,
-                    generation: installedGeneration)
-            }
-            let (plan, changedTarget) = planned
-            let installed = try await store.installRecipePlan(
-                plan, packageID: reference, schemaID: active.installation.schemaID,
-                deploy: { deployment in
-                    let verification = try await Self.verifyRecipeDeployment(
-                        deployment,
-                        packageID: reference, packageName: packageName,
-                        postValidation: { _, enabledIDs in
-                            try FuzzyPinyinPlanning.verify(enabledSchemaIDs: enabledIDs, target: changedTarget)
-                        })
-                    return verification.receipt
-                })
+                return ManagedPatchPlan(recipe: recipe, change: planned.changed)
+            },
+            verify: { _, enabledIDs, _, changedTarget in
+                try FuzzyPinyinPlanning.verify(enabledSchemaIDs: enabledIDs, target: changedTarget)
+            })
+        guard let installed = result.installed else {
             return FuzzyPinyinOutcome(
-                changed: true, previousRevision: active.installation.revision,
-                generation: installed.generation)
+                changed: result.previousGeneration != viewedGeneration,
+                previousRevision: result.previousRevision, generation: result.previousGeneration)
         }
+        return FuzzyPinyinOutcome(
+            changed: true, previousRevision: result.previousRevision, generation: installed.generation)
     }
 }
 

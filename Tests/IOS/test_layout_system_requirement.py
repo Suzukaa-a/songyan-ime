@@ -299,7 +299,7 @@ class LayoutSystemRequirementTests(unittest.TestCase):
                 + fixture + "\n" + CHECKS)
             binary = compile_swift(
                 directory,
-                [generated, CORE / "Support/LatestWinsReadGate.swift", *sources],
+                [generated, CORE / "Support/LatestWinsReadGate.swift", CORE / "Support/SerialIOQueue.swift", *sources],
                 library=True)
             runtime = directory / "runtime"
             runtime.mkdir()

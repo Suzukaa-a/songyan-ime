@@ -86,18 +86,6 @@ public struct SchemaDisplayCapability: Equatable, Sendable {
         self.syllables = syllables
     }
 
-    public enum DecodeError: Error, Equatable {
-        case unsupportedVersion(Int)
-        case unknownDisplayMode(String)
-        case unsupportedMappingPolicy(String)
-        case emptySourceSchema
-        case emptyTranslatorNamespace
-        case emptySeparator
-        case emptyAdapterSchema
-        case emptySyllableKey
-        case emptySyllableValue(String)
-    }
-
     /// Strict decode: returns nil if any gate fails (callers must fall back to native).
     /// `canonical`/`source_code`/`source_rendered` must carry `adapter_schema`;
     /// `source_code` also needs `unique_normal` and a non-empty mapping.
@@ -313,15 +301,5 @@ public enum CompositionDisplayPolicy {
             snapshot.displayMode = .native
         }
         return (snapshot, outcome)
-    }
-
-    /// The exact display span a resolved snapshot must mark: the production
-    /// `MarkedComposition` for `[selStart, selEnd)` replaced by the display value.
-    /// Returns nil when the production rewrite refuses (caller falls back).
-    public static func markedSegment(
-        for snapshot: EngineSnapshot,
-        spellingPreedit: Bool = true
-    ) -> MarkedComposition {
-        MarkedComposition(snapshot: snapshot, spellingPreedit: spellingPreedit)
     }
 }

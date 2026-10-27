@@ -110,7 +110,7 @@ enum KeyboardPageDraftFactory {
             let quick: String
             if let shared = KeyboardRecipeStore.sharedContainerURL() {
                 quick = try T9QuickSymbolStore(
-                    directory: shared.appendingPathComponent("KeyboardQuickSymbols", isDirectory: true)
+                    directory: shared.appendingPathComponent(T9QuickSymbolStore.directoryName, isDirectory: true)
                 ).load().symbols
             } else {
                 quick = T9QuickSymbolStore.defaultSymbols

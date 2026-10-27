@@ -266,15 +266,15 @@ extension SchemePackageImportView {
             if let provided = center.providedDownloadFiles[resource.path] {
                 Text(
                     developerOptions
-                        ? "\(ByteCountFormatter.string(fromByteCount: Int64(provided.size), countStyle: .file)) · SHA256 \(String(provided.sha256.prefix(12)))…"
-                        : ByteCountFormatter.string(fromByteCount: Int64(provided.size), countStyle: .file)
+                        ? "\(HostStorePaths.fileSizeText(provided.size)) · SHA256 \(String(provided.sha256.prefix(12)))…"
+                        : HostStorePaths.fileSizeText(provided.size)
                 )
                 .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             } else if let ordinary = center.providedOrdinaryResources[resource.path] {
                 Text(
                     developerOptions
-                        ? "\(ByteCountFormatter.string(fromByteCount: Int64(ordinary.size), countStyle: .file)) · SHA256 \(String(ordinary.sha256.prefix(12)))…"
-                        : ByteCountFormatter.string(fromByteCount: Int64(ordinary.size), countStyle: .file)
+                        ? "\(HostStorePaths.fileSizeText(ordinary.size)) · SHA256 \(String(ordinary.sha256.prefix(12)))…"
+                        : HostStorePaths.fileSizeText(ordinary.size)
                 )
                 .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             } else {

@@ -157,7 +157,7 @@ public enum SchemeGrammarRequirements {
                 entries = list.compactMap { $0["schema"] as? String }
             } else {
                 // Same fallback as SharedRimePresets when no source default exists.
-                entries = files.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }.map {
+                entries = InstalledPackageLayout.topLevelSchemaFiles(in: files.keys).map {
                     String($0.dropLast(12))
                 }
             }

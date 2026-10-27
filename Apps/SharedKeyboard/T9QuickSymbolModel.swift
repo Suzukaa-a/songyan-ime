@@ -152,7 +152,8 @@ private final class T9QuickSymbolIOWorker: Sendable {
 
     private func resolveStore() -> T9QuickSymbolStore? {
         guard let shared = sharedContainer() else { return nil }
-        return T9QuickSymbolStore(directory: shared.appendingPathComponent("KeyboardQuickSymbols", isDirectory: true))
+        return T9QuickSymbolStore(
+            directory: shared.appendingPathComponent(T9QuickSymbolStore.directoryName, isDirectory: true))
     }
 }
 

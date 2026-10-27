@@ -637,7 +637,7 @@ public struct KeyboardPanelHost: View {
                 snapshot = try await KeyboardResourceReadQueue.async { () throws -> ShuangpinHintSnapshot? in
                     guard let root = KeyboardRecipeStore.sharedContainerURL() else { return nil }
                     return try ShuangpinHintStore(
-                        directory: root.appendingPathComponent("ShuangpinHints", isDirectory: true)
+                        directory: root.appendingPathComponent(ShuangpinHintStore.directoryName, isDirectory: true)
                     ).load()
                 }
             } catch {

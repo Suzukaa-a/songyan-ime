@@ -99,7 +99,9 @@ final class TypoCorrectionCenter: ObservableObject {
         guard let schemaID = activation.selectedSchemaID ?? activation.requiredSchemaIDs.first else { return nil }
         let keyboard = activation.selectedLayout.map { PublishedKeyboard(schemaID: schemaID, layout: $0) }
         let unavailable = State.unavailable("当前输入方式不支持错键纠正。")
-        guard let compiled = try? Data(contentsOf: snapshot.build.appendingPathComponent(schemaID + ".schema.yaml")),
+        guard
+            let compiled = try? Data(
+                contentsOf: InstalledPackageLayout.compiledSchemaURL(build: snapshot.build, id: schemaID)),
             let target = TypoCorrection.eligibility(compiled: compiled, schemaID: schemaID).target
         else {
             return PublishedContext(
@@ -212,72 +214,25 @@ extension SchemeImportCenter {
     /// managed patch; the live engine must read the new value back before commit. Failure
     /// leaves the previous installation and publication untouched.
     func applyTypoCorrection(enabled: Bool, packageID: String) async throws -> TypoCorrectionOutcome {
-        guard !busy, !KeyboardSelectionCenter.shared.isBusy else { throw UserKeyboardPublicationError.busy }
-        busy = true
-        message = enabled ? "正在开启错键纠正…" : "正在关闭错键纠正…"
-        defer {
-            busy = false
-            message = nil
-        }
-        let openCC = Bundle.main.url(forResource: "opencc", withExtension: nil, subdirectory: "EngineResources")
-        let store = manager(packageID)
-        let packageName = installedPackages.first { $0.id == packageID }?.name
-        return try await EngineOwnershipCoordinator.shared.withExclusive {
-            guard let active = try await store.activeInstallation() else {
-                throw RecipeInstallError.invalidResource("请先安装输入方案")
-            }
-            let reference = packageID
-            let snapshot = try await Self.readWorkspaceSnapshot(
-                resources: active.resourceURL,
-                userConfiguration: active.userDataURL)
-            let sources = try await Self.readInstalledSources(resources: active.resourceURL)
-            let build = active.userDataURL.appendingPathComponent("build")
-            let task = Task.detached(priority: .userInitiated) {
-                () throws -> (DeclarativeRecipePlan, [TypoCorrection.Target])? in
+        let result = try await applyManagedPatch(
+            packageID: packageID, message: enabled ? "正在开启错键纠正…" : "正在关闭错键纠正…",
+            plan: { context in
                 let changes = TypoCorrectionPlanning.changes(
-                    desired: enabled, build: build,
-                    customFiles: snapshot.files, packageReference: reference)
+                    desired: enabled, build: context.build,
+                    customFiles: context.snapshot.files, packageReference: packageID)
                 guard !changes.isEmpty else { return nil }
                 let recipe = try TypoCorrection.make(
                     enabling: enabled ? changes : [],
                     disabling: enabled ? [] : changes)
-                // A previous run archived a different body at the same path; the new recipe
-                // replaces it (same as grammar model bindings).
-                var files = sources.files
-                files[recipe.path] = recipe.source
-                let plan = try DeclarativeRecipePlan(
-                    recipe: recipe, packageReference: reference,
-                    selectedRecipe: recipe.declaredName ?? "", arguments: [], packageFiles: files,
-                    existingFiles: snapshot.files, sourceRevision: active.installation.revision,
-                    expectedGeneration: active.installation.generation,
-                    packageFileResources: sources.fileResources,
-                    existingFileResources: snapshot.fileResources,
-                    userCustomBaseline: snapshot.userCustomFiles, sharedOpenCCDirectory: openCC)
-                return (plan, changes)
-            }
-            let planned = try await withTaskCancellationHandler(
-                operation: { try await task.value },
-                onCancel: { task.cancel() })
-            guard let planned else {
-                return TypoCorrectionOutcome(changed: false, previousRevision: active.installation.revision)
-            }
-            let (plan, changes) = planned
-            _ = try await store.installRecipePlan(
-                plan, packageID: reference, schemaID: active.installation.schemaID,
-                deploy: { deployment in
-                    let compiled = deployment.userDataURL.appendingPathComponent("build")
-                    let verification = try await Self.verifyRecipeDeployment(
-                        deployment,
-                        packageID: reference, packageName: packageName,
-                        postValidation: { engine, enabledIDs in
-                            try TypoCorrectionPlanning.verify(
-                                engine: engine, enabledSchemaIDs: enabledIDs,
-                                changes: changes, desired: enabled, build: compiled)
-                        })
-                    return verification.receipt
-                })
-            return TypoCorrectionOutcome(changed: true, previousRevision: active.installation.revision)
-        }
+                return ManagedPatchPlan(recipe: recipe, change: changes)
+            },
+            verify: { engine, enabledIDs, deployment, changes in
+                try TypoCorrectionPlanning.verify(
+                    engine: engine, enabledSchemaIDs: enabledIDs,
+                    changes: changes, desired: enabled,
+                    build: deployment.userDataURL.appendingPathComponent("build"))
+            })
+        return TypoCorrectionOutcome(changed: result.installed != nil, previousRevision: result.previousRevision)
     }
 }
 
@@ -289,14 +244,11 @@ enum TypoCorrectionPlanning {
         desired: Bool, build: URL, customFiles: [String: Data],
         packageReference: String
     ) -> [TypoCorrection.Target] {
-        guard let defaults = try? Data(contentsOf: build.appendingPathComponent("default.yaml")) else { return [] }
         var targets: [TypoCorrection.Target] = []
         var current: [String: Bool] = [:]
         var managed = Set<String>()
-        for id in TypoCorrection.enabledSchemaIDs(compiledDefault: defaults) {
-            guard let compiled = try? Data(contentsOf: build.appendingPathComponent(id + ".schema.yaml")),
-                let target = TypoCorrection.eligibility(compiled: compiled, schemaID: id).target
-            else { continue }
+        for (id, compiled) in TypoCorrection.enabledCompiledSchemas(build: build) {
+            guard let target = TypoCorrection.eligibility(compiled: compiled, schemaID: id).target else { continue }
             targets.append(target)
             current[id] = TypoCorrection.compiledValue(compiled: compiled, target: target)
             if TypoCorrection.userOwnsSetting(
@@ -325,8 +277,8 @@ enum TypoCorrectionPlanning {
             }
         }
         let names = (try? FileManager.default.contentsOfDirectory(atPath: build.path)) ?? []
-        for name in names where name.hasSuffix(".schema.yaml") {
-            let id = String(name.dropLast(".schema.yaml".count))
+        for name in names where name.hasSuffix(InstalledPackageLayout.schemaFileSuffix) {
+            let id = String(name.dropLast(InstalledPackageLayout.schemaFileSuffix.count))
             guard CompactSchemaAdapter.isGeneratedCompanionID(id) else { continue }
             if engine.schemaValue(id, key: "translator/" + TypoCorrection.configLeaf) == "true" {
                 throw RecipeInstallError.deployment("错键纠正不适用于紧凑键盘：\(id)")

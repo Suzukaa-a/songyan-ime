@@ -291,7 +291,7 @@ struct InputOptionsView: View {
                     .font(.caption).foregroundStyle(.red)
             }
             if let bytes = prediction.databaseBytes {
-                Text("已导入联想词库（\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))）")
+                Text("已导入联想词库（\(HostStorePaths.fileSizeText(bytes))）")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if prediction.working {

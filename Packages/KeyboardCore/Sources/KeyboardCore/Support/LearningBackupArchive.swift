@@ -58,15 +58,6 @@ public struct LearningBackupArchive: Codable, Equatable, Sendable {
     public static let maximumSourceNameBytes = 256
     public static let maximumEngineVersionBytes = 128
 
-    /// Whether this platform has a real SHA256 (without CryptoKit it does not degrade to a weak hash; the archive is refused).
-    public static var canVerifyDigests: Bool {
-        #if canImport(CryptoKit)
-            return true
-        #else
-            return false
-        #endif
-    }
-
     // MARK: - Fields
 
     public let version: Int

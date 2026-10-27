@@ -106,8 +106,6 @@ public struct PhoneKeypadMetrics: Equatable, Sendable {
     public var mainWidth: Double { digitWidth * 3 + spacing * 2 }
     /// Rail + gap + pad + gap + rail; identical to `contentWidth` by construction.
     public var computedContentWidth: Double { railWidth * 2 + mainWidth + spacing * 2 }
-    /// Every horizontal gap in the unit: two inner pad gaps plus the two rail gaps.
-    public var gapBudget: Double { spacing * 4 }
     /// Symmetric margin around the whole shell (grid and control row together).
     /// Exactly zero on every supported phone width.
     public var outerInset: Double { max(0, (width - contentWidth) / 2) }

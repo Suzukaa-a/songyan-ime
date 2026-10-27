@@ -4,6 +4,7 @@ import unittest
 
 from swift_probe import ROOT, run, run_swift, scratch_directory, section
 
+SERIAL_IO_QUEUE = ROOT / "Packages/KeyboardCore/Sources/KeyboardCore/Support/SerialIOQueue.swift"
 SYMBOL_MODEL = ROOT / "Apps/SharedKeyboard/SymbolLibraryModel.swift"
 LOCAL_MODEL = ROOT / "Apps/SharedKeyboard/LocalQuickContentModel.swift"
 EDITOR = ROOT / "Apps/HostApp/SymbolCatalogManagementView.swift"
@@ -164,6 +165,7 @@ def production_source():
     local_model = LOCAL_MODEL.read_text(encoding="utf-8")
     editor = EDITOR.read_text(encoding="utf-8")
     pieces = [
+        SERIAL_IO_QUEUE.read_text(encoding="utf-8").replace("import Foundation\n", ""),
         section(symbol_model, *WRITE_QUEUE),
         local_model[local_model.index(STORAGE_MARK):],
         section(editor, SAVE_PATH_MARK, VIEW_MARK),

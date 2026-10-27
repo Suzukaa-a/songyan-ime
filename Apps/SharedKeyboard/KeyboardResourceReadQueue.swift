@@ -1,4 +1,5 @@
 import Foundation
+import KeyboardCore
 
 /// Read-only resource/appearance resolution queue for the keyboard.
 ///
@@ -12,16 +13,10 @@ import Foundation
 /// immutable read of `active.json`, immutable `generation` directories) guarantees ABA safety,
 /// independent of the serial queue.
 public enum KeyboardResourceReadQueue {
-    private static let queue = DispatchQueue(
-        label: "app.songyan.keyboard.resource.read",
-        qos: .utility, attributes: [])
+    private static let queue = SerialIOQueue(label: "app.songyan.keyboard.resource.read", qos: .utility)
 
     /// Runs a read-only resolve on the independent low-priority queue without blocking the calling thread.
     public static func async<T>(_ body: @escaping @Sendable () throws -> T) async throws -> sending T {
-        try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                do { continuation.resume(returning: try body()) } catch { continuation.resume(throwing: error) }
-            }
-        }
+        try await queue.async(body)
     }
 }

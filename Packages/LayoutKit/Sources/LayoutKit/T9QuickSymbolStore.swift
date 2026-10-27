@@ -9,6 +9,8 @@ import Foundation
 /// One explicit container URL, shared by Host and Extension. Atomic replacement
 /// prevents torn reads; a shared file lock serializes slot edits.
 public struct T9QuickSymbolStore: Sendable {
+    /// Directory name under the App Group container.
+    public static let directoryName = "KeyboardQuickSymbols"
     public static let defaultSymbols = "，。？！、…"
     public struct Snapshot: Codable, Equatable, Sendable {
         public let version: Int

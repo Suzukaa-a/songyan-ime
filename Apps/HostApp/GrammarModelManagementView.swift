@@ -187,7 +187,7 @@ struct GrammarModelManagementView: View {
                     ForEach(models.keys.sorted(), id: \.self) { path in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(modelTitle(path))
-                            Text(ByteCountFormatter.string(fromByteCount: Int64(models[path]!.size), countStyle: .file))
+                            Text(HostStorePaths.fileSizeText(models[path]!.size))
                                 .font(.caption).foregroundStyle(.secondary)
                             if singleModelPath == nil {
                                 let bound = bindings.filter { $0.binds(modelPath: path) }.map(\.schemaID).sorted()
@@ -549,7 +549,7 @@ struct GrammarModelManagementView: View {
                         bindings: [GrammarBinding], descriptors: [KeyboardSchemaDescriptor], managed: Set<String>
                     ) in
                     let sourceFile = active.resourceURL.deletingLastPathComponent().appendingPathComponent(
-                        "source.json")
+                        InstalledPackageLayout.sourceFile)
                     let source = try JSONDecoder().decode(RecipeManifest.self, from: Data(contentsOf: sourceFile))
                     guard source.id == active.installation.id, source.revision == active.installation.revision,
                         source.schemaID == active.installation.schemaID

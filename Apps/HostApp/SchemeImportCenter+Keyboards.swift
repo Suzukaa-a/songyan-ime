@@ -361,27 +361,6 @@ extension SchemeImportCenter {
         throw UserKeyboardPublicationError.sourceNotInstalled
     }
 
-    /// Human-facing projection of added keyboards (long-press switcher / list): names come from the current publication record's
-    /// structured scheme descriptions (`activation.schemas`), not persisted and not hardcoded. A read failure throws; the caller
-    /// keeps the old roster and reports the failure, never treating failure as "no keyboards".
-    func publishedKeyboardDisplays(packageID: String) async throws -> [PublishedKeyboardDisplay] {
-        let resources = try await keyboardResources(packageID: packageID)
-        let published = try await publishedKeyboards(packageID: packageID)
-        return resources.publishedDisplays(published)
-    }
-
-    /// A user-facing notice for published keyboards that currently cannot run (compact layout missing structured adapter/binding, or engine schema missing);
-    /// nil when all can run. The list uses it to explain why, never treating "published but not runnable" as usable,
-    /// and never silently adding a source combination.
-    func unrunnableKeyboardNotice(packageID: String) async throws -> String? {
-        let resources = try await keyboardResources(packageID: packageID)
-        let published = try await publishedKeyboards(packageID: packageID)
-        let unrunnable = resources.unrunnablePublished(published)
-        guard !unrunnable.isEmpty else { return nil }
-        let names = unrunnable.map { UserTerminology.layoutName($0.layout) }.joined(separator: "、")
-        return "有 \(unrunnable.count) 个已添加的键盘暂时无法使用（\(names)）。请重新添加该键盘。"
-    }
-
     /// Candidate keyboards that can be added for the current source (input method x layout): 26-key is directly available; compact layouts (14 / 9)
     /// are listed only when the source is structurally adaptable and the physical alphabet can fold. Used by the "add keyboard" UI;
     /// the list holds candidates to try adding, and an add failure is reported as such, never pretending to be usable here.
@@ -400,7 +379,9 @@ extension SchemeImportCenter {
                 PublishedKeyboard(schemaID: $0.schemaID, layout: $0.layout)
             }
             for source in enabled {
-                guard let compiled = try? Data(contentsOf: build.appendingPathComponent(source + ".schema.yaml")),
+                guard
+                    let compiled = try? Data(
+                        contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: source)),
                     case .adaptable = (try? CompactSchemaAdapter.adaptability(compiled: compiled, sourceID: source))
                         ?? .unsupported("")
                 else { continue }

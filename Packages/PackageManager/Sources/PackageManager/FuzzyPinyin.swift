@@ -348,7 +348,8 @@ public enum FuzzyPinyin {
         else {
             return .refused("这个输入方式还没有启用，请在「我的键盘」中重新选择后再试。")
         }
-        guard let compiled = try? Data(contentsOf: build.appendingPathComponent(schemaID + ".schema.yaml")),
+        guard
+            let compiled = try? Data(contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: schemaID)),
             let changed = eligibility(compiled: compiled, schemaID: schemaID).target
         else {
             return .refused("这个输入方式暂不支持模糊音，请选择其他输入方式。")
@@ -366,7 +367,7 @@ public enum FuzzyPinyin {
         // keeps meaning off, expressed as an empty append that touches nothing).
         var pairsBySchema: [String: Set<String>] = [schemaID: enabledPairIDs]
         for id in TypoCorrection.enabledSchemaIDs(compiledDefault: defaults) where id != schemaID {
-            guard let other = try? Data(contentsOf: build.appendingPathComponent(id + ".schema.yaml")),
+            guard let other = try? Data(contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: id)),
                 let target = eligibility(compiled: other, schemaID: id).target
             else { continue }
             let custom = customFiles[id + ".custom.yaml"]

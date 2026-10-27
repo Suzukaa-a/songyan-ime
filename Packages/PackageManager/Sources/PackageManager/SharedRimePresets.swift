@@ -29,7 +29,7 @@ enum SharedRimePresets {
                 files[path] = try Data(contentsOf: url)
             }
         }
-        let schemas = files.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+        let schemas = InstalledPackageLayout.topLevelSchemaFiles(in: files.keys)
             .map { String($0.dropLast(12)) }.sorted()
         for name in configurationNames where files[name] == nil {
             var data = try bundled(name)

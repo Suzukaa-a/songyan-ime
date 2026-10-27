@@ -196,7 +196,7 @@ extension SchemeImportCenter {
     func installSourcePlan() -> Task<Void, Never>? {
         guard !busy, let plan = sourcePlan, let packageID = sourcePackageID else { return nil }
         retryState.begin(.installSourcePlan)
-        guard let schema = plan.files.keys.filter({ $0.hasSuffix(".schema.yaml") && !$0.contains("/") }).sorted().first
+        guard let schema = InstalledPackageLayout.topLevelSchemaFiles(in: plan.files.keys).sorted().first
         else {
             error = "来源列表里没有可用的输入方案。请把输入方案和它需要的文件放进同一个来源列表。"
             return nil

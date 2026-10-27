@@ -132,7 +132,7 @@ class LayoutImportTests(unittest.TestCase):
             generated.write_text("import SwiftUI\n" + manager + "\n" + queue + "\n" + outcome + "\n" + CHECKS)
             binary = compile_swift(
                 directory,
-                [generated, REQUIREMENTS_STUB, CORE / "Support/LatestWinsReadGate.swift", *sources],
+                [generated, REQUIREMENTS_STUB, CORE / "Support/LatestWinsReadGate.swift", CORE / "Support/SerialIOQueue.swift", *sources],
                 library=True)
             runtime = directory / "runtime"
             runtime.mkdir()

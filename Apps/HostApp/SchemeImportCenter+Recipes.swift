@@ -107,7 +107,7 @@ extension SchemeImportCenter {
                 let requestedEntry = Self.requestedEntrySchema(
                     plan: plan,
                     manifestEntry: prepared.manifest.schemaID, manifestFiles: [:])
-                let deployable = plan.files.keys.contains { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+                let deployable = plan.files.keys.contains(where: InstalledPackageLayout.isTopLevelSchemaFile)
                 plannedRecipe = PlannedRecipeInstall(
                     recipePath: recipePath, rx: plan.rx,
                     schemaID: requestedEntry.isEmpty == false && deployable ? requestedEntry : "",
@@ -237,7 +237,7 @@ extension SchemeImportCenter {
         }
         // plum semantics: a patch-only recipe copies no package sources; without a
         // schema in the plan output the fresh import would have nothing to deploy.
-        let installedSchemas = plan.files.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+        let installedSchemas = InstalledPackageLayout.topLevelSchemaFiles(in: plan.files.keys)
         if installedSchemas.isEmpty {
             summary.append("此选项仅更改设置，请先点「安装」安装方案。")
         }
@@ -251,7 +251,7 @@ extension SchemeImportCenter {
             guard RecipeResourceBudget.isModel(path) else { continue }
             let kind = Prediction.isDatabasePath(path) ? "联想词库" : "语法模型"
             summary.append(
-                "已提供\(kind)（\(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))）")
+                "已提供\(kind)（\(HostStorePaths.fileSizeText(file.size))）")
         }
     }
 
@@ -286,7 +286,8 @@ extension SchemeImportCenter {
                             // Keep the package declaration discoverable by refresh()/apply().
                             let declaration = prepared.declaration
                             try JSONEncoder().encode(declaration).write(
-                                to: deployment.resourceURL.appendingPathComponent("keyboard-package.json"),
+                                to: deployment.resourceURL.appendingPathComponent(
+                                    InstalledPackageLayout.keyboardPackageFile),
                                 options: .atomic)
                             return verification.receipt
                         })
@@ -387,7 +388,8 @@ extension SchemeImportCenter {
                 // are therefore dropped on a revision change (never resurrected here).
                 var bindings: [SchemeInputBinding] = []
                 if let data = try? Data(
-                    contentsOf: deployment.resourceURL.appendingPathComponent("keyboard-package.json")),
+                    contentsOf: deployment.resourceURL.appendingPathComponent(
+                        InstalledPackageLayout.keyboardPackageFile)),
                     let existing = try? JSONDecoder().decode(SchemePackageDeclaration.self, from: data)
                 {
                     bindings = existing.bindings.filter {
@@ -396,7 +398,8 @@ extension SchemeImportCenter {
                 }
                 let declaration = SchemePackageDeclaration(id: packageID, name: packageName, bindings: bindings)
                 try JSONEncoder().encode(declaration).write(
-                    to: deployment.resourceURL.appendingPathComponent("keyboard-package.json"), options: .atomic)
+                    to: deployment.resourceURL.appendingPathComponent(InstalledPackageLayout.keyboardPackageFile),
+                    options: .atomic)
             }
             return DeployVerification(
                 receipt: RecipeDeploymentReceipt(
@@ -409,9 +412,16 @@ extension SchemeImportCenter {
     /// exclusive engine lease: no live writer can change custom bytes between this read and the
     /// later plan/install (which rechecks the generation baseline inside the store lock).
     func openInstalledWorkspace(packageID: String) {
+        guard let item = beginWorkspaceRead(packageID: packageID) else { return }
+        Task { await readInstalledWorkspace(item) }
+    }
+
+    /// Resets the workspace state and claims `busy` synchronously, so callers see the change before
+    /// the read starts. Returns nil when the read cannot start.
+    func beginWorkspaceRead(packageID: String) -> InstalledPackage? {
         guard !busy else {
             message = "另一项操作正在进行，请稍后。"
-            return
+            return nil
         }
         lastInstalledPackageID = nil
         installedWorkspace = nil
@@ -419,36 +429,39 @@ extension SchemeImportCenter {
         recipeDiscoveryErrors = []
         guard let item = installedPackages.first(where: { $0.id == packageID }) else {
             error = "未找到该输入方案"
-            return
+            return nil
         }
         busy = true
         error = nil
         message = "正在读取方案…"
-        Task {
-            defer { busy = false }
-            do {
-                let resources = item.active.resourceURL
-                let userConfiguration = item.active.userDataURL
-                // The read runs inside an exclusive lease on a background thread: the MainActor keeps responding to the UI during the snapshot.
-                let snapshot = try await EngineOwnershipCoordinator.shared.withExclusive {
-                    try await Self.readWorkspaceSnapshot(resources: resources, userConfiguration: userConfiguration)
-                }
-                let sources = try await Self.readInstalledSources(resources: resources)
-                installedWorkspace = InstalledRecipeWorkspace(
-                    packageID: item.id, displayName: item.name,
-                    revision: item.active.installation.revision, generation: item.active.installation.generation,
-                    initialUserDataURL: nil, snapshot: snapshot, sources: sources)
-                plannedDiagnostics = []
-                let found = discoverRecipes(in: sources.files, archivedPaths: sources.receipts.map(\.recipePath))
-                recipes = found
-                plannedRecipe = nil
-                providedDownloadFiles = [:]
-                providedOrdinaryResources = [:]
-                message = nil
-            } catch {
-                fail(.nothingCommitted, error)
-                message = nil
+        return item
+    }
+
+    /// Completes when the read is finished; releases the `busy` claim from `beginWorkspaceRead`.
+    func readInstalledWorkspace(_ item: InstalledPackage) async {
+        defer { busy = false }
+        do {
+            let resources = item.active.resourceURL
+            let userConfiguration = item.active.userDataURL
+            // The read runs inside an exclusive lease on a background thread: the MainActor keeps responding to the UI during the snapshot.
+            let snapshot = try await EngineOwnershipCoordinator.shared.withExclusive {
+                try await Self.readWorkspaceSnapshot(resources: resources, userConfiguration: userConfiguration)
             }
+            let sources = try await Self.readInstalledSources(resources: resources)
+            installedWorkspace = InstalledRecipeWorkspace(
+                packageID: item.id, displayName: item.name,
+                revision: item.active.installation.revision, generation: item.active.installation.generation,
+                initialUserDataURL: nil, snapshot: snapshot, sources: sources)
+            plannedDiagnostics = []
+            let found = discoverRecipes(in: sources.files, archivedPaths: sources.receipts.map(\.recipePath))
+            recipes = found
+            plannedRecipe = nil
+            providedDownloadFiles = [:]
+            providedOrdinaryResources = [:]
+            message = nil
+        } catch {
+            fail(.nothingCommitted, error)
+            message = nil
         }
     }
 
@@ -548,7 +561,7 @@ extension SchemeImportCenter {
                     plan: plan,
                     manifestEntry: workspace.schemaIDs.first ?? "", manifestFiles: [:])
                 let deployable =
-                    plan.files.keys.contains { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+                    plan.files.keys.contains(where: InstalledPackageLayout.isTopLevelSchemaFile)
                     || !workspace.schemaIDs.isEmpty
                 plannedRecipe = PlannedRecipeInstall(
                     recipePath: recipePath, rx: plan.rx,
@@ -632,5 +645,107 @@ extension SchemeImportCenter {
             }
         }
         return step
+    }
+}
+
+// MARK: - Managed patch transaction
+
+/// What a managed-patch feature reads before it plans.
+struct ManagedPatchContext: Sendable {
+    let active: ActiveRecipe
+    let snapshot: RecipeWorkspaceSnapshot
+    let sources: InstalledRecipeSources
+    /// `build/` of the active installation's user data.
+    let build: URL
+}
+
+/// A feature's planned recipe, the extra file resources it ships, and what verification needs.
+struct ManagedPatchPlan<Change: Sendable>: Sendable {
+    let recipe: DeclarativeRecipe
+    var resources: [String: RecipeFileResource] = [:]
+    let change: Change
+}
+
+/// Result of one managed-patch transaction. `installed` is nil when the planner found nothing to change.
+struct ManagedPatchResult: Sendable {
+    let installed: InstalledRecipe?
+    let previousRevision: String
+    let previousGeneration: String
+}
+
+extension SchemeImportCenter {
+    /// Shared transaction behind typo correction, prediction, Lua components and fuzzy pinyin:
+    /// plan one managed recipe patch off the main actor, install it, and let the live engine
+    /// read the patched values back (`verify`) before the installation commits.
+    func applyManagedPatch<Change: Sendable>(
+        packageID: String, message busyMessage: String,
+        preflight: @escaping @Sendable (ActiveRecipe) throws -> Void = { _ in },
+        plan: @escaping @Sendable (ManagedPatchContext) throws -> ManagedPatchPlan<Change>?,
+        verify: @escaping @Sendable (RimeEngine, [String], RecipeDeployment, Change) throws -> Void
+    ) async throws -> ManagedPatchResult {
+        guard !busy, !KeyboardSelectionCenter.shared.isBusy else { throw UserKeyboardPublicationError.busy }
+        busy = true
+        message = busyMessage
+        defer {
+            busy = false
+            message = nil
+        }
+        let openCC = Bundle.main.url(forResource: "opencc", withExtension: nil, subdirectory: "EngineResources")
+        let store = manager(packageID)
+        let packageName = installedPackages.first { $0.id == packageID }?.name
+        return try await EngineOwnershipCoordinator.shared.withExclusive {
+            guard let active = try await store.activeInstallation() else {
+                throw RecipeInstallError.invalidResource("请先安装输入方案")
+            }
+            try preflight(active)
+            let snapshot = try await Self.readWorkspaceSnapshot(
+                resources: active.resourceURL,
+                userConfiguration: active.userDataURL)
+            let sources = try await Self.readInstalledSources(resources: active.resourceURL)
+            let context = ManagedPatchContext(
+                active: active, snapshot: snapshot, sources: sources,
+                build: active.userDataURL.appendingPathComponent("build"))
+            let task = Task.detached(priority: .userInitiated) {
+                () throws -> (DeclarativeRecipePlan, Change)? in
+                guard let planned = try plan(context) else { return nil }
+                let recipe = planned.recipe
+                // A previous run archived a different body at the same path; the new recipe replaces it.
+                var files = sources.files
+                files[recipe.path] = recipe.source
+                var resources = sources.fileResources
+                resources.merge(planned.resources) { _, new in new }
+                let declarative = try DeclarativeRecipePlan(
+                    recipe: recipe, packageReference: packageID,
+                    selectedRecipe: recipe.declaredName ?? "", arguments: [], packageFiles: files,
+                    existingFiles: snapshot.files, sourceRevision: active.installation.revision,
+                    expectedGeneration: active.installation.generation,
+                    packageFileResources: resources,
+                    existingFileResources: snapshot.fileResources,
+                    userCustomBaseline: snapshot.userCustomFiles, sharedOpenCCDirectory: openCC)
+                return (declarative, planned.change)
+            }
+            let planned = try await withTaskCancellationHandler(
+                operation: { try await task.value },
+                onCancel: { task.cancel() })
+            guard let (declarative, change) = planned else {
+                return ManagedPatchResult(
+                    installed: nil, previousRevision: active.installation.revision,
+                    previousGeneration: active.installation.generation)
+            }
+            let installed = try await store.installRecipePlan(
+                declarative, packageID: packageID, schemaID: active.installation.schemaID,
+                deploy: { deployment in
+                    let verification = try await Self.verifyRecipeDeployment(
+                        deployment,
+                        packageID: packageID, packageName: packageName,
+                        postValidation: { engine, enabledIDs in
+                            try verify(engine, enabledIDs, deployment, change)
+                        })
+                    return verification.receipt
+                })
+            return ManagedPatchResult(
+                installed: installed, previousRevision: active.installation.revision,
+                previousGeneration: active.installation.generation)
+        }
     }
 }

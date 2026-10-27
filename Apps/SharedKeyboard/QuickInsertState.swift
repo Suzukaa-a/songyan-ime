@@ -82,12 +82,6 @@ public final class QuickInsertState: ObservableObject {
         core.insertDateFormat(format)
     }
 
-    /// Inserts the currently remembered format.
-    @discardableResult
-    public func insertSelectedFormat() -> Bool {
-        core.insertDateFormat(selectedFormat)
-    }
-
     /// Display text computed on demand (re-evaluated on every call, so it is correct across midnight).
     public func formattedText(_ format: QuickInsertDateFormat) -> String {
         core.formattedText(format)

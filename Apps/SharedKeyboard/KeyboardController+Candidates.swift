@@ -234,8 +234,9 @@ extension KeyboardController {
             if inputError != nil { inputError = nil }
             snapshot = s
         }
-        if inputUnavailableReason != session.inputUnavailableReason {
-            inputUnavailableReason = session.inputUnavailableReason
+        let unavailableReason = session.inputUnavailableReason
+        if inputUnavailableReason != unavailableReason {
+            inputUnavailableReason = unavailableReason
         }
         if engineKind != session.engine.kind { engineKind = session.engine.kind }
         if options != session.options { options = session.options }
@@ -252,11 +253,15 @@ extension KeyboardController {
             probeEnglishSuggestions()
         }
         refreshHighlightedReading(for: s)
-        if !(s.isComposing && holdsMarkedCompositionForReading) {
+        // Both readers below would otherwise spell the sentence again; it is nil
+        // unless a keypad hides the code.
+        let spelling =
+            s.isComposing && highlightedReading.isEmpty && s.hidesNumericTransportCode ? sentenceSpelling : nil
+        if !(s.isComposing && holdsMarkedComposition(sentenceSpelling: spelling)) {
             reportCompositionPresentation(
                 s.isComposing
                     ? (onMarkedComposition == nil ? .keyboard(reason: "输入框暂不可用") : .awaitingHost) : .idle)
-            publishMarked(s.isComposing ? markedComposition : nil)
+            publishMarked(s.isComposing ? markedComposition(sentenceSpelling: spelling) : nil)
         }
         if layout != prevLayout {
             if let message = (session.engine as? RimeBackend)?.lastErrorText {

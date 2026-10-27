@@ -39,7 +39,7 @@ public struct GrammarBinding: Identifiable, Sendable {
         guard schemaID.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else {
             throw RecipeInstallError.invalidResource("输入方式标识无效")
         }
-        let url = buildDirectory.appendingPathComponent(schemaID + ".schema.yaml")
+        let url = InstalledPackageLayout.compiledSchemaURL(build: buildDirectory, id: schemaID)
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
         guard size <= RecipeResourceBudget.sourceFile else { throw RecipeInstallError.invalidResource("编译配置文件超过大小限制") }
         let text = try String(contentsOf: url, encoding: .utf8)

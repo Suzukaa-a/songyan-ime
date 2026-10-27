@@ -14,14 +14,14 @@ public extension DeclarativeRecipePlan {
             !sources.contains(where: { !$0.isDependency && $0.files["default.yaml"] != nil })
         {
             ids = sources.filter { !$0.isDependency }.flatMap { source in
-                source.files.keys.filter { $0.hasSuffix(".schema.yaml") && !$0.contains("/") }
+                InstalledPackageLayout.topLevelSchemaFiles(in: source.files.keys)
                     .map { String($0.dropLast(12)) }
             }.sorted()
         }
         guard !ids.isEmpty else { return self }
         guard
             ids.allSatisfy({
-                files[$0 + ".schema.yaml"] != nil
+                files[$0 + InstalledPackageLayout.schemaFileSuffix] != nil
                     && $0.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil
             })
         else {

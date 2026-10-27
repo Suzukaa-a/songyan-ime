@@ -71,12 +71,6 @@ public enum KeyboardRecipeStore {
             case .userScheme: return dictionaryName ?? packageID ?? "用户方案"
             }
         }
-        /// Display name of the current input method (schema), separate from the source name.
-        public var inputMethodDisplayName: String? {
-            UserTerminology.inputMethodName(
-                schemaID: selectedSchemaID ?? requiredSchemaIDs.first,
-                schemas: schemas)
-        }
         /// One authoritative OptionStore namespace, shared by Host settings and every runtime.
         public var resourceID: String {
             switch kind {
@@ -215,8 +209,6 @@ public enum KeyboardRecipeStore {
         public let data: Data?
         /// Why the read failed (never silently treated as absent).
         public let readError: String?
-        /// The container is readable and `active.json` does not exist.
-        public var isAbsent: Bool { root != nil && data == nil && readError == nil }
     }
 
     public static func readSelection(rootURL: URL? = nil) -> SelectionRead {

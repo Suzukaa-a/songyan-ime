@@ -92,17 +92,6 @@ extension KeyboardPanelView {
     /// and every layout (including author-defined/imported keyboards) reaches it through the same language-key long press.
     var moreToolsCapID: String { "keyboard-more-tools" }
 
-    private var utilitiesKey: some View {
-        Button {
-            emitKeyFeedback()
-            showsUtilitiesMenu = true
-        } label: {
-            ControlKeyFace(symbol: "wrench.and.screwdriver")
-        }
-        .accessibilityLabel(UserTerminology.keyboardUtilitiesOpenLabel)
-        .accessibilityHint("符号库、快捷短语与输入选项")
-    }
-
     var modeSwitchKey: some View {
         let action = controlPolicy.languageAction(for: nil)
         return AlternateCharacterKey(

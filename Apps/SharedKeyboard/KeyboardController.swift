@@ -238,54 +238,6 @@ public final class KeyboardController: ObservableObject {
         }
     }
     public var onSelectionChanged: ((KeyboardSelectionChange) -> Void)?
-    /// Menu level one: source schemes, never a flat list of generated combinations.
-    public var inputSchemeChoices: [KeyboardSchemaDescriptor] {
-        guard let resources = session.resourceSet else { return availableSchemas }
-        if !resources.schemas.isEmpty { return resources.inputSchemeChoices }
-        // Builtin resources declare enabled schemas through layoutEntries.
-        // An empty descriptor list is not an empty enabled list in that contract.
-        // Read names from this running engine, restricted to the declared pairs.
-        let enabled = Set(resources.availableCombinations.map(\.schemaID))
-        return availableSchemas.filter { enabled.contains($0.id) }
-    }
-    /// Human-readable display name of the current input method; nil when the resource descriptor has no real name.
-    ///
-    /// General policy: only the structured resource descriptor's human-readable `name` is trusted, with
-    /// no special-casing by schema/source ID or brand; when missing it returns nil, the view omits it,
-    /// and a bare ID is never shown.
-    public var currentInputMethodDisplayName: String? {
-        let source = session.resourceSet?.sourceSchemaID(selectedSchemaID) ?? selectedSchemaID
-        return inputSchemeChoices.first { $0.id == source }?.humanReadableName
-    }
-    /// Menu level two: keyboards for the current scheme only. No cross-scheme fallback.
-    public var currentSchemeKeyboards: [KeyboardResourceSet.Combination] {
-        let source = session.resourceSet?.sourceSchemaID(selectedSchemaID) ?? selectedSchemaID
-        return availableCombinations.filter { $0.schemaID == source }
-    }
-    /// Explicit runnable pairs from this loaded source, including other enabled schemes.
-    /// A menu tap binds both schema and layout; never infer a cross-source fallback.
-    public var layoutSwitchChoices: [KeyboardResourceSet.Combination] {
-        let source = session.resourceSet?.sourceSchemaID(selectedSchemaID) ?? selectedSchemaID
-        let order: [KeyboardLayoutKind] = [.merged14, .merged18, .qwerty26, .phone9]
-        let enabled = Set(inputSchemeChoices.map(\.id))
-        let groups = order.map { layout in
-            availableCombinations.filter { $0.layout == layout && enabled.contains($0.schemaID) }
-                .sorted { lhs, rhs in
-                    if (lhs.schemaID == source) != (rhs.schemaID == source) { return lhs.schemaID == source }
-                    return lhs.schemaID < rhs.schemaID
-                }
-        }
-        // Keep every physical layout within the leading buttons, even when
-        // this source enables many schemas. Remaining explicit pairs follow.
-        return groups.compactMap(\.first) + groups.flatMap { Array($0.dropFirst()) }
-    }
-    public func layoutSwitchSchemeName(_ pair: KeyboardResourceSet.Combination) -> String {
-        inputSchemeChoices.first { $0.id == pair.schemaID }?.displayName ?? pair.name
-    }
-    public func selectCurrentSchemeKeyboard(_ layout: KeyboardLayoutKind) {
-        let source = session.resourceSet?.sourceSchemaID(selectedSchemaID) ?? selectedSchemaID
-        selectLayout(layout, boundSchemaID: source)
-    }
 
     // MARK: ABC word guessing state (see KeyboardController+EnglishSuggestions.swift)
 
@@ -530,9 +482,6 @@ public final class KeyboardController: ObservableObject {
     public var onMoveCursor: ((Int) -> Void)?
     /// Layout change callback (`KeyboardPadSession` syncs its own layout and persists the selection from it).
     public var onLayoutChanged: ((KeyboardLayoutKind) -> Void)?
-
-    /// Whether to show the demo-engine banner hint.
-    public var showsDemoBanner: Bool { !engineKind.isRealRime }
 
     /// - Parameters:
     ///   - layout: initial layout (the caller should normalize it to a layout the resource set offers).

@@ -458,11 +458,13 @@ class KeyboardViewController: UIInputViewController {
         // Key feedback: declare this process's capabilities (system click and haptics both need Full Access in a
         // keyboard extension; playInputClick without it has public reports of blocking the main thread) and refresh
         // the shared preferences so host-app changes apply. Warm-up happens in the panel's onAppear.
+        // Each `hasFullAccess` read is a TCC IPC on the main thread.
+        let fullAccess = hasFullAccess
         KeyboardFeedbackService.shared.setProcessCapabilities(
-            keyClicksAllowed: hasFullAccess,
-            hapticsAllowed: hasFullAccess)
+            keyClicksAllowed: fullAccess,
+            hapticsAllowed: fullAccess)
         // Without Full Access the App Group is read-only: choices stay in memory for the session.
-        KeyboardRecipeStore.canWriteSharedContainer = hasFullAccess
+        KeyboardRecipeStore.canWriteSharedContainer = fullAccess
         KeyboardFeedbackService.shared.refreshPreferences()
         // Appearance (skin + candidate-area layout) is re-read via the `hostBindingTick` increment below
         // (the panel's `onChange(of: hostBindingTick)`); no separate notification, or each appearance would read twice.
@@ -531,7 +533,7 @@ class KeyboardViewController: UIInputViewController {
         // drives the panel to re-read appearance/layout (unlock, cross-app return, new controller takeover).
         route.hostBindingTick &+= 1
         session.resetHostContext()
-        fullAccessAtWillAppear = hasFullAccess
+        fullAccessAtWillAppear = fullAccess
         refreshLayoutRegistry()
         refreshPublishedKeyboards()
         // A ready engine is never restarted just because the view reappeared: the refresh re-resolves only when
@@ -808,19 +810,20 @@ class KeyboardViewController: UIInputViewController {
         // The live document/keyboard connection is now attached. Full Access
         // can resolve after willAppear; use its visible value for click feedback
         // rather than leaving this appearance pinned to an early false reading.
+        let fullAccess = hasFullAccess
         KeyboardFeedbackService.shared.setProcessCapabilities(
-            keyClicksAllowed: hasFullAccess,
-            hapticsAllowed: hasFullAccess)
-        KeyboardRecipeStore.canWriteSharedContainer = hasFullAccess
+            keyClicksAllowed: fullAccess,
+            hapticsAllowed: fullAccess)
+        KeyboardRecipeStore.canWriteSharedContainer = fullAccess
         // Lets the host app truthfully show "keyboard added with Full Access allowed".
-        if hasFullAccess { KeyboardPresenceStamp.recordFullAccessSeen() }
-        if let early = fullAccessAtWillAppear, early != hasFullAccess {
+        if fullAccess { KeyboardPresenceStamp.recordFullAccessSeen() }
+        if let early = fullAccessAtWillAppear, early != fullAccess {
             KeyboardLifecycleDiagnostics.emit(
                 "fullAccessResolvedAfterWillAppear",
                 [
-                    "early": early ? "1" : "0", "now": hasFullAccess ? "1" : "0",
+                    "early": early ? "1" : "0", "now": fullAccess ? "1" : "0",
                 ])
-            fullAccessAtWillAppear = hasFullAccess
+            fullAccessAtWillAppear = fullAccess
         }
         refreshRouteOncePerAppearance()
         refreshHostTraits()
@@ -832,7 +835,7 @@ class KeyboardViewController: UIInputViewController {
                 "route": session?.runningRouteKey?.diagnosticDescription ?? "-",
             ])
         KeyboardStallReport.appeared()
-        pollFullAccess = hasFullAccess
+        pollFullAccess = fullAccess
         Self.diagnosticLogger.debug(
             """
             keyboard appeared hasFullAccess=\(self.pollFullAccess, privacy: .public) \

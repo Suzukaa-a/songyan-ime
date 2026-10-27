@@ -84,7 +84,7 @@ struct SchemeURLImportView: View {
     }
 
     private func byteText(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        HostStorePaths.fileSizeText(bytes)
     }
 
     private func submit() {

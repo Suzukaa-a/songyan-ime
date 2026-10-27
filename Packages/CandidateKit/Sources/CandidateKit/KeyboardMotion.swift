@@ -180,18 +180,6 @@ public extension View {
     func keyboardPressMovement(isPressed: Bool) -> some View {
         modifier(KeyboardPressMovement(pressed: isPressed))
     }
-
-    /// Opaque backing for a composite surface that covers the keys (tools menu /
-    /// symbol library). The backing sits in the same immediate transaction, so the
-    /// covered keys are never visible through it. This is not a transition owner:
-    /// the production key area switches in place without an ancestor cue.
-    @available(iOS 17.0, macOS 14.0, *)
-    func keyboardOpaqueSurface(backing: Color) -> some View {
-        self.background {
-            // The system base also makes translucent custom skin colors opaque.
-            Rectangle().fill(.background).overlay(backing)
-        }
-    }
 }
 
 /// Up/down controls share a single SF Symbol identity. iOS symbol replacement

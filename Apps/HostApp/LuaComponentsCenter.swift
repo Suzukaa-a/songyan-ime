@@ -55,12 +55,11 @@ final class LuaComponentsCenter: ObservableObject {
         let build = active.userDataURL.appendingPathComponent("build")
         let customDirectories = [active.userDataURL, active.resourceURL]
         let task = Task.detached(priority: .userInitiated) { () -> [SchemaRow] in
-            guard let defaults = try? Data(contentsOf: build.appendingPathComponent("default.yaml")) else { return [] }
             var rows: [SchemaRow] = []
-            for id in TypoCorrection.enabledSchemaIDs(compiledDefault: defaults)
-            where !CompactSchemaAdapter.isGeneratedCompanionID(id) {
-                guard let compiled = try? Data(contentsOf: build.appendingPathComponent(id + ".schema.yaml")),
-                    let state = LuaComponents.state(compiled: compiled, schemaID: id),
+            for (id, compiled) in TypoCorrection.enabledCompiledSchemas(
+                build: build, include: { !CompactSchemaAdapter.isGeneratedCompanionID($0) })
+            {
+                guard let state = LuaComponents.state(compiled: compiled, schemaID: id),
                     !state.components.isEmpty
                 else { continue }
                 let userManaged = customDirectories.contains {
@@ -121,66 +120,34 @@ extension SchemeImportCenter {
         packageID: String, schemaID: String, baseline: [String: [String]],
         disabled: Set<String>
     ) async throws -> PredictionOutcome {
-        guard !busy, !KeyboardSelectionCenter.shared.isBusy else { throw UserKeyboardPublicationError.busy }
-        busy = true
-        message = "正在保存…"
-        defer {
-            busy = false
-            message = nil
-        }
-        let openCC = Bundle.main.url(forResource: "opencc", withExtension: nil, subdirectory: "EngineResources")
-        let store = manager(packageID)
-        let packageName = installedPackages.first { $0.id == packageID }?.name
-        return try await EngineOwnershipCoordinator.shared.withExclusive {
-            guard let active = try await store.activeInstallation() else {
-                throw RecipeInstallError.invalidResource("请先安装输入方案")
-            }
-            let reference = packageID
-            let snapshot = try await Self.readWorkspaceSnapshot(
-                resources: active.resourceURL,
-                userConfiguration: active.userDataURL)
-            let sources = try await Self.readInstalledSources(resources: active.resourceURL)
-            guard !LuaComponents.userOwnsSetting(customYAML: snapshot.files[schemaID + ".custom.yaml"]) else {
-                throw RecipeInstallError.invalidResource("此输入方式的扩展功能由方案配置决定")
-            }
-            let recipe = try LuaComponents.make(schemaID: schemaID, baseline: baseline, disabled: disabled)
-            var files = sources.files
-            files[recipe.path] = recipe.source
-            let plan = try DeclarativeRecipePlan(
-                recipe: recipe, packageReference: reference,
-                selectedRecipe: recipe.declaredName ?? "", arguments: [], packageFiles: files,
-                existingFiles: snapshot.files, sourceRevision: active.installation.revision,
-                expectedGeneration: active.installation.generation,
-                packageFileResources: sources.fileResources,
-                existingFileResources: snapshot.fileResources,
-                userCustomBaseline: snapshot.userCustomFiles, sharedOpenCCDirectory: openCC)
-            _ = try await store.installRecipePlan(
-                plan, packageID: reference, schemaID: active.installation.schemaID,
-                deploy: { deployment in
-                    let build = deployment.userDataURL.appendingPathComponent("build")
-                    let verification = try await Self.verifyRecipeDeployment(
-                        deployment,
-                        packageID: reference, packageName: packageName,
-                        postValidation: { engine, enabledIDs in
-                            guard enabledIDs.contains(schemaID) else {
-                                throw RecipeInstallError.deployment("扩展功能：输入方式「\(schemaID)」未启用")
-                            }
-                            let components = Set(engine.schemaComponents(schemaID))
-                            let lua = baseline.values.flatMap { $0 }.filter(LuaComponents.isLua)
-                            guard lua.allSatisfy({ components.contains($0) != disabled.contains($0) }),
-                                let compiled = try? Data(
-                                    contentsOf: build.appendingPathComponent(schemaID + ".schema.yaml")),
-                                LuaComponents.matches(
-                                    compiled: compiled, schemaID: schemaID,
-                                    baseline: baseline, disabled: disabled)
-                            else {
-                                throw RecipeInstallError.deployment("扩展功能配置读取不一致：输入方式「\(schemaID)」")
-                            }
-                        })
-                    return verification.receipt
-                })
-            return PredictionOutcome(changed: true, previousRevision: active.installation.revision)
-        }
+        let result = try await applyManagedPatch(
+            packageID: packageID, message: "正在保存…",
+            plan: { context in
+                guard !LuaComponents.userOwnsSetting(customYAML: context.snapshot.files[schemaID + ".custom.yaml"])
+                else {
+                    throw RecipeInstallError.invalidResource("此输入方式的扩展功能由方案配置决定")
+                }
+                let recipe = try LuaComponents.make(schemaID: schemaID, baseline: baseline, disabled: disabled)
+                return ManagedPatchPlan(recipe: recipe, change: ())
+            },
+            verify: { engine, enabledIDs, deployment, _ in
+                guard enabledIDs.contains(schemaID) else {
+                    throw RecipeInstallError.deployment("扩展功能：输入方式「\(schemaID)」未启用")
+                }
+                let build = deployment.userDataURL.appendingPathComponent("build")
+                let components = Set(engine.schemaComponents(schemaID))
+                let lua = baseline.values.flatMap { $0 }.filter(LuaComponents.isLua)
+                guard lua.allSatisfy({ components.contains($0) != disabled.contains($0) }),
+                    let compiled = try? Data(
+                        contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: schemaID)),
+                    LuaComponents.matches(
+                        compiled: compiled, schemaID: schemaID,
+                        baseline: baseline, disabled: disabled)
+                else {
+                    throw RecipeInstallError.deployment("扩展功能配置读取不一致：输入方式「\(schemaID)」")
+                }
+            })
+        return PredictionOutcome(changed: true, previousRevision: result.previousRevision)
     }
 }
 

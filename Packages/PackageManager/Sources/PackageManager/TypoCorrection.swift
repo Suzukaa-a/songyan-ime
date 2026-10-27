@@ -121,6 +121,20 @@ public enum TypoCorrection {
         return list.compactMap { $0["schema"] as? String }.filter { seen.insert($0).inserted }
     }
 
+    /// Compiled `build/<id>.schema.yaml` bytes of the enabled schemas in `build/default.yaml`, in
+    /// order; schemas without a compiled file (or rejected by `include`) are skipped.
+    public static func enabledCompiledSchemas(
+        build: URL, include: (String) -> Bool = { _ in true }
+    ) -> [(id: String, compiled: Data)] {
+        guard let defaults = try? Data(contentsOf: build.appendingPathComponent("default.yaml")) else { return [] }
+        return enabledSchemaIDs(compiledDefault: defaults).compactMap { id in
+            guard include(id),
+                let compiled = try? Data(contentsOf: InstalledPackageLayout.compiledSchemaURL(build: build, id: id))
+            else { return nil }
+            return (id, compiled)
+        }
+    }
+
     /// The Rx identity `DeclarativeRecipePlan` assigns to this recipe for `packageReference`.
     public static func rx(packageReference: String) -> String {
         packageReference + ":" + recipeName + ":"

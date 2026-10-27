@@ -49,17 +49,11 @@ final class ProcessActivityAssertion: Sendable {
 //  * never re-enter this queue from itself (self-wait deadlock) and never call the engine here.
 public enum LearningTransferIO {
 
-    private static let queue = DispatchQueue(
-        label: "app.songyan.learning.transfer.io",
-        qos: .utility)
+    private static let queue = SerialIOQueue(label: "app.songyan.learning.transfer.io", qos: .utility)
 
     /// Runs one piece of disk I/O on the dedicated file queue and awaits its result.
     public static func async<T>(_ body: @escaping @Sendable () throws -> T) async throws -> sending T {
-        try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                do { continuation.resume(returning: try body()) } catch { continuation.resume(throwing: error) }
-            }
-        }
+        try await queue.async(body)
     }
 }
 

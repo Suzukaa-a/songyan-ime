@@ -124,7 +124,6 @@ public struct KeyboardPanelHeightState: Sendable {
         private var heightState: KeyboardPanelHeightState
         public var panelHeight: CGFloat { CGFloat(heightState.panelHeight) }
         public private(set) var budgetHeightConstraint: NSLayoutConstraint!
-        public var requestedPanelHeights: [CGFloat] { heightState.requestedHeights.map { CGFloat($0) } }
         public var presentationRevision: UInt64 { heightState.revision }
 
         public func acceptsPresentation(_ revision: UInt64) -> Bool {

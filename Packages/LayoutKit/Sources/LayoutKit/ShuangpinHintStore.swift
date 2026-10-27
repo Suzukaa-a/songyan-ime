@@ -111,8 +111,6 @@ public struct ShuangpinHintStore: Sendable {
     /// Directory name under the App Group container; also shown by the host UI.
     public static let directoryName = "ShuangpinHints"
     public static let catalogFileName = "hints.json"
-    /// Suffix of an exported/imported single preset document.
-    public static let presetFileExtension = ".songyanhints.json"
 
     public let directory: URL
 
@@ -196,8 +194,7 @@ public struct ShuangpinHintStore: Sendable {
 
     public static func encodeSnapshot(_ snapshot: ShuangpinHintSnapshot) throws -> Data {
         try snapshot.validate()
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let encoder = JSONEncoder.layoutKitPretty()
         let data = try encoder.encode(snapshot)
         try ShuangpinHintDocument.checkSize(data, "提示设置")
         return data

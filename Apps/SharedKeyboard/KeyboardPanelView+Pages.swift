@@ -117,11 +117,15 @@ extension KeyboardPanelView {
     }
 
     /// The saved pairing's main layout, else the same default the host app shows for this keyboard.
+    /// Memoized like `selectedComposition`: it reads nothing outside that key, and the
+    /// registry default scans every layout while `definitionFacts` asks per key read.
     var preferredDefinitionID: String? {
-        if let id = selectedComposition?.mainLayoutID { return id }
-        guard let builtin = LayoutInput.Builtin(rawValue: controller.layout.rawValue) else { return nil }
-        let key = KeyboardCompositionKey(inputMethodID: controller.selectedSchemaID, layout: builtin)
-        return layoutRegistry?.defaultMainLayoutID(for: key) ?? BuiltinLayouts.preset(for: builtin).id
+        pageMemo.preferredDefinitionID(for: compositionMemoKey) {
+            if let id = selectedComposition?.mainLayoutID { return id }
+            guard let builtin = LayoutInput.Builtin(rawValue: controller.layout.rawValue) else { return nil }
+            let key = KeyboardCompositionKey(inputMethodID: controller.selectedSchemaID, layout: builtin)
+            return layoutRegistry?.defaultMainLayoutID(for: key) ?? BuiltinLayouts.preset(for: builtin).id
+        }
     }
 
     /// The authored page to draw, or nil when the built-in page area draws this page.
@@ -477,6 +481,8 @@ final class PageResolutionMemo {
 
     private var compositionKey: CompositionKey?
     private var composition: KeyboardComposition?
+    private var preferredIDKey: CompositionKey?
+    private var preferredID: String?
     private var pairedKey: PairedKey?
     private var paired: Paired?
     private var resolutionKey: ResolutionKey?
@@ -487,6 +493,14 @@ final class PageResolutionMemo {
         let value = resolve()
         compositionKey = key
         composition = value
+        return value
+    }
+
+    func preferredDefinitionID(for key: CompositionKey, resolve: () -> String?) -> String? {
+        if preferredIDKey == key { return preferredID }
+        let value = resolve()
+        preferredIDKey = key
+        preferredID = value
         return value
     }
 

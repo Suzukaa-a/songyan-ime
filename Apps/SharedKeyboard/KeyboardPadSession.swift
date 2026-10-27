@@ -176,8 +176,6 @@ public final class KeyboardPadSession: ObservableObject {
         return backend?.suspendSessionForHostDisappearance() ?? false
     }
 
-    /// Includes the window waiting for engine ownership / resource resolution; the initial `.starting` is not an in-flight boot.
-    public var hasPendingBoot: Bool { startTapped && phase == .starting }
     /// Current resource set (nil = not specified; Release without one is unconfigured, with no bundled fallback).
     public private(set) var resourceSet: KeyboardResourceSet?
 

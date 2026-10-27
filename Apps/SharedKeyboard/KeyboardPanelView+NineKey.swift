@@ -16,8 +16,6 @@ extension KeyboardPanelView {
 
     private var liveT9RailChoices: T9RailChoices { controller.spellingRailChoices }
 
-    private var hasT9ReadingChoices: Bool { !liveT9RailChoices.isEmpty }
-
     /// The live choices once settled (nil otherwise); feeds `heldT9RailChoices`.
     var settledT9RailChoices: T9RailChoices? {
         guard compactSpellingCapability, controller.snapshot.isComposing, t9RailChoicesSettled else { return nil }
@@ -51,11 +49,13 @@ extension KeyboardPanelView {
         let displayed = displayedT9RailChoices
         let showsReadingChoices =
             controller.snapshot.isComposing
-            && (displayed.interactive ? hasT9ReadingChoices : heldT9RailChoices != nil)
+            // Interactive means `displayed.choices` are the live ones; resolving them
+            // again here and in `t9ReadingChoices` cost two more passes per render.
+            && (displayed.interactive ? !displayed.choices.isEmpty : heldT9RailChoices != nil)
         return ZStack {
             if showsReadingChoices {
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: CGFloat(metrics.spacing)) { t9ReadingChoices(metrics) }
+                    LazyVStack(spacing: CGFloat(metrics.spacing)) { t9ReadingChoices(metrics, displayed: displayed) }
                 }
                 .sharpCandidateScrollEdges()
             } else {
@@ -94,9 +94,11 @@ extension KeyboardPanelView {
     /// arbitrated differently from the neighbouring keys. Every slot keeps the digit
     /// row pitch (no divider), so the rail and the 3×3 grid stay on the same lines.
     @ViewBuilder
-    private func t9ReadingChoices(_ metrics: PhoneKeypadMetrics) -> some View {
+    private func t9ReadingChoices(
+        _ metrics: PhoneKeypadMetrics, displayed resolved: (choices: T9RailChoices, interactive: Bool)? = nil
+    ) -> some View {
         if controller.snapshot.isComposing {
-            let displayed = displayedT9RailChoices
+            let displayed = resolved ?? displayedT9RailChoices
             let choices = displayed.choices
             // Undo is the delete key (`KeyboardController.handleBackspaceTap`): the rail
             // only offers choices, never a separate back button.

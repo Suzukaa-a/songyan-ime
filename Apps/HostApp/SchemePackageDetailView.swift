@@ -407,7 +407,7 @@ struct SchemePackageDetailView: View {
                     Text(downloadService.isDownloading ? "正在下载…" : (center.message ?? "正在更新…"))
                 }
                 if let progress = downloadService.progress, progress.downloadedBytes > 0 {
-                    Text("已下载 \(ByteCountFormatter.string(fromByteCount: progress.downloadedBytes, countStyle: .file))")
+                    Text("已下载 \(HostStorePaths.fileSizeText(progress.downloadedBytes))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
