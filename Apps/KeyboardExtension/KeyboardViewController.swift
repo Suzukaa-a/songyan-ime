@@ -571,6 +571,7 @@ class KeyboardViewController: UIInputViewController {
             return self.writableDocument().map { AnyHashable($0) }
         }
         session.onMarkedComposition = { [weak self] in self?.updateMarked($0) }
+        session.remembersLayoutSwitch = { [weak self] in self?.switchOutlivesPresentation ?? true }
         session.onSelectionChanged = { [weak self] change in
             guard let self, Self.activeController === self else { return }
             self.selectionSaveGeneration &+= 1

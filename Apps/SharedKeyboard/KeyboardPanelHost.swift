@@ -608,7 +608,8 @@ public struct KeyboardPanelHost: View {
             if definitionShell != shell { definitionShell = shell }
             KeyboardInitialPresentation.recordReadingRow(
                 eligible: report.eligible,
-                candidateAreaRequired: report.candidateAreaRequired)
+                candidateAreaRequired: report.candidateAreaRequired,
+                layout: session.layout)
         }
         KeyboardLifecycleDiagnostics.emit(
             "readingRowGrant",

@@ -70,6 +70,14 @@ extension KeyboardViewController {
         }
     }
 
+    /// Whether an in-keyboard switch is still showing at the next presentation: the bundled
+    /// fallback remembers its own layout, a published keyboard needs its choice saved to the
+    /// App Group. Otherwise the next presentation returns to the saved keyboard.
+    var switchOutlivesPresentation: Bool {
+        guard session.backend?.prebuiltDirectory != nil else { return true }
+        return session.resourceSet?.publicationGeneration != nil && KeyboardRecipeStore.canWriteSharedContainer
+    }
+
     /// Shown when a choice is made while the keyboard was temporarily switched to the bundled fallback.
     var temporaryBuiltinSelectionNotice: String {
         "暂时使用\(ProductionInputAvailability.fallbackInputMethodName)，下次打开键盘时恢复原来的选择。"

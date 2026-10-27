@@ -77,6 +77,10 @@ public final class KeyboardPadSession: ObservableObject {
         onMarkedComposition?(controller.markedComposition)
     }
     public var onSelectionChanged: ((KeyboardSelectionChange) -> Void)?
+    /// Asked when a ready engine switches layout. False keeps the remembered layout on the
+    /// keyboard the next start shows: a switch that cannot be saved lasts one presentation,
+    /// and that presentation's height is budgeted from the remembered layout.
+    public var remembersLayoutSwitch: (() -> Bool)?
     /// Host identity is memory-only. Tools refuse delivery if confirmation changes the target.
     public var hostContextIdentifier: (() -> String?)?
     /// Captured only for explicit asynchronous insertions; nil means no live target.
@@ -809,7 +813,7 @@ public final class KeyboardPadSession: ObservableObject {
         ctrl.onLayoutChanged = { [weak self] newLayout in
             guard let self else { return }
             self.layout = newLayout
-            self.persistLayout(newLayout)
+            if self.remembersLayoutSwitch?() ?? true { self.persistLayout(newLayout) }
             self.noteRunningIdentity()
         }
         // The generation was validated and published before the controller was built (see 5); only state writes happen here.

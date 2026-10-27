@@ -332,6 +332,7 @@ extension KeyboardViewController {
         session.onSwitchKeyboard = nil
         session.onMarkedComposition = nil
         session.onSelectionChanged = nil
+        session.remembersLayoutSwitch = nil
         session.hostContextIdentifier = nil
         session.asyncInsertionContext = nil
         session.resetHostContext()

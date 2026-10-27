@@ -127,11 +127,16 @@ public struct KeyboardInitialPresentation {
     }
 
     /// Called after the host adopts eligibility: records it as the next cold-start first-frame hint (not rewritten if unchanged).
-    public static func recordReadingRow(eligible: Bool, candidateAreaRequired: Bool = true) {
+    /// Only the remembered layout's report is recorded: a switch that was not remembered lasts one
+    /// presentation and must not overwrite the hint of the keyboard the next one shows.
+    public static func recordReadingRow(
+        eligible: Bool, candidateAreaRequired: Bool = true, layout: KeyboardLayoutKind
+    ) {
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: AppSettings.selectedLayoutKey) == layout.rawValue else { return }
         let hint = CandidateReadingRowHint(
             selection: readingRowSelection, eligible: eligible,
             candidateAreaRequired: candidateAreaRequired)
-        let defaults = UserDefaults.standard
         guard CandidateReadingRowHint(storedValue: defaults.object(forKey: CandidateReadingRowHint.defaultsKey)) != hint
         else { return }
         defaults.set(hint.storedValue, forKey: CandidateReadingRowHint.defaultsKey)
