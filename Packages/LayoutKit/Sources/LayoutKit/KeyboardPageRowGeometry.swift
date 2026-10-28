@@ -4,10 +4,11 @@ import Foundation
 public struct KeyboardPageRowGeometry: Equatable, Sendable {
     public let keyIndices: [Int]
     public let keyWidths: [Double]
-    /// Native-control (`chrome == nil`) pages only: the geometry synthesizes Shift/Delete around
-    /// the last row. Authored pages carry those keys as data, so both stay false and
-    /// `keyWidths` has one entry per `keyIndices` element.
-    public let showsShift: Bool
+    /// Native-control (`chrome == nil`) pages only: the geometry synthesizes the leading control
+    /// (Shift on ABC, the 123/symbol switch elsewhere) and Delete around the last row. Authored
+    /// pages carry those keys as data, so both stay false and `keyWidths` has one entry per
+    /// `keyIndices` element.
+    public let showsLeadingControl: Bool
     public let showsDelete: Bool
     public let sideWidth: Double
     public let rowWidth: Double
@@ -15,8 +16,9 @@ public struct KeyboardPageRowGeometry: Equatable, Sendable {
     public let gap: Double
     /// Full-row index of the split cut, or the row's key count when it is not split.
     public let splitIndex: Int
-    /// The authored row is the standard 10 / 9 / (Shift+7 letters+Delete) alphabet, so it keeps
-    /// equal letter columns instead of relative weights.
+    /// The authored rows are the standard 10 / 9 / (Shift+7 letters+Delete) alphabet or the
+    /// 10 / 10 / (switch+7 marks+Delete) 123 / symbol shape, so they keep equal character columns
+    /// instead of relative weights.
     public let usesStandardAlphabet: Bool
 
     public init(
@@ -26,7 +28,7 @@ public struct KeyboardPageRowGeometry: Equatable, Sendable {
         guard page.rows.indices.contains(row) else {
             keyIndices = []
             keyWidths = []
-            showsShift = false
+            showsLeadingControl = false
             showsDelete = false
             sideWidth = 0
             rowWidth = 0
@@ -39,10 +41,10 @@ public struct KeyboardPageRowGeometry: Equatable, Sendable {
         let keys = page.rows[row].keys
         if page.chrome != nil {
             keyIndices = Array(keys.indices)
-            showsShift = false
+            showsLeadingControl = false
             showsDelete = false
             let last = row == page.rows.count - 1
-            let standard = KeyboardPageDefaultShape.isAuthoredAlphabet(page)
+            let standard = KeyboardPageDefaultShape.isAuthoredStandardRows(page)
             usesStandardAlphabet = standard
             if standard {
                 let metrics = StandardKeyRowGeometry(width: width, split: split)
@@ -85,21 +87,21 @@ public struct KeyboardPageRowGeometry: Equatable, Sendable {
         // Native controls: Shift/Delete are drawn around the stored rows.
         keyIndices = keys.indices.filter { showsGlobe || keys[$0].action.type != .globe }
         let visible = keyIndices.map { keys[$0] }
-        let alphabet = KeyboardPageDefaultShape.isNativeAlphabet(page)
-        let tenColumns = KeyboardPageDefaultShape.isNativeTenColumns(page)
+        let standardRows =
+            KeyboardPageDefaultShape.isNativeAlphabet(page) || KeyboardPageDefaultShape.isNativeMarkRows(page)
         let last = row == page.rows.count - 1
-        showsShift = last && page.kind == .english
-        showsDelete = last && !page.rows.flatMap(\.keys).contains { $0.action.type == .backspace }
-        usesStandardAlphabet = alphabet
+        let declared = page.rows.flatMap(\.keys)
+        let leadingType: LayoutAction.Kind = page.kind == .english ? .shift : .pageSwitch
+        showsLeadingControl = last && !declared.contains { $0.action.type == leadingType }
+        showsDelete = last && !declared.contains { $0.action.type == .backspace }
+        usesStandardAlphabet = standardRows
         let standard = StandardKeyRowGeometry(width: width, split: split)
-        sideWidth =
-            alphabet
-            ? standard.thirdRowSideWidth : (tenColumns ? standard.keyWidth : max(44, standard.thirdRowSideWidth))
-        rowWidth = max(0, width - (showsShift ? sideWidth + 4 : 0) - (showsDelete ? sideWidth + 4 : 0))
-        gap = alphabet || tenColumns ? standard.gap : (split?.gap(width: rowWidth, keyCount: visible.count) ?? 0)
+        sideWidth = standardRows ? standard.thirdRowSideWidth : max(44, standard.thirdRowSideWidth)
+        rowWidth = max(0, width - (showsLeadingControl ? sideWidth + 4 : 0) - (showsDelete ? sideWidth + 4 : 0))
+        gap = standardRows ? standard.gap : (split?.gap(width: rowWidth, keyCount: visible.count) ?? 0)
         splitIndex = split?.breakIndex(row: row, keyCount: visible.count) ?? visible.count
         let available = max(0, rowWidth - Double(max(0, visible.count - 1)) * 4 - gap)
-        if alphabet || tenColumns {
+        if standardRows {
             keyWidths = visible.map { _ in standard.keyWidth }
             inset = max(0, (available - Double(visible.count) * standard.keyWidth) / 2)
         } else {

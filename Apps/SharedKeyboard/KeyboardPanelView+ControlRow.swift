@@ -186,6 +186,7 @@ extension KeyboardPanelView {
                 mainIsPhoneKeypad: usesPhoneDefinition, showsCategorySymbolPage: showsCategorySymbolPage),
             usesFixedEditingRail: usesFixedEditingRail,
             declaredTrailingReturn: t9AuxiliaryKeys(.trailing).contains { $0.action.type == .enter },
-            showsCategorySymbolPage: showsCategorySymbolPage)
+            showsCategorySymbolPage: showsCategorySymbolPage,
+            numericPageReachesSymbols: page != .letters || numericPageReachesSymbols)
     }
 }

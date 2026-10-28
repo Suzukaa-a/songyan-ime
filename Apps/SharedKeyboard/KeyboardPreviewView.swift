@@ -154,7 +154,7 @@ private struct KeyboardMainLayoutPreview: View {
                 mainIsPhoneKeypad: facts.isPhone, showsCategorySymbolPage: false),
             usesFixedEditingRail: showsBundledPhoneShell,
             declaredTrailingReturn: railEntries(.trailing).contains { $0.key.action.type == .enter },
-            showsCategorySymbolPage: false)
+            showsCategorySymbolPage: false, numericPageReachesSymbols: !facts.isPhone)
     }
 
     var body: some View {
@@ -237,7 +237,8 @@ private struct KeyboardMainLayoutPreview: View {
         case .symbolRows:
             KeyboardSymbolPageRows(
                 rows: SymbolPageTable.numericRows(ascii: usesASCIIPunctuation), split: split,
-                onTap: { _ in }, delete: { RepeatingDeleteKey {} })
+                onTap: { _ in }, pageSwitch: { MarkPageSwitchKey(target: .symbols) {} },
+                delete: { RepeatingDeleteKey {} })
         case .authoredChromePage, .phoneDigitPad, .categorySymbolPage, .authoredRows, .phonePad:
             // Drawn by the body, or never shown by a main-layout preview.
             EmptyView()

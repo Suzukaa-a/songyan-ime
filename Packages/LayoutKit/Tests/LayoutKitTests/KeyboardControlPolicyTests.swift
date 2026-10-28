@@ -31,9 +31,19 @@ final class KeyboardControlPolicyTests: XCTestCase {
                             let policy = KeyboardControlPolicy(
                                 page: page, isEnglishMode: english,
                                 hasGlobe: globe, isPhoneLayout: phone, usesASCIIPunctuation: false)
-                            XCTAssertEqual(policy.slots, reference.slots)
+                            // The row-shaped 123 page drops the utility slot: its third row already
+                            // carries the page switch and the sentence marks. The symbol page here is
+                            // the categorized grid (the default), which keeps 锁定 there.
+                            let isRow = page == .numeric && !phone
+                            XCTAssertEqual(policy.isRowPage, isRow)
+                            XCTAssertEqual(
+                                policy.slots, isRow ? reference.slots.filter { $0 != .utility } : reference.slots)
                             let metrics = policy.metrics(width: width)
-                            XCTAssertEqual(metrics, reference.metrics(width: width))
+                            if isRow {
+                                XCTAssertEqual(metrics.utility, 0)
+                            } else {
+                                XCTAssertEqual(metrics, reference.metrics(width: width))
+                            }
                             XCTAssertEqual(
                                 policy.slots.reduce(0) { $0 + metrics[$1] }
                                     + Double(policy.slots.count - 1) * metrics.spacing, width, accuracy: 0.0001)
@@ -56,7 +66,8 @@ final class KeyboardControlPolicyTests: XCTestCase {
                                 XCTAssertEqual(policy.pageTarget, .numeric)
                             }
                             if page == .letters {
-                                XCTAssertEqual(policy.key(at: .utility), .symbolPage)
+                                // Punctuation on a native letter page, the direct symbol key on a phone pad.
+                                XCTAssertEqual(policy.key(at: .utility), phone ? .symbolPage : .utility)
                             }
                         }
                     }
@@ -65,26 +76,28 @@ final class KeyboardControlPolicyTests: XCTestCase {
         }
     }
 
-    /// Every page puts the globe first. The left switch after it is 123 on letters, a literal
-    /// return on the row pages, and the language/return key on the categorized grid. Slot widths
-    /// stay position-based; the semantic slot never adds or removes a physical key.
+    /// Every page puts the globe first. The left switch after it is 123 on letters and a literal
+    /// return on the row pages, which have no utility key (their third row holds the page switch).
+    /// Slot widths stay position-based.
     func testNonLetterPagesLeadWithTheirSwitchKey() {
         let expectations: [KeyboardControlPolicy.Page: [KeyboardControlPolicy.Slot]] = [
-            .letters: [.globe, .page, .language, .space, .symbolPage, .enter],
-            .numeric: [.globe, .returnToLetters, .language, .space, .page, .enter],
-            .symbols: [.globe, .language, .page, .space, .symbolLock, .enter],
+            .letters: [.globe, .page, .language, .space, .utility, .enter],
+            .numeric: [.globe, .returnToLetters, .language, .space, .enter],
+            .symbols: [.globe, .returnToLetters, .language, .space, .enter],
         ]
         for (page, expected) in expectations {
             let policy = KeyboardControlPolicy(
                 page: page, isEnglishMode: false,
-                hasGlobe: true, isPhoneLayout: false, usesASCIIPunctuation: false)
+                hasGlobe: true, isPhoneLayout: false, usesASCIIPunctuation: false,
+                usesCategorySymbolPage: false)
             XCTAssertEqual(policy.slots.map(policy.key(at:)), expected, "\(page)")
         }
     }
 
-    /// Letter pages open symbols directly; numeric and symbol pages retain their utility actions.
-    /// The utility mark follows only the effective symbol state, never the input language.
-    func testGenericControlRowOpensSymbolsDirectlyFromLetters() {
+    /// The utility position types a comma on native letter pages and keeps 0 on the phone digit
+    /// pad; the row pages have no such slot. The mark follows only the effective symbol state,
+    /// never the input language.
+    func testGenericControlRowTypesPunctuationFromLetters() {
         for phone in [false, true] {
             for english in [false, true] {
                 for page in KeyboardControlPolicy.Page.allCases {
@@ -92,14 +105,11 @@ final class KeyboardControlPolicyTests: XCTestCase {
                         page: page, isEnglishMode: english,
                         hasGlobe: true, isPhoneLayout: phone, usesASCIIPunctuation: false)
                     let expected: KeyboardControlPolicy.Utility =
-                        page == .numeric
-                        ? (phone ? .digit("0") : .punctuation("……"))
-                        : .punctuation(phone ? "。" : "，")
-                    XCTAssertEqual(
-                        policy.utility, expected,
-                        "bottom-row utility is a direct punctuation key (0 on the 9-key digit page)"
-                    )
-                    XCTAssertEqual(policy.slots.map(policy.key(at:)).contains(.symbolPage), page == .letters)
+                        page == .numeric && phone ? .digit("0") : .punctuation("，")
+                    XCTAssertEqual(policy.utility, expected)
+                    let keys = policy.slots.map(policy.key(at:))
+                    XCTAssertEqual(keys.contains(.utility), page == .letters && !phone)
+                    XCTAssertEqual(keys.contains(.symbolPage), page == .letters && phone)
                 }
             }
         }
@@ -107,11 +117,21 @@ final class KeyboardControlPolicyTests: XCTestCase {
         let englishChineseSymbols = KeyboardControlPolicy(
             page: .numeric, isEnglishMode: true, hasGlobe: true,
             isPhoneLayout: false, usesASCIIPunctuation: false)
-        XCTAssertEqual(englishChineseSymbols.utility, .punctuation("……"))
+        XCTAssertEqual(englishChineseSymbols.utility, .punctuation("，"))
         let chineseASCIISymbols = KeyboardControlPolicy(
-            page: .numeric, isEnglishMode: false, hasGlobe: true,
+            page: .letters, isEnglishMode: false, hasGlobe: true,
             isPhoneLayout: false, usesASCIIPunctuation: true)
-        XCTAssertEqual(chineseASCIISymbols.utility, .punctuation("#"))
+        XCTAssertEqual(chineseASCIISymbols.utility, .punctuation(","))
+    }
+
+    /// A 123 page without its own symbol switch (phone keypad, authored keypad) sends the letter
+    /// page's utility position to the symbol page so symbols stay reachable.
+    func testLetterUtilityOpensSymbolsWhenNumericPageCannotReachThem() {
+        let policy = KeyboardControlPolicy(
+            page: .letters, isEnglishMode: false, hasGlobe: true,
+            isPhoneLayout: false, usesASCIIPunctuation: false, numericPageReachesSymbols: false)
+        XCTAssertEqual(policy.key(at: .utility), .symbolPage)
+        XCTAssertEqual(policy.slots.map(policy.key(at:)), [.globe, .page, .language, .space, .symbolPage, .enter])
     }
 
     /// Bundled 9-key: 123 | 中/英 | 空格 | 符号 on letters, so 123 and the language key stay where every layout
@@ -411,31 +431,35 @@ final class KeyboardControlPolicyTests: XCTestCase {
         XCTAssertTrue(numeric.utilityAlternates.isEmpty)
     }
 
-    /// The 26/14/18 123 rows already hold comma and period, so the slot below them
-    /// carries a mark those rows lack, and its long-press list repeats none of them.
-    func testNumericPageUtilityAddsAMarkTheRowsLack() {
-        for english in [false, true] {
+    /// The row pages already hold comma and period and have no utility slot; the letter page's
+    /// comma keeps the other sentence marks on long press, never repeating itself.
+    func testRowPagesHaveNoUtilitySlotAndLetterCommaCarriesTheOtherMarks() {
+        for page in [KeyboardControlPolicy.Page.numeric, .symbols] {
             let policy = KeyboardControlPolicy(
-                page: .numeric, isEnglishMode: english, hasGlobe: true,
-                isPhoneLayout: false, usesASCIIPunctuation: english)
-            XCTAssertEqual(policy.utility, .punctuation(english ? "#" : "……"))
-            XCTAssertEqual(policy.utilityAlternates, english ? ["*", "="] : ["——"])
+                page: page, isEnglishMode: false, hasGlobe: true,
+                isPhoneLayout: false, usesASCIIPunctuation: false, usesCategorySymbolPage: false)
+            XCTAssertFalse(policy.slots.contains(.utility))
+            XCTAssertEqual(policy.metrics(width: 390).utility, 0)
         }
-        let letters = KeyboardControlPolicy(
-            page: .letters, isEnglishMode: false, hasGlobe: true,
-            isPhoneLayout: false, usesASCIIPunctuation: false)
-        XCTAssertEqual(letters.utilityAlternates, ["。", "？", "！", "、", "…"])
+        for ascii in [false, true] {
+            let letters = KeyboardControlPolicy(
+                page: .letters, isEnglishMode: ascii, hasGlobe: true,
+                isPhoneLayout: false, usesASCIIPunctuation: ascii)
+            XCTAssertEqual(letters.utility, .punctuation(ascii ? "," : "，"))
+            XCTAssertEqual(
+                letters.utilityAlternates, ascii ? [".", "?", "!", "'", "\""] : ["。", "？", "！", "、", "…"])
+        }
     }
 
-    /// The row-shaped #+= page (the default) has no 锁定 and no punctuation utility slot: its
-    /// utility position opens 123, its language key switches symbols in place, and its left switch
+    /// The row-shaped #+= page (the default) has no 锁定 and no utility slot (its third row opens
+    /// with the 123 switch): its language key switches symbols in place and its left switch
     /// returns to letters.
-    func testRowShapedSymbolPageMapsUtilityToNumericAndLanguageToSymbols() {
+    func testRowShapedSymbolPageHasNoUtilityAndLanguageSwitchesSymbols() {
         for english in [false, true] {
             let policy = KeyboardControlPolicy(
                 page: .symbols, isEnglishMode: english, hasGlobe: true,
                 isPhoneLayout: false, usesASCIIPunctuation: english, usesCategorySymbolPage: false)
-            XCTAssertEqual(policy.key(at: .utility), .page)
+            XCTAssertFalse(policy.slots.contains(.utility))
             XCTAssertEqual(policy.pageTarget, .numeric)
             XCTAssertEqual(policy.pageTitle, "123")
             XCTAssertEqual(policy.key(at: .page), .returnToLetters)

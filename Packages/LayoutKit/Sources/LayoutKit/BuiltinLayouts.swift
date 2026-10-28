@@ -218,41 +218,37 @@ public enum BuiltinLayouts {
 
     // MARK: - 123 / symbol page rows
 
-    /// The 123 page's marks, ten columns per row. The third row keeps **one
-    /// character per column of the letter grid**, so it is exactly as wide as the
-    /// rows above and Delete fills the tenth column; nine marks are needed, so the
-    /// row also carries the common marks the two rows above lack instead of
-    /// leaving half-width blanks (a four-key row with two wide caps is what users
-    /// notice as "unequal").
+    /// The 123 page's marks. The first two rows fill the ten letter columns; the
+    /// third row holds seven sentence marks between the 123/symbol switch and
+    /// Delete, the same shape as the ABC page's Shift row.
     public static func numericPageRows(ascii: Bool) -> [[String]] {
         ascii
             ? [
                 Array("1234567890").map(String.init),
                 Array("-/:;()$&@\"").map(String.init),
-                [".", ",", "?", "!", "'", "[", "]", "%", "+"],
+                [".", ",", "?", "!", "'", "%", "+"],
             ]
             : [
                 Array("1234567890").map(String.init),
                 ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"],
-                ["。", "，", "、", "？", "！", ".", "…", "「", "」"],
+                ["。", "，", "、", "？", "！", ".", "…"],
             ]
     }
 
     /// The row-shaped symbol page: the 123 page's geometry with the two mark rows
-    /// swapped for the second page's set. The third row is the shared sentence row,
-    /// again one character per ten-column slot with Delete in the last one; every
-    /// mark is chosen so no character repeats within the page.
+    /// swapped for the second page's set and the same seven-mark sentence row;
+    /// no character repeats within the page.
     public static func symbolPageRows(ascii: Bool) -> [[String]] {
         ascii
             ? [
                 Array("[]{}#%^*+=").map(String.init),
                 ["_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•"],
-                [".", ",", "?", "!", "'", "\"", ":", ";", "/"],
+                [".", ",", "?", "!", "'", "\"", "/"],
             ]
             : [
                 ["【", "】", "{", "}", "#", "%", "^", "*", "+", "="],
                 ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"],
-                ["。", "，", "、", "？", "！", ".", "：", "；", "…"],
+                ["。", "，", "、", "？", "！", ".", "…"],
             ]
     }
 

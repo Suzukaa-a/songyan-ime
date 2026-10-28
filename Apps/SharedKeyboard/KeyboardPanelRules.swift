@@ -86,14 +86,15 @@ enum KeyboardPanelRules {
     static func controlPolicy(
         page: KeyboardPage, isEnglishMode: Bool, hasGlobe: Bool, usesASCIIPunctuation: Bool,
         phoneShellVisible: Bool, usesFixedEditingRail: Bool,
-        declaredTrailingReturn: @autoclosure () -> Bool, showsCategorySymbolPage: Bool
+        declaredTrailingReturn: @autoclosure () -> Bool, showsCategorySymbolPage: Bool,
+        numericPageReachesSymbols: Bool = true
     ) -> KeyboardControlPolicy {
         let trailingHasReturn = !usesFixedEditingRail && phoneShellVisible && declaredTrailingReturn()
         return KeyboardControlPolicy(
             page: page, isEnglishMode: isEnglishMode, hasGlobe: hasGlobe,
             isPhoneLayout: phoneShellVisible, usesASCIIPunctuation: usesASCIIPunctuation,
             includesBottomEnter: !phoneShellVisible || (!usesFixedEditingRail && !trailingHasReturn),
-            usesCategorySymbolPage: showsCategorySymbolPage)
+            usesCategorySymbolPage: showsCategorySymbolPage, numericPageReachesSymbols: numericPageReachesSymbols)
     }
 
     /// The known bundled main-shell preset (26 or merged 14/18) whose main rows still provide the

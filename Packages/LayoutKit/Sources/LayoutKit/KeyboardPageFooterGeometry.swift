@@ -86,8 +86,10 @@ public struct KeyboardPageFooterGeometry: Equatable, Sendable {
         case .symbolLock:
             return action.type == .symbolLock
         case .utility:
-            // Only the digit pad's utility position resolves here: the fixed 0 key.
-            return action.type == .literal && action.value == KeyboardPageDefaultShape.keypadZero
+            // The digit pad's fixed 0 key, or the ABC page's comma.
+            guard action.type == .literal else { return false }
+            if case .digit = policy.utility { return action.value == KeyboardPageDefaultShape.keypadZero }
+            return true
         }
     }
 }

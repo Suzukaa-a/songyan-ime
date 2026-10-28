@@ -106,6 +106,23 @@ extension KeyboardPanelView {
 
     var pageResolution: KeyboardPageResolution { pageFacts.resolution }
 
+    /// Whether the 123 page the letter page opens can switch on to the symbol page; otherwise the
+    /// letter page keeps its direct symbol key. Memoized: the control row asks on every render.
+    var numericPageReachesSymbols: Bool {
+        let key = PageResolutionMemo.NumericReachKey(
+            composition: compositionMemoKey, needsSwitchEntry: systemKeyboardSwitch != nil,
+            mainLayoutIsPhoneKeypad: usesPhoneDefinition)
+        return pageMemo.numericReachesSymbols(for: key) {
+            var page = selectedComposition.flatMap { layoutRegistry?.page(id: $0.pageID(for: .numeric)) }
+            // A page skipped for a missing system-switch entry is replaced by the built-in one.
+            if let authored = page, key.needsSwitchEntry, authored.chrome != nil, !authored.hasInputModeSwitchKey {
+                page = nil
+            }
+            return KeyboardPageResolver.numericPageReachesSymbols(
+                page: page, mainLayoutIsPhoneKeypad: key.mainLayoutIsPhoneKeypad)
+        }
+    }
+
     /// Whether the authored page draws a live Return title or clear-input enabled state.
     var pageDefinitionReadsComposition: Bool { pageFacts.readsComposition }
 
@@ -165,15 +182,28 @@ extension KeyboardPanelView {
             key: { key, row, index in
                 authoredPageKey(key, id: "page-\(definition.id)-\(row)-\(index)", kind: definition.kind)
             },
-            shift: {
-                ShiftKey(
-                    state: controller.shiftState, isEnglishMode: true,
-                    tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
-                    doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } })
+            leading: {
+                if definition.kind == .english {
+                    ShiftKey(
+                        state: controller.shiftState, isEnglishMode: true,
+                        tap: { keyFeedbackAfterEffect { controller.handleShiftTap() } },
+                        doubleTap: { keyFeedbackAfterEffect { controller.handleShiftDoubleTap() } })
+                } else {
+                    markPageSwitchKey(target: definition.kind == .numeric ? .symbols : .numeric)
+                }
             },
             delete: {
                 RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) }
             })
+    }
+
+    /// The 123 / symbol page's third-row switch.
+    func markPageSwitchKey(target: KeyboardPage) -> some View {
+        MarkPageSwitchKey(target: target) {
+            emitKeyFeedback()
+            page = target
+            showsAllCandidates = false
+        }
     }
 
     @ViewBuilder
@@ -468,6 +498,12 @@ final class PageResolutionMemo {
         let missingSwitchEntry: Bool
     }
 
+    struct NumericReachKey: Equatable {
+        let composition: CompositionKey
+        let needsSwitchEntry: Bool
+        let mainLayoutIsPhoneKeypad: Bool
+    }
+
     struct ResolutionKey: Equatable {
         let paired: PairedKey
         let usesASCIIPunctuation: Bool
@@ -487,6 +523,8 @@ final class PageResolutionMemo {
     private var paired: Paired?
     private var resolutionKey: ResolutionKey?
     private var resolved: Resolution?
+    private var numericReachKey: NumericReachKey?
+    private var numericReach: Bool?
 
     func composition(for key: CompositionKey, resolve: () -> KeyboardComposition?) -> KeyboardComposition? {
         if compositionKey == key { return composition }
@@ -509,6 +547,14 @@ final class PageResolutionMemo {
         let value = resolve()
         pairedKey = key
         paired = value
+        return value
+    }
+
+    func numericReachesSymbols(for key: NumericReachKey, resolve: () -> Bool) -> Bool {
+        if let numericReach, numericReachKey == key { return numericReach }
+        let value = resolve()
+        numericReachKey = key
+        numericReach = value
         return value
     }
 

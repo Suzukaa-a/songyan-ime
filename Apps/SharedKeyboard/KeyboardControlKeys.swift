@@ -116,6 +116,25 @@ struct ControlRow<ModeKey: View>: View {
 
 }
 
+/// The 123 / symbol page's third-row switch in the Shift position, as on the system keyboard.
+/// It owns the touch through the same UIKit key as its neighbours.
+struct MarkPageSwitchKey: View {
+    /// The page this key opens: 符号 on the 123 page, 123 on the symbol page.
+    let target: KeyboardPage
+    let onTap: () -> Void
+
+    var body: some View {
+        AlternateCharacterKey(
+            cap: KeyCap(
+                id: "control-mark-page-switch",
+                title: target == .symbols ? KeyboardControlPolicy.symbolPageTitle : "123",
+                action: .cycleLayout),
+            alternates: []
+        ) { _ in onTap() }
+        .accessibilityLabel(target == .symbols ? "打开更多符号页" : "打开数字符号页")
+    }
+}
+
 /// All return placements share the same composition/host title and enter action.
 struct ReturnKey: View {
     let title: String

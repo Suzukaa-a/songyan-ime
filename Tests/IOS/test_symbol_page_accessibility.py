@@ -51,29 +51,27 @@ for ascii in [false, true] {
     let numericValues = literalValues(numeric.flatMap(\.caps))
     precondition(numericValues.contains("."), "decimal separator must survive both modes")
     precondition(numericValues.filter { $0.count == 1 && $0.first!.isNumber } == "1234567890".map(String.init))
-    // The third row fills nine equal character columns beside Delete.
+    // The third row holds seven marks between the 123/symbol switch and Delete.
     let expectedNumeric: [[String]] = ascii
-        ? ["1234567890".map(String.init), "-/:;()$&@\"".map(String.init), [".", ",", "?", "!", "'", "[", "]", "%", "+"]]
+        ? ["1234567890".map(String.init), "-/:;()$&@\"".map(String.init), [".", ",", "?", "!", "'", "%", "+"]]
         : ["1234567890".map(String.init), ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"],
-           ["。", "，", "、", "？", "！", ".", "…", "「", "」"]]
+           ["。", "，", "、", "？", "！", ".", "…"]]
     precondition(numeric.map { literalValues($0.caps) } == expectedNumeric, "123 rows (ascii=\(ascii))")
-    // Each symbol page exposes nine sentence marks without repeating its other rows.
+    // Each symbol page exposes seven sentence marks without repeating its other rows.
     let expectedSymbols: [[String]] = ascii
-        ? ["[]{}#%^*+=".map(String.init), "_\\|~<>€£¥•".map(String.init), [".", ",", "?", "!", "'", "\"", ":", ";", "/"]]
+        ? ["[]{}#%^*+=".map(String.init), "_\\|~<>€£¥•".map(String.init), [".", ",", "?", "!", "'", "\"", "/"]]
         : [["【", "】", "{", "}", "#", "%", "^", "*", "+", "="], ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"],
-           ["。", "，", "、", "？", "！", ".", "：", "；", "…"]]
+           ["。", "，", "、", "？", "！", ".", "…"]]
     precondition(symbols.map { literalValues($0.caps) } == expectedSymbols, "#+= rows (ascii=\(ascii))")
     for (page, rows) in [(KeyboardControlPolicy.Page.numeric, numeric), (.symbols, symbols)] {
         let values = literalValues(rows.flatMap(\.caps))
         precondition(Set(values).count == values.count, "\(page) shows each mark once (ascii=\(ascii))")
-        // The bottom row's punctuation slot sits on the same page: it must add a mark, not repeat one.
+        // The third row already carries the page switch and the sentence marks, so the bottom row
+        // has no punctuation slot that could repeat one of them.
         let bottom = KeyboardControlPolicy(page: page, isEnglishMode: ascii, hasGlobe: true,
                                            isPhoneLayout: false, usesASCIIPunctuation: ascii,
                                            usesCategorySymbolPage: false)
-        guard case .punctuation(let slot) = bottom.utility else { fatalError("\(page) bottom slot is punctuation") }
-        precondition(!values.contains(slot), "the \(page) bottom slot \(slot) repeats a key (ascii=\(ascii))")
-        precondition(Set(bottom.utilityAlternates).isDisjoint(with: values + [slot]),
-                     "the \(page) bottom slot's long press repeats a key (ascii=\(ascii))")
+        precondition(!bottom.slots.contains(.utility), "the \(page) bottom row has no utility slot")
     }
 
     let rail = SymbolPageTable.phoneNumericRail(ascii: ascii)

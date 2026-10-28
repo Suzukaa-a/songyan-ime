@@ -69,6 +69,9 @@ struct KeyAreaRenderToken: Equatable {
     let hasSystemKeyboardSwitch: Bool
     let allowsCursorMovement: Bool
     let prefersCategorySymbolPage: Bool
+    /// The letter page's utility key types punctuation or opens symbols depending on the paired
+    /// 123 page, which can change without any other token input.
+    let numericPageReachesSymbols: Bool
     /// Authored symbol-lock keys redraw their selected state; the token is what lets the gate see it.
     let symbolPageLocked: Bool
     /// The open category of a categorized authored page (its rail and grid render inside the gate).

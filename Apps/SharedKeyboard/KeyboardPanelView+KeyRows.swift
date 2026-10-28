@@ -35,6 +35,7 @@ extension KeyboardPanelView {
             KeyboardSymbolPageRows(
                 rows: symbolRows, split: activeSplit, alternates: alternates,
                 onTap: { handleKey($0.action) },
+                pageSwitch: { markPageSwitchKey(target: page == .numeric ? .symbols : .numeric) },
                 delete: { RepeatingDeleteKey { repeating in handleKey(.backspace, emitFeedback: !repeating) } })
         case .authoredChromePage, .phoneDigitPad, .categorySymbolPage, .phonePad:
             // These shells are drawn by the panel body, never inside the rows area.
@@ -115,6 +116,7 @@ extension KeyboardPanelView {
             hasSystemKeyboardSwitch: systemKeyboardSwitch != nil,
             allowsCursorMovement: allowsCursorMovement,
             prefersCategorySymbolPage: prefersCategorySymbolPage,
+            numericPageReachesSymbols: page == .letters && numericPageReachesSymbols,
             symbolPageLocked: symbolPageLocked,
             symbolCategoryID: phoneSymbolCategoryID,
             showsExpandedCandidates: showsExpandedCandidates)

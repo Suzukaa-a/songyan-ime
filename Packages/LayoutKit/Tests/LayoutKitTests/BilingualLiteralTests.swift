@@ -179,7 +179,9 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertEqual(ascii.defaultSymbolMarks, .ascii)
         XCTAssertEqual(ascii.rows[0], KeyboardPagePresets.symbolsEnglish.rows[0])
         XCTAssertEqual(ascii.rows[1], KeyboardPagePresets.symbolsEnglish.rows[1])
-        XCTAssertEqual(Array(ascii.rows[2].keys.dropLast()), KeyboardPagePresets.symbolsEnglish.rows[2].keys)
+        // Materializing wraps the marks in the 123 switch and Delete.
+        XCTAssertEqual(
+            Array(ascii.rows[2].keys.dropFirst().dropLast()), KeyboardPagePresets.symbolsEnglish.rows[2].keys)
         XCTAssertEqual(ascii.rows[0].keys[0].label, KeyboardPagePresets.symbolsEnglish.rows[0].keys[0].label)
         XCTAssertEqual(
             ascii.rows[0].keys[0].longPress, KeyboardPagePresets.symbolsEnglish.rows[0].keys[0].longPress,
@@ -220,15 +222,16 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertNil(copy.rows[0].keys[0].action.asciiValue)
         XCTAssertEqual(copy.rows[0].keys[0].action.literalValue(usesASCIIPunctuation: true), "固定")
 
-        // Materializing a row page on native controls only appends the controls the renderer draws;
-        // it never rewrites an author literal.
+        // Materializing a row page on native controls only adds the switch and Delete the renderer
+        // draws; it never rewrites an author literal.
         let native = KeyboardPageDefinition(
             id: "author.native", name: "作者旧页", kind: .numeric,
             rows: [LayoutRow(keys: [fixed, LayoutKey(label: "2", action: .init(.literal, value: "2"))])])
         let materialized = native.materialized()
-        XCTAssertEqual(Array(materialized.rows[0].keys.prefix(2)), native.rows[0].keys)
-        XCTAssertEqual(materialized.rows[0].keys.count, 3)  // Delete appended
-        XCTAssertNil(materialized.rows[0].keys[0].action.asciiValue)
+        XCTAssertEqual(Array(materialized.rows[0].keys.dropFirst().prefix(2)), native.rows[0].keys)
+        XCTAssertEqual(materialized.rows[0].keys.count, 4)  // page switch prepended, Delete appended
+        XCTAssertEqual(materialized.rows[0].keys[0].action.pageSwitchTarget, .symbols)
+        XCTAssertNil(materialized.rows[0].keys[1].action.asciiValue)
         try materialized.validate()
     }
 
@@ -240,23 +243,22 @@ final class BilingualLiteralTests: XCTestCase {
 
     func testDefaultFootersMatchTheFrozenOrderAndActions() throws {
         let abc = footer(KeyboardPagePresets.englishQwerty)
-        XCTAssertEqual(
-            abc.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .pageSwitch, .enter])
         XCTAssertEqual(abc[1].action.pageSwitchTarget, .numeric)
-        XCTAssertEqual(abc[4].action.pageSwitchTarget, .symbols)
-        XCTAssertEqual(abc[4].label, "符号")
+        XCTAssertEqual(abc.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .literal, .enter])
+        XCTAssertEqual(abc[4].label, ",")
+        XCTAssertEqual(abc[4].action.value, "，")
+        XCTAssertEqual(abc[4].action.asciiValue, ",")
+        XCTAssertEqual(abc[4].longPress?.compactMap(\.action.value), ["。", "？", "！", "、", "…"])
+        XCTAssertEqual(abc[4].longPress?.compactMap(\.action.asciiValue), [".", "?", "!", "'", "\""])
 
         let numeric = footer(KeyboardPagePresets.numericChinese)
-        XCTAssertEqual(
-            numeric.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .pageSwitch, .enter])
+        XCTAssertEqual(numeric.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .enter])
         XCTAssertEqual(numeric[1].label, "返回")
         XCTAssertEqual(numeric[1].action.pageSwitchTarget, .letters)
-        XCTAssertEqual(numeric[4].action.pageSwitchTarget, .symbols)
 
         let symbols = footer(KeyboardPagePresets.symbolsChinese)
-        XCTAssertEqual(
-            symbols.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .pageSwitch, .enter])
-        XCTAssertEqual(symbols[4].action.pageSwitchTarget, .numeric)
+        XCTAssertEqual(symbols.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .enter])
+        XCTAssertEqual(symbols[1].action.pageSwitchTarget, .letters)
 
         let categorized = try XCTUnwrap(KeyboardPagePresets.symbolsCategorized.materialized().chrome?.bottom)
         XCTAssertEqual(categorized.map(\.action.type), [.globe, .languageSwitch, .pageSwitch, .space, .symbolLock])
@@ -271,11 +273,11 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertEqual(keypad.trailing.map(\.action.type), [.backspace, .clearInput, .enter])
 
         // Space is the only relative width in a default footer; function keys draw automatic faces,
-        // while the fixed digit 0 keeps the plain literal face.
+        // while the fixed digit 0 keeps the plain literal face (the ABC comma is automatic).
         for keys in [abc, numeric, symbols, categorized, keypad.bottom] {
             for key in keys {
                 XCTAssertEqual(key.width, key.action.type == .space ? 4 : nil)
-                XCTAssertEqual(key.titleMode, key.action.type == .literal ? nil : .automatic)
+                XCTAssertEqual(key.titleMode, key.action.value == "0" ? nil : .automatic)
             }
         }
     }
@@ -359,6 +361,6 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertNil(page.rows[0].keys[0].action.asciiValue)
         XCTAssertEqual(page.rows[0].keys[0].action.literalValue(usesASCIIPunctuation: true), "。")
         try page.validate()
-        XCTAssertEqual(page.materialized().rows[0].keys[0], page.rows[0].keys[0])
+        XCTAssertEqual(page.materialized().rows[0].keys[1], page.rows[0].keys[0])
     }
 }

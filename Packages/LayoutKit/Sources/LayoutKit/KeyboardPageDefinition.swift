@@ -100,6 +100,20 @@ public enum KeyboardPageResolver {
         input.usesASCIIPunctuation ? .ascii : .chinese
     }
 
+    /// Whether the 123 page a letter page opens has its own way to the symbol page. The built-in
+    /// row page (and an authored row page drawn with native controls) opens the third row with the
+    /// switch; a phone digit pad has none; other authored pages only if they carry a symbol switch.
+    /// `page` is the pairing's 123 page as the panel would draw it, nil for the built-in one.
+    public static func numericPageReachesSymbols(
+        page: KeyboardPageDefinition?, mainLayoutIsPhoneKeypad: Bool
+    ) -> Bool {
+        guard let page, page.kind == .numeric, page.numericPresentation != .automatic else {
+            return !mainLayoutIsPhoneKeypad
+        }
+        guard page.chrome != nil else { return true }
+        return page.containsKey { $0.action.pageSwitchTarget == .symbols }
+    }
+
     private static func builtIn(kind: KeyboardPageKind, input: KeyboardPageResolutionInput) -> KeyboardPageResolution {
         switch kind {
         case .numeric: return .automaticNumeric(form: numericForm(input), marks: marks(input))
@@ -271,8 +285,8 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
                     (numericMarks == .ascii ? KeyboardPagePresets.numericEnglish : KeyboardPagePresets.numericChinese)
                     .rows
                 page.numericPresentation = nil
-                // The native row page gets its tenth-column Delete from the renderer; materialized
-                // data carries it explicitly so an authored page still has a Delete key.
+                // The native row page gets its third-row switch and Delete from the renderer;
+                // materialized data carries them explicitly so an authored page keeps both.
                 page.rows = Self.rowsInsertingNativeControls(rows: page.rows, kind: .numeric, split: &page.split)
                 page.chrome = Self.rowsChrome(kind: .numeric)
                 page.defaultSymbolMarks = numericMarks
@@ -328,8 +342,26 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     private static let deleteKey = LayoutKey(
         label: "⌫", width: KeyboardPageDefaultShape.alphabetSideWidth, action: .init(.backspace),
         titleMode: .automatic)
-    private static let plainDeleteKey = LayoutKey(
-        label: "⌫", action: .init(.backspace), titleMode: .automatic)
+
+    /// The 123 / symbol page's third-row switch in the Shift position, opening the other page.
+    private static func markPageSwitchKey(kind: KeyboardPageKind) -> LayoutKey {
+        let target: LayoutAction.PageTarget = kind == .numeric ? .symbols : .numeric
+        return LayoutKey(
+            label: pageSwitchKey(target).label, width: KeyboardPageDefaultShape.alphabetSideWidth,
+            action: .pageSwitch(target), titleMode: .automatic)
+    }
+
+    /// The ABC page's comma in the utility position; long press holds the other sentence marks.
+    /// Each mark keeps its Chinese/ASCII pair so the key follows the symbol branch.
+    private static var commaKey: LayoutKey {
+        let pairs = [("。", "."), ("？", "?"), ("！", "!"), ("、", "'"), ("…", "\"")]
+        return LayoutKey(
+            label: ",", action: .init(.literal, value: "，", asciiValue: ","),
+            longPress: pairs.map { chinese, ascii in
+                LayoutOption(label: ascii, action: .init(.literal, value: chinese, asciiValue: ascii))
+            },
+            titleMode: .automatic)
+    }
 
     private static func functionKey(
         _ label: String, _ action: LayoutAction, width: Double? = nil
@@ -387,26 +419,13 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
     private static func rowsChrome(kind: KeyboardPageKind) -> KeyboardPageChrome {
         switch kind {
         case .english:
-            // globe, 123, 中英, space, 符号, Return
+            // globe, 123, 中英, space, comma, Return
             return KeyboardPageChrome(
-                bottom: [
-                    globeKey, pageSwitchKey(.numeric), languageSwitchKey, spaceKey,
-                    pageSwitchKey(.symbols), enterKey,
-                ])
-        case .numeric:
-            // globe, 返回, 中英, space, 符号, Return
+                bottom: [globeKey, pageSwitchKey(.numeric), languageSwitchKey, spaceKey, commaKey, enterKey])
+        case .numeric, .symbols:
+            // globe, 返回, 中英, space, Return; the 123/symbol switch opens the third row.
             return KeyboardPageChrome(
-                bottom: [
-                    globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey,
-                    pageSwitchKey(.symbols), enterKey,
-                ])
-        case .symbols:
-            // globe, 返回, 中英, space, 123, Return
-            return KeyboardPageChrome(
-                bottom: [
-                    globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey,
-                    pageSwitchKey(.numeric), enterKey,
-                ])
+                bottom: [globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey, enterKey])
         }
     }
 
@@ -452,29 +471,31 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             trailingSpansBottom: true)
     }
 
-    /// Native rendering synthesizes Shift/Delete around the last row. Materializing writes them as
-    /// keys instead; a stored split cut on the Shift row moves by one because Shift is inserted
-    /// before the characters, while an appended Delete never moves a cut.
+    /// Native rendering synthesizes the leading control (Shift on ABC, the 123/symbol switch
+    /// elsewhere) and Delete around the last row. Materializing writes them as keys instead; a
+    /// stored split cut on that row moves by one because the leading key is inserted before the
+    /// characters, while an appended Delete never moves a cut.
     private static func rowsInsertingNativeControls(
         rows: [LayoutRow], kind: KeyboardPageKind, split: inout LayoutSplitConfiguration?
     ) -> [LayoutRow] {
         guard !rows.isEmpty else { return rows }
         let declared = rows.flatMap(\.keys)
-        let declaresShift = declared.contains { $0.action.type == .shift }
+        let leadingType: LayoutAction.Kind = kind == .english ? .shift : .pageSwitch
+        let declaresLeading = declared.contains { $0.action.type == leadingType }
         let declaresDelete = declared.contains { $0.action.type == .backspace }
         var result = rows
         var shiftRow: Int?
-        if kind == .english, !declaresShift {
+        if !declaresLeading {
             let index = result.count - 1
             var keys = result[index].keys
-            keys.insert(shiftKey, at: 0)
+            keys.insert(kind == .english ? shiftKey : markPageSwitchKey(kind: kind), at: 0)
             result[index] = LayoutRow(keys: keys)
             shiftRow = index
         }
         if !declaresDelete {
             let index = result.count - 1
             var keys = result[index].keys
-            keys.append(kind == .english ? deleteKey : plainDeleteKey)
+            keys.append(deleteKey)
             result[index] = LayoutRow(keys: keys)
         }
         if let shiftRow, let current = split, current.rowBreaks.indices.contains(shiftRow) {
@@ -510,20 +531,30 @@ enum KeyboardPageDefaultShape {
             && page.rows.allSatisfy { $0.keys.allSatisfy(isLetterKey) }
     }
 
-    /// Native 123 / symbol rows: 10 / 10 / 9 equal literals; the renderer adds Delete.
-    static func isNativeTenColumns(_ page: KeyboardPageDefinition) -> Bool {
-        page.kind != .english && page.rows.map(\.keys.count) == [10, 10, 9]
-            && page.rows.allSatisfy { $0.keys.allSatisfy { $0.widthWeight == 1 && $0.action.type == .literal } }
+    /// One mark per equal-width column on a 123 / symbol page.
+    static func isMarkKey(_ key: LayoutKey) -> Bool {
+        key.widthWeight == 1 && key.action.type == .literal
     }
 
-    /// Authored ABC rows: 10 / 9 / Shift + 7 letters + Delete, with the default side weights.
-    static func isAuthoredAlphabet(_ page: KeyboardPageDefinition) -> Bool {
-        guard page.rows.map(\.keys.count) == [10, 9, 9] else { return false }
+    /// Native 123 / symbol rows: 10 / 10 / 7 equal literals; the renderer adds the 123/symbol
+    /// switch and Delete around the third row.
+    static func isNativeMarkRows(_ page: KeyboardPageDefinition) -> Bool {
+        page.kind != .english && page.rows.map(\.keys.count) == [10, 10, 7]
+            && page.rows.allSatisfy { $0.keys.allSatisfy(isMarkKey) }
+    }
+
+    /// Authored ABC rows (10 / 9 / Shift + 7 letters + Delete) or 123 / symbol rows
+    /// (10 / 10 / switch + 7 marks + Delete), with the default side weights.
+    static func isAuthoredStandardRows(_ page: KeyboardPageDefinition) -> Bool {
+        let english = page.kind == .english
+        guard page.rows.map(\.keys.count) == [10, english ? 9 : 10, 9] else { return false }
         let last = page.rows[2].keys
-        guard last.first?.action.type == .shift, last.last?.action.type == .backspace,
+        guard last.first?.action.type == (english ? .shift : .pageSwitch),
+            last.last?.action.type == .backspace,
             last.first?.widthWeight == alphabetSideWidth, last.last?.widthWeight == alphabetSideWidth
         else { return false }
-        return page.rows[0].keys.allSatisfy(isLetterKey) && page.rows[1].keys.allSatisfy(isLetterKey)
-            && last.dropFirst().dropLast().allSatisfy(isLetterKey)
+        let character = english ? isLetterKey : isMarkKey
+        return page.rows[0].keys.allSatisfy(character) && page.rows[1].keys.allSatisfy(character)
+            && last.dropFirst().dropLast().allSatisfy(character)
     }
 }

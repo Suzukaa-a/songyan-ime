@@ -2,20 +2,20 @@ import XCTest
 
 @testable import LayoutKit
 
-/// The 123 and row-shaped #+= pages share one ten-column grid. Their third row
-/// carries one character per column with Delete in the last one, so its caps are
-/// exactly as wide as the rows above instead of a few wide caps standing out.
+/// The 123 and row-shaped #+= pages share one ten-column grid. Their third row is the
+/// page switch, seven marks and Delete, with the side keys as wide as Shift and Delete on
+/// the ABC page, so the rows end on the same edges.
 final class KeyboardPageRowsTests: XCTestCase {
     private let spacing = 4.0
 
-    func testBothPagesKeepTenColumnRowsWithANineCharacterThirdRow() {
+    func testBothPagesKeepTenColumnRowsWithASevenMarkThirdRow() {
         for ascii in [false, true] {
             for rows in [
                 BuiltinLayouts.numericPageRows(ascii: ascii),
                 BuiltinLayouts.symbolPageRows(ascii: ascii),
             ] {
                 XCTAssertEqual(rows.count, 3)
-                XCTAssertEqual(rows.map(\.count), [10, 10, 9])
+                XCTAssertEqual(rows.map(\.count), [10, 10, 7])
                 XCTAssertTrue(rows.allSatisfy { $0.allSatisfy { !$0.isEmpty } })
                 if ascii {
                     // Only the third row is checked: the two mark rows above keep
@@ -28,18 +28,18 @@ final class KeyboardPageRowsTests: XCTestCase {
         }
     }
 
-    /// A nine-cap third row plus Delete fills the same width as a ten-cap letter
-    /// row: 9*keyWidth + 8 gaps + one gap + keyWidth == 10*keyWidth + 9 gaps.
-    func testThirdRowPlusDeleteFillsTheTenColumnWidth() {
+    /// Switch + seven marks + Delete fills the same width as a ten-cap letter row, with both
+    /// side keys at thirdRowSideWidth (the ABC page's Shift / Delete width).
+    func testThirdRowPlusSwitchAndDeleteFillsTheTenColumnWidth() {
         for width in [280.0, 320, 382, 422, 768, 1024] {
             for split in [nil, LayoutSplitConfiguration(activation: .always, rowBreaks: [5, 4, 3], gapFraction: 0.24)] {
                 let geometry = StandardKeyRowGeometry(width: width, split: split?.resolved(forWidth: width))
                 let contentWidth = width - geometry.gap
                 let letterRow = geometry.keyWidth * 10 + spacing * 9
-                let thirdRow = geometry.keyWidth * 9 + spacing * 8
-                let rowPlusDelete = thirdRow + spacing + geometry.keyWidth
+                let marks = geometry.keyWidth * 7 + spacing * 6
+                let fullRow = geometry.thirdRowSideWidth * 2 + marks + spacing * 2 + geometry.gap
                 XCTAssertEqual(letterRow, contentWidth, accuracy: 0.001)
-                XCTAssertEqual(rowPlusDelete, letterRow, accuracy: 0.001)
+                XCTAssertEqual(fullRow, letterRow + geometry.gap, accuracy: 0.001)
             }
         }
     }
@@ -68,25 +68,26 @@ final class KeyboardPageRowsTests: XCTestCase {
         XCTAssertEqual(presetRows(KeyboardPagePresets.symbolsSystem), BuiltinLayouts.symbolPageRows(ascii: false))
     }
 
-    /// Every letter page opens the symbol page from the bottom row's utility slot,
-    /// where a comma/period used to sit, while 123 and #+= keep their own actions.
-    func testLetterPagesOpenSymbolsAndNumberPagesKeepTheirUtility() {
-        for phone in [false, true] {
-            for english in [false, true] {
-                for globe in [false, true] {
-                    let letters = KeyboardControlPolicy(
-                        page: .letters, isEnglishMode: english, hasGlobe: globe,
-                        isPhoneLayout: phone, usesASCIIPunctuation: english)
-                    XCTAssertEqual(letters.key(at: .utility), .symbolPage)
-                    let numeric = KeyboardControlPolicy(
-                        page: .numeric, isEnglishMode: english, hasGlobe: globe,
-                        isPhoneLayout: phone, usesASCIIPunctuation: english)
-                    XCTAssertNotEqual(numeric.key(at: .utility), .symbolPage)
-                    let symbols = KeyboardControlPolicy(
-                        page: .symbols, isEnglishMode: english, hasGlobe: globe,
-                        isPhoneLayout: phone, usesASCIIPunctuation: english,
+    /// A native letter page types a comma from the utility slot (the row page's third row carries
+    /// the symbol switch); the 123 and #+= row pages have no utility slot at all. Phone pads
+    /// keep their direct symbol key and their 0 / 锁定 actions.
+    func testLetterPagesTypeCommaAndRowPagesHaveNoUtilitySlot() {
+        for english in [false, true] {
+            for globe in [false, true] {
+                let letters = KeyboardControlPolicy(
+                    page: .letters, isEnglishMode: english, hasGlobe: globe,
+                    isPhoneLayout: false, usesASCIIPunctuation: english)
+                XCTAssertEqual(letters.key(at: .utility), .utility)
+                let phoneLetters = KeyboardControlPolicy(
+                    page: .letters, isEnglishMode: english, hasGlobe: globe,
+                    isPhoneLayout: true, usesASCIIPunctuation: english)
+                XCTAssertEqual(phoneLetters.key(at: .utility), .symbolPage)
+                for page in [KeyboardControlPolicy.Page.numeric, .symbols] {
+                    let policy = KeyboardControlPolicy(
+                        page: page, isEnglishMode: english, hasGlobe: globe,
+                        isPhoneLayout: false, usesASCIIPunctuation: english,
                         usesCategorySymbolPage: false)
-                    XCTAssertNotEqual(symbols.key(at: .utility), .symbolPage)
+                    XCTAssertFalse(policy.slots.contains(.utility), "\(page)")
                 }
             }
         }
@@ -100,25 +101,16 @@ final class KeyboardPageRowsTests: XCTestCase {
         XCTAssertEqual(categorized.key(at: .utility), .symbolLock)
     }
 
-    /// The utility key on the row pages must not repeat a mark its own rows type.
-    func testUtilityKeyAndItsLongPressStayClearOfThePageRows() {
+    /// The letter page's comma and its long-press marks are the sentence marks, so the
+    /// ASCII branch must stay ASCII.
+    func testLetterCommaAndItsLongPressFollowTheSymbolBranch() {
         for ascii in [false, true] {
-            for page in [KeyboardControlPolicy.Page.numeric, .symbols] {
-                let policy = KeyboardControlPolicy(
-                    page: page, isEnglishMode: ascii, hasGlobe: true,
-                    isPhoneLayout: false, usesASCIIPunctuation: ascii, usesCategorySymbolPage: false)
-                guard case .punctuation(let text) = policy.utility else {
-                    return XCTFail("row pages keep a punctuation utility key")
-                }
-                let rows =
-                    page == .numeric
-                    ? BuiltinLayouts.numericPageRows(ascii: ascii)
-                    : BuiltinLayouts.symbolPageRows(ascii: ascii)
-                let visible = Set(rows.flatMap { $0 })
-                XCTAssertFalse(visible.contains(text), "\(page) utility repeats \(text)")
-                for alternate in policy.utilityAlternates {
-                    XCTAssertFalse(visible.contains(alternate), "\(page) long press repeats \(alternate)")
-                }
+            let policy = KeyboardControlPolicy(
+                page: .letters, isEnglishMode: ascii, hasGlobe: true,
+                isPhoneLayout: false, usesASCIIPunctuation: ascii)
+            XCTAssertEqual(policy.utility, .punctuation(ascii ? "," : "，"))
+            if ascii {
+                XCTAssertTrue(policy.utilityAlternates.allSatisfy { $0.utf8.allSatisfy { $0 < 128 } })
             }
         }
     }

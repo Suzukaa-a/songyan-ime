@@ -8,13 +8,14 @@ import UIKit
 // action closures; the panel passes live state, a preview passes its sample state.
 
 /// The rows of a page without authored chrome, with the native Shift and Delete around them.
-struct KeyboardPageRows<Key: View, Shift: View, Delete: View>: View {
+struct KeyboardPageRows<Key: View, Leading: View, Delete: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let page: KeyboardPageDefinition
     let split: ActiveLayoutSplit?
     var showsGlobe = true
     @ViewBuilder var key: (LayoutKey, Int, Int) -> Key
-    @ViewBuilder var shift: () -> Shift
+    /// Shift on the ABC page, the 123/symbol switch on the other pages.
+    @ViewBuilder var leading: () -> Leading
     @ViewBuilder var delete: () -> Delete
 
     var body: some View {
@@ -23,7 +24,9 @@ struct KeyboardPageRows<Key: View, Shift: View, Delete: View>: View {
                 let geometry = KeyboardPageRowGeometry(
                     width: Double(proxy.size.width), page: page, row: row, split: split, showsGlobe: showsGlobe)
                 HStack(spacing: 4) {
-                    if geometry.showsShift { shift().frame(width: geometry.sideWidth, height: keyHeight) }
+                    if geometry.showsLeadingControl {
+                        leading().frame(width: geometry.sideWidth, height: keyHeight)
+                    }
                     HStack(spacing: 4) {
                         ForEach(Array(geometry.keyIndices.enumerated()), id: \.element) { index, source in
                             if index == geometry.splitIndex, geometry.gap > 0 {
@@ -89,14 +92,16 @@ struct KeyboardCategoryGrid<Key: View>: View {
     }
 }
 
-/// The built-in 123 rows and the row-shaped #+= page: ten equal columns, and a nine-character third
-/// row that gives Delete one column of its own, so no symbol is narrower than a 26-key letter.
-struct KeyboardSymbolPageRows<Delete: View>: View {
+/// The built-in 123 rows and the row-shaped #+= page: ten equal columns, and a seven-mark third row
+/// between the 123/symbol switch and Delete, the ABC page's Shift-row shape.
+struct KeyboardSymbolPageRows<PageSwitch: View, Delete: View>: View {
     @Environment(\.keyboardKeyHeight) private var keyHeight
     let rows: [KeyboardRow]
     let split: ActiveLayoutSplit?
     var alternates: (KeyCap) -> [KeyCap] = { _ in [] }
     let onTap: (KeyCap) -> Void
+    /// The 123/symbol switch in the ABC page's Shift position.
+    @ViewBuilder var pageSwitch: () -> PageSwitch
     @ViewBuilder var delete: () -> Delete
 
     var body: some View {
@@ -104,17 +109,17 @@ struct KeyboardSymbolPageRows<Delete: View>: View {
             GeometryReader { geometry in
                 let metrics = StandardKeyRowGeometry(width: Double(geometry.size.width), split: split)
                 HStack(spacing: 4) {
+                    if index == 2 {
+                        pageSwitch().frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
+                    }
                     WeightedKeyRow(
                         caps: row.caps, alternates: alternates, showsKeyPreview: true,
                         split: split, rowIndex: index,
                         fixedKeyWidth: CGFloat(metrics.keyWidth), splitGap: CGFloat(metrics.gap),
                         onTap: onTap
                     )
-                    .frame(
-                        width: index == 2
-                            ? max(0, geometry.size.width - CGFloat(metrics.keyWidth) - 4) : geometry.size.width)
                     if index == 2 {
-                        delete().frame(width: CGFloat(metrics.keyWidth), height: keyHeight)
+                        delete().frame(width: CGFloat(metrics.thirdRowSideWidth), height: keyHeight)
                     }
                 }
             }.frame(height: keyHeight)

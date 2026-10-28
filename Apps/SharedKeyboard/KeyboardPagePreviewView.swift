@@ -406,7 +406,13 @@ public struct KeyboardPagePreviewView: View {
             key: { key, row, index in
                 pageKey(key, page: page, id: "page-\(page.id)-\(row)-\(index)") {}
             },
-            shift: { ShiftKey(state: .off, isEnglishMode: true, tap: {}, doubleTap: {}) },
+            leading: {
+                if page.kind == .english {
+                    ShiftKey(state: .off, isEnglishMode: true, tap: {}, doubleTap: {})
+                } else {
+                    MarkPageSwitchKey(target: page.kind == .numeric ? .symbols : .numeric) {}
+                }
+            },
             delete: { RepeatingDeleteKey {} })
         return VStack(spacing: 4) {
             Group {
@@ -430,7 +436,10 @@ public struct KeyboardPagePreviewView: View {
     ) -> some View {
         VStack(spacing: 4) {
             VStack(spacing: 4) {
-                KeyboardSymbolPageRows(rows: rows, split: split, onTap: { _ in }, delete: { RepeatingDeleteKey {} })
+                KeyboardSymbolPageRows(
+                    rows: rows, split: split, onTap: { _ in },
+                    pageSwitch: { MarkPageSwitchKey(target: page == .numeric ? .symbols : .numeric) {} },
+                    delete: { RepeatingDeleteKey {} })
             }
             .frame(height: mainAreaHeight, alignment: .top)
             KeyboardPreviewControlRow(

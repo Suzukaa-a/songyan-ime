@@ -10,8 +10,8 @@ final class KeyboardPageGeometryTests: XCTestCase {
             let rows = page.rows.indices.map {
                 KeyboardPageRowGeometry(width: width, page: page, row: $0, split: split)
             }
-            XCTAssertFalse(rows[0].showsShift)
-            XCTAssertTrue(rows[2].showsShift)
+            XCTAssertFalse(rows[0].showsLeadingControl)
+            XCTAssertTrue(rows[2].showsLeadingControl)
             XCTAssertTrue(rows[2].showsDelete)
             for row in rows {
                 XCTAssertTrue(row.keyWidths.allSatisfy { abs($0 - rows[0].keyWidths[0]) < 0.001 })
@@ -20,7 +20,7 @@ final class KeyboardPageGeometryTests: XCTestCase {
         }
     }
 
-    func testNumericAndSymbolThirdRowsIncludeTheTenthDeleteColumn() {
+    func testNumericAndSymbolThirdRowsIncludeTheSwitchAndDeleteColumns() {
         for page in [
             KeyboardPagePresets.numericChinese, KeyboardPagePresets.numericEnglish, KeyboardPagePresets.symbolsChinese,
             KeyboardPagePresets.symbolsEnglish,
@@ -29,10 +29,15 @@ final class KeyboardPageGeometryTests: XCTestCase {
                 width: 834, page: page, row: 0, split: LayoutSplitConfiguration().resolved(forWidth: 834))
             let third = KeyboardPageRowGeometry(
                 width: 834, page: page, row: 2, split: LayoutSplitConfiguration().resolved(forWidth: 834))
+            XCTAssertTrue(third.showsLeadingControl)
             XCTAssertTrue(third.showsDelete)
-            XCTAssertEqual(third.keyWidths.count, 9)
-            XCTAssertEqual(third.sideWidth, first.keyWidths[0], accuracy: 0.001)
-            XCTAssertEqual(third.rowWidth + third.sideWidth + 4, 834, accuracy: 0.001)
+            XCTAssertEqual(third.keyWidths.count, 7)
+            // Both side keys are as wide as Shift / Delete on the ABC page.
+            let standard = StandardKeyRowGeometry(
+                width: 834, split: LayoutSplitConfiguration().resolved(forWidth: 834))
+            XCTAssertEqual(third.sideWidth, standard.thirdRowSideWidth, accuracy: 0.001)
+            XCTAssertEqual(third.keyWidths[0], first.keyWidths[0], accuracy: 0.001)
+            XCTAssertEqual(third.rowWidth + (third.sideWidth + 4) * 2, 834, accuracy: 0.001)
         }
     }
 
@@ -110,7 +115,7 @@ final class KeyboardPageGeometryTests: XCTestCase {
             let third = KeyboardPageRowGeometry(width: width, page: page, row: 2, split: split)
             XCTAssertTrue(first.usesStandardAlphabet)
             XCTAssertTrue(third.usesStandardAlphabet)
-            XCTAssertFalse(first.showsShift)
+            XCTAssertFalse(first.showsLeadingControl)
             XCTAssertFalse(third.showsDelete)
             XCTAssertEqual(first.keyIndices.count, 10)
             XCTAssertEqual(third.keyIndices.count, 9)
@@ -166,18 +171,22 @@ final class KeyboardPageGeometryTests: XCTestCase {
             ).usesStandardAlphabet)
     }
 
-    func testMaterializedNumericRowKeepsTenEqualColumns() {
+    func testMaterializedNumericRowKeepsTenColumnsWithSideKeysOnTheThirdRow() {
         let page = KeyboardPagePresets.numericChinese.materialized()
         for width in [320.0, 466, 834] {
             let split = LayoutSplitConfiguration().resolved(forWidth: width)
             let standard = StandardKeyRowGeometry(width: width, split: split)
             for row in 0..<page.rows.count {
                 let geometry = KeyboardPageRowGeometry(width: width, page: page, row: row, split: split)
-                XCTAssertEqual(geometry.keyIndices.count, 10)
-                XCTAssertEqual(geometry.keyWidths.count, 10)
-                XCTAssertFalse(geometry.usesStandardAlphabet)
-                for keyWidth in geometry.keyWidths {
-                    XCTAssertEqual(keyWidth, standard.keyWidth, accuracy: 0.001)
+                XCTAssertEqual(geometry.keyIndices.count, row == 2 ? 9 : 10)
+                XCTAssertEqual(geometry.keyWidths.count, geometry.keyIndices.count)
+                XCTAssertTrue(geometry.usesStandardAlphabet)
+                // Authored data carries the switch and Delete, so nothing is synthesized.
+                XCTAssertFalse(geometry.showsLeadingControl)
+                XCTAssertFalse(geometry.showsDelete)
+                for (index, keyWidth) in geometry.keyWidths.enumerated() {
+                    let isSide = row == 2 && (index == 0 || index == 8)
+                    XCTAssertEqual(keyWidth, isSide ? standard.thirdRowSideWidth : standard.keyWidth, accuracy: 0.001)
                 }
             }
         }
