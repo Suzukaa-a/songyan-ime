@@ -34,7 +34,9 @@ extension KeyboardViewController {
                 "controllerStyle": "\(traitCollection.userInterfaceStyle.rawValue)",
                 "resolvedDark": scheme == .dark ? "1" : "0",
             ])
-        if animated {
+        // Only a live toggle on a fully shown panel fades; the system backdrop switches at once,
+        // so fading a correction during presentation would flash the old key colors.
+        if animated && isPresentationSettled {
             withAnimation(.easeInOut(duration: 0.22)) { route.systemColorScheme = scheme }
         } else {
             route.systemColorScheme = scheme

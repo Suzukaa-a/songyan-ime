@@ -63,6 +63,10 @@ class KeyboardViewController: UIInputViewController {
     /// From `viewWillAppear` to `viewDidDisappear`. A window alone is not proof: a host
     /// can keep a dismissed controller's view attached.
     private var isOnScreen = false
+    /// From `viewDidAppear` to `viewWillDisappear`: the panel is fully shown, so a light/dark
+    /// change is a live system toggle and may fade. Before that, the shared route may still
+    /// hold the previous host app's scheme and must be corrected without animation.
+    private(set) var isPresentationSettled = false
     /// This controller was the active one when its keyboard started to hide; only it may
     /// budget the next presentation, once off screen.
     private var preparesNextPresentation = false
@@ -530,6 +534,10 @@ class KeyboardViewController: UIInputViewController {
         }
         // One ownership point: from here the session calls only this controller.
         session.bind(self)
+        // The route is process-wide and still carries the last host app's scheme; correct it
+        // before the first frame so a light app does not open on dark keys (or the reverse).
+        // Only the bound controller may write it, so this follows `bind`.
+        syncSystemColorScheme(animated: false)
         syncPresentationSizeClass()
         // A resumed session is refreshed only when the queued work has completed.
         // The old snapshot is not evidence that the suspended engine is usable.
@@ -597,6 +605,7 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        isPresentationSettled = false
         hostDocumentAttachPending = false
         preparesNextPresentation = isBoundHost
         endPresentationGeometry()
@@ -656,8 +665,10 @@ class KeyboardViewController: UIInputViewController {
         attachToHostDocument()
         checkDocumentOwnership()
         // A controller's initial trait can be unspecified until UIKit attaches
-        // its input view to a host. Resolve once more while actually visible.
-        syncSystemColorScheme(animated: true)
+        // its input view to a host. Resolve once more while actually visible; the system
+        // backdrop has already switched, so a fade here would show mismatched keys.
+        syncSystemColorScheme(animated: false)
+        isPresentationSettled = true
         syncPresentationSizeClass()
         // The live document/keyboard connection is now attached. Full Access
         // can resolve after willAppear; use its visible value for click feedback
