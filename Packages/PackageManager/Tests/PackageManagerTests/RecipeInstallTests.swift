@@ -82,6 +82,54 @@ final class RecipeInstallTests: XCTestCase {
         XCTAssertNil(sources.files["a.schema.yaml"])
     }
 
+    /// Mirrors the compact-keyboard regeneration: a no-op recipe replanned from the installed
+    /// generation must not rewrite the model, neither into resources nor into the recipe inputs.
+    func testRegenerationClonesModelsInsteadOfRewritingThem() async throws {
+        let (root, _) = try fixture()
+        try BoundedLocalFileTests.requireCloning(root)
+        let model = root.appendingPathComponent("model.gram")
+        try Data((0..<(2 * RecipeResourceBudget.bufferBytes)).map { UInt8(truncatingIfNeeded: $0) }).write(to: model)
+        let resource = try RecipeFileResource.reference(at: model)
+        let recipeBytes = Data(
+            "recipe:\n  Rx: all\ninstall_files: >-\n  a.schema.yaml\n  b.schema.yaml\n  model.gram\n".utf8)
+        let inputs = [
+            "recipe.yaml": recipeBytes, "a.schema.yaml": Data("schema: {schema_id: a}".utf8),
+            "b.schema.yaml": Data("schema: {schema_id: b}".utf8),
+        ]
+        let first = try DeclarativeRecipePlan(
+            recipe: DeclarativeRecipe(path: "recipe.yaml", source: recipeBytes), packageReference: "user/test",
+            selectedRecipe: "", arguments: [], packageFiles: inputs, existingFiles: [:],
+            packageFileResources: ["model.gram": resource])
+        let manager = RecipePackageManager(rootURL: root.appendingPathComponent("store"))
+        try await manager.installRecipePlan(first, packageID: "test", schemaID: "b", deploy: { try Self.deploy($0) })
+        let installed = try await manager.activeInstallation()
+        let active = try XCTUnwrap(installed)
+        let snapshot = try RecipePackageManager.readRecipeWorkspaceSnapshot(
+            resources: active.resourceURL, userConfiguration: active.userDataURL)
+        let sources = try RecipePackageManager.readInstalledRecipeSources(resources: active.resourceURL)
+        XCTAssertNotNil(snapshot.fileResources["model.gram"])
+        let recipe = try DeclarativeRecipe(
+            path: "keyboard-adapters.recipe.yaml", source: Data("recipe:\n  Rx: keyboard-adapters\n".utf8))
+        let again = try DeclarativeRecipePlan(
+            recipe: recipe, packageReference: "test", selectedRecipe: "keyboard-adapters", arguments: [],
+            packageFiles: sources.files, existingFiles: snapshot.files, sourceRevision: active.installation.revision,
+            expectedGeneration: active.installation.generation, packageFileResources: sources.fileResources,
+            existingFileResources: snapshot.fileResources, userCustomBaseline: snapshot.userCustomFiles)
+        try await manager.installRecipePlan(again, packageID: "test", schemaID: "b", deploy: { try Self.deploy($0) })
+        let regenerated = try await manager.activeInstallation()
+        let next = try XCTUnwrap(regenerated)
+        XCTAssertNotEqual(next.installation.generation, active.installation.generation)
+        let generation = next.resourceURL.deletingLastPathComponent()
+        let copies = [
+            next.resourceURL.appendingPathComponent("model.gram"),
+            generation.appendingPathComponent("recipe-inputs/model.gram"),
+        ]
+        for copy in copies {
+            XCTAssertEqual(try Data(contentsOf: copy), try Data(contentsOf: model))
+            XCTAssertTrue(try BoundedLocalFileTests.sharesBlocks(model, copy), copy.path)
+        }
+    }
+
     private func fixture(_ suffix: String = "") throws -> (URL, DeclarativeRecipePlan) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("review-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -58,7 +58,12 @@ final class BoundedLocalFile {
         return data
     }
 
+    /// Clones when the volume allows it: installed generations, staging and recipe inputs share one
+    /// APFS container, so regenerating a generation must not rewrite every model byte. Anything the
+    /// clone cannot do falls back to the bounded stream, which reports its own error.
     func copy(to destination: URL) throws {
+        try Task.checkCancellation()
+        if try clone(to: destination) { return }
         let descriptor = open(destination.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, S_IRUSR | S_IWUSR)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let output = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
@@ -70,5 +75,27 @@ final class BoundedLocalFile {
         try consume { try output.write(contentsOf: $0) }
         try output.synchronize()
         completed = true
+    }
+
+    /// Clones the descriptor opened (and type-checked) in `init`, so the checked file is the one
+    /// cloned. The clone is a point-in-time copy; its size is re-checked against the budget because
+    /// the file may have grown since `init`. Same owner-only mode and durability as the stream path.
+    private func clone(to destination: URL) throws -> Bool {
+        guard fclonefileat(input.fileDescriptor, AT_FDCWD, destination.path, 0) == 0 else { return false }
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: destination) } }
+        let descriptor = open(destination.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard info.st_mode & S_IFMT == S_IFREG, info.st_size <= maximumBytes else {
+            throw RecipeInstallError.invalidResource("文件超过大小限制")
+        }
+        guard fchmod(descriptor, S_IRUSR | S_IWUSR) == 0, fsync(descriptor) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        completed = true
+        return true
     }
 }

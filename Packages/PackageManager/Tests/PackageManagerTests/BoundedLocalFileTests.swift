@@ -42,4 +42,49 @@ final class BoundedLocalFileTests: XCTestCase {
             XCTFail("oversized dictionary accepted")
         } catch {}
     }
+
+    static func sharesBlocks(_ lhs: URL, _ rhs: URL) throws -> Bool {
+        let key = URLResourceKey.fileContentIdentifierKey
+        let left = try lhs.resourceValues(forKeys: [key]).fileContentIdentifier
+        let right = try rhs.resourceValues(forKeys: [key]).fileContentIdentifier
+        return left != nil && left == right
+    }
+
+    static func requireCloning(_ url: URL) throws {
+        let supported = try url.resourceValues(forKeys: [.volumeSupportsFileCloningKey]).volumeSupportsFileCloning
+        if supported != true { throw XCTSkip("volume cannot clone files") }
+    }
+
+    func testCopyClonesWithOwnerOnlyModeAndNeverReplaces() throws {
+        let root = try directory()
+        try Self.requireCloning(root)
+        let source = root.appendingPathComponent("model.gram")
+        let bytes = Data((0..<(3 * RecipeResourceBudget.bufferBytes + 7)).map { UInt8(truncatingIfNeeded: $0) })
+        try bytes.write(to: source)
+        let target = root.appendingPathComponent("copy.gram")
+        try BoundedLocalFile(source, maximumBytes: bytes.count).copy(to: target)
+        XCTAssertEqual(try Data(contentsOf: target), bytes)
+        XCTAssertTrue(try Self.sharesBlocks(source, target), "same-volume copies must clone, not rewrite")
+        let mode = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(mode.uint16Value & 0o777, 0o600)
+        try Data("kept".utf8).write(to: target)
+        XCTAssertThrowsError(try BoundedLocalFile(source, maximumBytes: bytes.count).copy(to: target))
+        XCTAssertEqual(try Data(contentsOf: target), Data("kept".utf8))
+        XCTAssertThrowsError(try BoundedLocalFile(source, maximumBytes: bytes.count - 1))
+    }
+
+    func testCloneRejectsFileGrownPastBudgetAfterOpen() throws {
+        let root = try directory()
+        try Self.requireCloning(root)
+        let source = root.appendingPathComponent("model.gram")
+        try Data(count: 8).write(to: source)
+        let file = try BoundedLocalFile(source, maximumBytes: 8)
+        let writer = try FileHandle(forWritingTo: source)
+        try writer.truncate(atOffset: 64)
+        try writer.close()
+        let target = root.appendingPathComponent("copy.gram")
+        XCTAssertThrowsError(try file.copy(to: target))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+    }
 }
