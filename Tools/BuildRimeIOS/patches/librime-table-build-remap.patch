@@ -1,0 +1,17 @@
+diff --git a/src/rime/dict/table.cc b/src/rime/dict/table.cc
+--- a/src/rime/dict/table.cc
++++ b/src/rime/dict/table.cc
+@@ -251,6 +251,13 @@ bool Table::OnBuildFinish() {
+     return false;
+   }
+   string_table_builder_->Dump(image, image_size);
++  // Allocate grows and remaps the file when the estimate in Build() is too small
++  // (a marisa image is larger than the reserve for dictionaries with very few
++  // entries), leaving the cached raw pointers dangling. The offsets stored in
++  // the file stay valid, so re-read the pointers from the new mapping.
++  metadata_ = Find<table::Metadata>(0);
++  syllabary_ = metadata_->syllabary.get();
++  index_ = metadata_->index.get();
+   metadata_->string_table = image;
+   metadata_->string_table_size = image_size;
+   return true;

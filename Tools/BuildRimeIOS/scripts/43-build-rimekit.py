@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build RimeKit.xcframework (both iOS slices) from the pinned sources.
 
-Inputs: pinned librime + patch, the dependency archives from 11-build-deps.sh
+Inputs: pinned librime + patches, the dependency archives from 11-build-deps.sh
 (<deps-root>/prefix, default .local/ios-engine), and the plugin sources under
 .local/ios-engine/plugin-sources (fetched by 09-fetch-plugins.sh). Output goes to a fresh directory
 under .local/ios-engine; export-rimekit.py then installs it into the package.
@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[3]
 TOOLS = ROOT / "Tools/BuildRimeIOS"
 ENGINE = ROOT / ".local/ios-engine"
 SOURCE = ROOT / ".local/engine/src/librime"
-PATCH = TOOLS / "patches/librime-tsv-write-failures.patch"
+PATCHES = sorted((TOOLS / "patches").glob("*.patch"))
 CMAKE = ROOT / ".local/engine/tools/cmake/CMake.app/Contents/bin/cmake"
 BUNDLE_ID = "app.songyan.RimeKit"
 PUBLIC_HEADERS = ("rime_api.h", "rime_api_deprecated.h", "rime_api_stdbool.h", "rime_levers_api.h")
@@ -234,7 +234,8 @@ def main():
     native = out / "src/librime"
     shutil.copytree(SOURCE, native, ignore=shutil.ignore_patterns(".git", "deps", "build"))
     run(["git", "init", "--quiet", native], env)
-    run(["git", "apply", PATCH], env, cwd=native)
+    for patch in PATCHES:
+        run(["git", "apply", patch], env, cwd=native)
     build_core(out, env, boost, args.jobs_per_slice, args.deps_root.absolute())
     build_plugins_and_link(out, env, boost, args.jobs_per_slice)
 

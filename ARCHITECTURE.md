@@ -47,7 +47,7 @@ Each package has its own `Package.swift` under `Packages/<Name>`.
 - Components initialised by the bridge: `default`, `levers`, `lua`, `octagram`, `t9_original`, `predict`. Deployment preflight asks the live engine (`rb_component_available`); a scheme that needs a missing component is skipped with a warning.
 - Native nine-key processor: [rime_t9_processor.cc](Tools/BuildRimeIOS/src/rime_t9_processor.cc) and [rime_t9_keys.h](Tools/BuildRimeIOS/src/rime_t9_keys.h). Digits 2-9 (including the physical keypad) are handed to librime's `Speller` with the scheme's own digit prism; modifier keys, ASCII mode and other keys pass through. The built-in 9-key companions (`keyboard_*_9.schema.yaml` in [Resources/BuiltinPackages/Basic](Resources/BuiltinPackages/Basic)) do not list the processor.
 - Prediction after commit uses upstream [librime-predict](https://github.com/rime/librime-predict) (pinned in [PREDICT-VERSIONS.env](Tools/BuildRimeIOS/PREDICT-VERSIONS.env)). The app neither bundles nor downloads a predict database; the user imports one (header `Rime::Predict/` is validated).
-- A librime patch ([librime-tsv-write-failures.patch](Tools/BuildRimeIOS/patches/librime-tsv-write-failures.patch)) makes the user-dictionary TSV writer report stream errors.
+- librime patches in [Tools/BuildRimeIOS/patches](Tools/BuildRimeIOS/patches), applied in name order: [librime-table-build-remap.patch](Tools/BuildRimeIOS/patches/librime-table-build-remap.patch) re-reads the table pointers after the string-table allocation grows and remaps the file (tiny dictionaries crashed the build); [librime-tsv-write-failures.patch](Tools/BuildRimeIOS/patches/librime-tsv-write-failures.patch) makes the user-dictionary TSV writer report stream errors.
 
 ## 4. Module entry points
 
