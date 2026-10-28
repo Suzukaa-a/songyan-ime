@@ -252,12 +252,13 @@ final class BilingualLiteralTests: XCTestCase {
         XCTAssertEqual(abc[4].longPress?.compactMap(\.action.asciiValue), [".", "?", "!", "'", "\""])
 
         let numeric = footer(KeyboardPagePresets.numericChinese)
-        XCTAssertEqual(numeric.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .enter])
+        XCTAssertEqual(numeric.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .literal, .enter])
+        XCTAssertEqual(numeric[4], abc[4], "every row page shares the ABC page's comma key")
         XCTAssertEqual(numeric[1].label, "返回")
         XCTAssertEqual(numeric[1].action.pageSwitchTarget, .letters)
 
         let symbols = footer(KeyboardPagePresets.symbolsChinese)
-        XCTAssertEqual(symbols.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .enter])
+        XCTAssertEqual(symbols.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .literal, .enter])
         XCTAssertEqual(symbols[1].action.pageSwitchTarget, .letters)
 
         let categorized = try XCTUnwrap(KeyboardPagePresets.symbolsCategorized.materialized().chrome?.bottom)

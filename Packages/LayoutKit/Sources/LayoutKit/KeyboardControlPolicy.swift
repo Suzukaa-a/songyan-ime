@@ -79,13 +79,12 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
         self.numericPageReachesSymbols = numericPageReachesSymbols
     }
 
-    /// Slot identities stay unchanged across pages and languages **for one surface**, with
-    /// three exceptions: a system-keyboard availability change may add/remove globe, the
-    /// bundled T9 (which moves Return into its own trailing column) drops `enter`, and the
-    /// row-shaped 123 / #+= pages drop `utility` because their third row already carries the
-    /// page switch (as on the system keyboard) and the sentence marks. The utility position
-    /// types punctuation (or opens symbols) on letter pages, types 0 on the phone digit pad
-    /// and locks the categorized symbol page.
+    /// Slot identities and count stay unchanged across all pages and languages
+    /// **for one surface**. Only an actual system-keyboard availability change may
+    /// add/remove globe, and only the bundled T9 (which moves Return into its own
+    /// trailing column) may drop `enter`. The utility position types the comma on letter
+    /// and row-shaped 123 / #+= pages (or opens symbols where 123 cannot), types 0 on the
+    /// phone digit pad and locks the categorized symbol page.
     ///
     /// The globe is the leftmost, lowest-frequency control; every other slot keeps its
     /// relative order after it. A surface without a system-keyboard switch has no globe
@@ -93,7 +92,6 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     public var slots: [Slot] {
         [.globe, .page, .language, .space, .utility, .enter].filter {
             ($0 != .globe || hasGlobe) && ($0 != .enter || includesBottomEnter)
-                && ($0 != .utility || !isRowPage)
         }
     }
 
@@ -106,16 +104,15 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// return-to-letters key takes the page position, while the globe keeps the
     /// leading position it has on every page.
     ///
-    /// A letter page whose 123 page switches to symbols types punctuation from the
-    /// utility slot (comma, long press for the other sentence marks), as Gboard and
-    /// Sogou do. A phone keypad's letter page, or one paired with a 123 page that has
-    /// no symbol switch, opens the symbol page from there instead so it stays reachable.
-    /// The phone digit pad keeps 0 there, a categorized symbol page 锁定.
+    /// The comma sits in the utility slot on the letter page and on the row-shaped
+    /// 123 / #+= pages alike (long press for the other sentence marks), so it never moves
+    /// when the page flips, as Gboard keeps its punctuation slots. A phone keypad's letter
+    /// page, or one paired with a 123 page that has no symbol switch, opens the symbol page
+    /// from there instead so it stays reachable. The phone digit pad keeps 0 there.
     ///
     /// The categorized symbol page carries 锁定 in the utility position: its grid
     /// already types every mark, and the lock decides whether the page stays open
-    /// after a symbol (Sogou and iFlytek return to letters unless locked). The
-    /// row-shaped #+= page keeps a punctuation key there, like 123.
+    /// after a symbol (Sogou and iFlytek return to letters unless locked).
     public func key(at slot: Slot) -> Slot {
         switch page {
         case .letters:
@@ -123,11 +120,11 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
             return lettersTypePunctuation ? .utility : .symbolPage
         case .numeric:
             // 123: the left switch returns to letters (keeping the language) and the language key
-            // switches the symbol branch in place. The row page has no utility slot; a digit pad
-            // keeps its 0 there (bundled 9-key) or the #+= switch (imported keypad).
+            // switches the symbol branch in place. The row page types the comma there, a digit
+            // pad its 0 (bundled 9-key) or the #+= switch (imported keypad, which has no rows).
             switch slot {
             case .page: return .returnToLetters
-            case .utility: return isBundledPhonePad ? .utility : .page
+            case .utility: return isRowPage || isBundledPhonePad ? .utility : .page
             default: return slot
             }
         case .symbols:
@@ -219,11 +216,11 @@ public struct KeyboardControlPolicy: Equatable, Sendable {
     /// previews scale as a whole.
     public func metrics(width: Double) -> Metrics {
         if let phoneColumns, !hasGlobe, !includesBottomEnter {
-            return Metrics(width: width, columns: phoneColumns, includesUtility: !isRowPage)
+            return Metrics(width: width, columns: phoneColumns, includesUtility: true)
         }
         return Metrics(
             width: width, hasGlobe: hasGlobe, includesEnter: includesBottomEnter,
-            includesUtility: !isRowPage)
+            includesUtility: true)
     }
 
     public struct Metrics: Equatable, Sendable {

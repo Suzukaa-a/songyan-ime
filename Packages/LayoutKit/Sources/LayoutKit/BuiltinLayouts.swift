@@ -211,7 +211,11 @@ public enum BuiltinLayouts {
     public static func phoneNumericRailValues(ascii: Bool) -> [String] {
         let priority = ascii ? [".", "?", "!"] : [".", "？", "！"]
         let rows = numericPageRows(ascii: ascii)
-        let rest = (rows.last ?? []) + (rows.count > 1 ? rows[1] : [])
+        // The row pages type the comma from the bottom row; the digit pad has none, so the rail
+        // keeps it right after the period as before.
+        var last = rows.last ?? []
+        last.insert(ascii ? "," : "，", at: min(1, last.count))
+        let rest = last + (rows.count > 1 ? rows[1] : [])
         var seen = Set<String>()
         return (priority + rest).filter { seen.insert($0).inserted }
     }
@@ -219,36 +223,37 @@ public enum BuiltinLayouts {
     // MARK: - 123 / symbol page rows
 
     /// The 123 page's marks. The first two rows fill the ten letter columns; the
-    /// third row holds seven sentence marks between the 123/symbol switch and
-    /// Delete, the same shape as the ABC page's Shift row.
+    /// third row holds seven marks between the 123/symbol switch and Delete, the
+    /// same shape as the ABC page's Shift row. The comma lives in the bottom row on
+    /// every page, so the third row carries a mark the page otherwise lacks instead.
     public static func numericPageRows(ascii: Bool) -> [[String]] {
         ascii
             ? [
                 Array("1234567890").map(String.init),
                 Array("-/:;()$&@\"").map(String.init),
-                [".", ",", "?", "!", "'", "%", "+"],
+                [".", "#", "?", "!", "'", "%", "+"],
             ]
             : [
                 Array("1234567890").map(String.init),
                 ["-", "/", "：", "；", "（", "）", "¥", "@", "“", "”"],
-                ["。", "，", "、", "？", "！", ".", "…"],
+                ["。", "%", "、", "？", "！", ".", "…"],
             ]
     }
 
     /// The row-shaped symbol page: the 123 page's geometry with the two mark rows
-    /// swapped for the second page's set and the same seven-mark sentence row;
-    /// no character repeats within the page.
+    /// swapped for the second page's set and a seven-mark sentence row (the comma
+    /// is in the bottom row); no character repeats within the page.
     public static func symbolPageRows(ascii: Bool) -> [[String]] {
         ascii
             ? [
                 Array("[]{}#%^*+=").map(String.init),
                 ["_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•"],
-                [".", ",", "?", "!", "'", "\"", "/"],
+                [".", "@", "?", "!", "'", "\"", "/"],
             ]
             : [
                 ["【", "】", "{", "}", "#", "%", "^", "*", "+", "="],
                 ["_", "——", "\\", "|", "～", "《", "》", "$", "&", "·"],
-                ["。", "，", "、", "？", "！", ".", "…"],
+                ["。", "@", "、", "？", "！", ".", "…"],
             ]
     }
 

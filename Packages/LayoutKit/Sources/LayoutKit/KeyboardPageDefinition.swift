@@ -351,7 +351,8 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             action: .pageSwitch(target), titleMode: .automatic)
     }
 
-    /// The ABC page's comma in the utility position; long press holds the other sentence marks.
+    /// The comma in the utility position of every row page; long press holds the other sentence
+    /// marks.
     /// Each mark keeps its Chinese/ASCII pair so the key follows the symbol branch.
     private static var commaKey: LayoutKey {
         let pairs = [("。", "."), ("？", "?"), ("！", "!"), ("、", "'"), ("…", "\"")]
@@ -423,9 +424,9 @@ public struct KeyboardPageDefinition: Codable, Equatable, Identifiable, Sendable
             return KeyboardPageChrome(
                 bottom: [globeKey, pageSwitchKey(.numeric), languageSwitchKey, spaceKey, commaKey, enterKey])
         case .numeric, .symbols:
-            // globe, 返回, 中英, space, Return; the 123/symbol switch opens the third row.
+            // globe, 返回, 中英, space, comma, Return; the 123/symbol switch opens the third row.
             return KeyboardPageChrome(
-                bottom: [globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey, enterKey])
+                bottom: [globeKey, pageSwitchKey(.letters), languageSwitchKey, spaceKey, commaKey, enterKey])
         }
     }
 

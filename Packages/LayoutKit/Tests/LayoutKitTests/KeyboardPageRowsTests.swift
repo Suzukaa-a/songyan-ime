@@ -87,7 +87,7 @@ final class KeyboardPageRowsTests: XCTestCase {
                         page: page, isEnglishMode: english, hasGlobe: globe,
                         isPhoneLayout: false, usesASCIIPunctuation: english,
                         usesCategorySymbolPage: false)
-                    XCTAssertFalse(policy.slots.contains(.utility), "\(page)")
+                    XCTAssertEqual(policy.key(at: .utility), .utility, "\(page) keeps the comma")
                 }
             }
         }

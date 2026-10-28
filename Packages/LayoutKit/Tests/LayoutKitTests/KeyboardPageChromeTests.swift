@@ -103,10 +103,7 @@ final class KeyboardPageChromeTests: XCTestCase {
             KeyboardPagePresets.englishQwerty, KeyboardPagePresets.numericChinese, KeyboardPagePresets.symbolsChinese,
         ] {
             let materialized = page.materialized()
-            // The 123 / #+= footers drop the trailing page key: their third row holds the switch.
-            XCTAssertEqual(
-                materialized.chrome?.bottom.map(\.widthWeight),
-                page.kind == .english ? [1, 1, 1, 4, 1, 1] : [1, 1, 1, 4, 1])
+            XCTAssertEqual(materialized.chrome?.bottom.map(\.widthWeight), [1, 1, 1, 4, 1, 1])
         }
         let categorized = KeyboardPagePresets.symbolsCategorized.materialized()
         XCTAssertEqual(categorized.chrome?.bottom.map(\.widthWeight), [1, 1, 1, 4, 1])
@@ -131,10 +128,11 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(delete.width, 1.5, "Delete is a side key as wide as on the ABC page")
         XCTAssertEqual(delete.titleMode, .automatic)
         XCTAssertEqual(chinese.defaultSymbolMarks, .chinese)
-        // Frozen default footer: globe, 返回, 中英, space, Return.
+        // Frozen default footer: globe, 返回, 中英, space, comma, Return.
         let bottom = try XCTUnwrap(chinese.chrome?.bottom)
-        XCTAssertEqual(bottom.count, 5)
-        XCTAssertEqual(bottom.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .enter])
+        XCTAssertEqual(bottom.count, 6)
+        XCTAssertEqual(bottom.map(\.action.type), [.globe, .pageSwitch, .languageSwitch, .space, .literal, .enter])
+        XCTAssertEqual(bottom[4].action.value, "，")
         XCTAssertEqual(bottom[1].label, "返回")
         XCTAssertEqual(bottom[1].action.pageSwitchTarget, .letters)
         XCTAssertEqual(bottom[1].titleMode, .automatic)
@@ -165,7 +163,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(symbolSwitch.width, 1.5)
         XCTAssertEqual(symbolSwitch.titleMode, .automatic)
         XCTAssertEqual(symbols.rows[2].keys.last?.action.type, .backspace)
-        XCTAssertEqual(symbols.chrome?.bottom.count, 5)
+        XCTAssertEqual(symbols.chrome?.bottom.count, 6)
     }
 
     func testMaterializedAutomaticSymbolPageBecomesAuthoredRows() throws {
@@ -174,7 +172,7 @@ final class KeyboardPageChromeTests: XCTestCase {
         XCTAssertEqual(page.rows.map { $0.keys.count }, [10, 10, 9])
         XCTAssertEqual(page.rows[2].keys.first?.action.pageSwitchTarget, .numeric)
         XCTAssertEqual(page.rows[2].keys.last?.action.type, .backspace)
-        XCTAssertEqual(page.chrome?.bottom.count, 5)
+        XCTAssertEqual(page.chrome?.bottom.count, 6)
         XCTAssertEqual(page.chrome?.bottom[1].action.pageSwitchTarget, .letters)
         try page.validate()
     }
